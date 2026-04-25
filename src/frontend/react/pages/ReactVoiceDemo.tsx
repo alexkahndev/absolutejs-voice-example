@@ -18,6 +18,7 @@ import {
   getVoiceModeLabel,
   getVoiceModePrompt,
   getVoiceRoutePath,
+  VOICE_ASSISTANT_CONFIG,
   VOICE_DEMO_GUIDE_STEPS,
   VOICE_DEMO_GUIDE_TITLE,
   VOICE_DEMO_GENERAL_LABEL,
@@ -35,7 +36,17 @@ type ReactVoiceDemoProps = {
 
 const EMPTY_VOICE = {
   assistantTexts: [] as string[],
-  assistantAudio: [] as Array<{ chunk: Uint8Array; format: { channels: 1 | 2; container: "raw"; encoding: "alaw" | "mulaw" | "pcm_s16le"; sampleRateHz: number; }; receivedAt: number; turnId?: string; }>,
+  assistantAudio: [] as Array<{
+    chunk: Uint8Array;
+    format: {
+      channels: 1 | 2;
+      container: "raw";
+      encoding: "alaw" | "mulaw" | "pcm_s16le";
+      sampleRateHz: number;
+    };
+    receivedAt: number;
+    turnId?: string;
+  }>,
   close: () => {},
   endTurn: () => {},
   error: null as string | null,
@@ -53,7 +64,8 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
     null,
   );
   const activeModeRef = useRef<VoiceDemoMode | null>(null);
-  const guidedVoice = useVoiceStream<SavedIntake>(getVoiceRoutePath("guided")) ?? EMPTY_VOICE;
+  const guidedVoice =
+    useVoiceStream<SavedIntake>(getVoiceRoutePath("guided")) ?? EMPTY_VOICE;
   const generalVoice =
     useVoiceStream<SavedIntake>(getVoiceRoutePath("general")) ?? EMPTY_VOICE;
   const [activeMode, setActiveMode] = useState<VoiceDemoMode | null>(null);
@@ -194,7 +206,9 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                   <div className="voice-badges">
                     <span className="voice-badge">Deepgram Flux</span>
                     <span className="voice-badge">Phrase hint correction</span>
-                    <span className="voice-badge">Reconnect-aware sessions</span>
+                    <span className="voice-badge">
+                      Reconnect-aware sessions
+                    </span>
                   </div>
                 </div>
                 <div className="voice-metrics">
@@ -205,15 +219,15 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                     </span>
                   </div>
                   <div className="voice-metric">
-                      <span className="voice-metric-label">Scenario</span>
+                    <span className="voice-metric-label">Scenario</span>
                     <span className="voice-metric-value">
-                      {activeMode ? getVoiceModeLabel(activeMode) : "Choose one"}
+                      {activeMode
+                        ? getVoiceModeLabel(activeMode)
+                        : "Choose one"}
                     </span>
                   </div>
                   <div className="voice-metric">
-                    <span className="voice-metric-label">
-                      Saved captures
-                    </span>
+                    <span className="voice-metric-label">Saved captures</span>
                     <span className="voice-metric-value">
                       {savedIntakes.length}
                     </span>
@@ -229,6 +243,53 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                   <li key={step}>{step}</li>
                 ))}
               </ol>
+            </article>
+
+            <article className="voice-card voice-assistant-config">
+              <span className="voice-framework-pill">Assistant API</span>
+              <h2>{VOICE_ASSISTANT_CONFIG.id}</h2>
+              <p className="voice-footnote">
+                Powered by createVoiceAssistant with a{" "}
+                {VOICE_ASSISTANT_CONFIG.recipe} artifact plan.
+              </p>
+              <div className="voice-config-grid">
+                <div>
+                  <div className="voice-assistant-label">Tools</div>
+                  <ul className="voice-compact-list">
+                    {VOICE_ASSISTANT_CONFIG.tools.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <div className="voice-assistant-label">Guardrails</div>
+                  <ul className="voice-compact-list">
+                    {VOICE_ASSISTANT_CONFIG.guardrails.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <div className="voice-assistant-label">Experiments</div>
+                  <ul className="voice-compact-list">
+                    {VOICE_ASSISTANT_CONFIG.experiments.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div>
+                  <div className="voice-assistant-label">Artifacts</div>
+                  <ul className="voice-compact-list">
+                    {VOICE_ASSISTANT_CONFIG.artifacts.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+              <p className="voice-footnote">
+                <a href="/tasks">Open tasks</a> ·{" "}
+                <a href="/integrations">Open integration events</a>
+              </p>
             </article>
 
             <article className="voice-card voice-card-wide">
@@ -289,9 +350,7 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                   </article>
                 ) : null}
               </div>
-              <div
-                className={`voice-monitor${isCapturing ? " is-live" : ""}`}
-              >
+              <div className={`voice-monitor${isCapturing ? " is-live" : ""}`}>
                 <div className="voice-monitor-header">
                   <span className="voice-monitor-label">Input monitor</span>
                   <span
@@ -339,7 +398,9 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
             <article className="voice-card voice-hero">
               <h2>Saved captures</h2>
               <p className="voice-footnote">
-                Open <a href="/reviews/latest">the latest review</a> or <a href="/reviews">browse all reviews</a> after a completed demo call.
+                Open <a href="/reviews/latest">the latest review</a> or{" "}
+                <a href="/reviews">browse all reviews</a> after a completed demo
+                call.
               </p>
               <div className="voice-saved-list">
                 {savedIntakes.length === 0 ? (

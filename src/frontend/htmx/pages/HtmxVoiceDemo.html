@@ -88,7 +88,7 @@
           </div>
         </article>
 
-      <article class="voice-card voice-card-side">
+        <article class="voice-card voice-card-side">
           <h2>Run the guided voice demo</h2>
           <ol class="voice-guide-list">
             <li>Use Start guided test for the prompt-driven chat flow.</li>
@@ -96,6 +96,54 @@
             <li>Pause after speaking so each turn commits cleanly.</li>
             <li>Click Stop microphone when you want to stop live capture.</li>
           </ol>
+        </article>
+
+        <article class="voice-card voice-assistant-config">
+          <span class="voice-framework-pill">Assistant API</span>
+          <h2>support</h2>
+          <p class="voice-footnote">
+            Powered by createVoiceAssistant with a support-triage artifact plan.
+          </p>
+          <div class="voice-config-grid">
+            <div>
+              <div class="voice-assistant-label">Tools</div>
+              <ul class="voice-compact-list">
+                <li>intake classifier</li>
+                <li>lifecycle router</li>
+                <li>review/task recorder</li>
+              </ul>
+            </div>
+            <div>
+              <div class="voice-assistant-label">Guardrails</div>
+              <ul class="voice-compact-list">
+                <li>Escalate when the caller asks for a human</li>
+                <li>
+                  Route transfer, voicemail, and no-answer intents into call
+                  outcomes
+                </li>
+              </ul>
+            </div>
+            <div>
+              <div class="voice-assistant-label">Experiments</div>
+              <ul class="voice-compact-list">
+                <li>baseline guide copy</li>
+                <li>direct support copy</li>
+              </ul>
+            </div>
+            <div>
+              <div class="voice-assistant-label">Artifacts</div>
+              <ul class="voice-compact-list">
+                <li>review artifact</li>
+                <li>ops task</li>
+                <li>integration event</li>
+                <li>trace-ready session</li>
+              </ul>
+            </div>
+          </div>
+          <p class="voice-footnote">
+            <a href="/tasks">Open tasks</a> ·
+            <a href="/integrations">Open integration events</a>
+          </p>
         </article>
 
         <article class="voice-card voice-card-wide">
@@ -149,7 +197,9 @@
             <button class="primary" id="start-guided" type="button">
               Start guided test
             </button>
-            <button id="start-general" type="button">Start general recording</button>
+            <button id="start-general" type="button">
+              Start general recording
+            </button>
             <button hidden id="stop-mic" type="button">Stop microphone</button>
           </div>
           <p class="voice-footnote">
@@ -161,7 +211,9 @@
         <article class="voice-card voice-hero">
           <h2>Saved captures</h2>
           <p class="voice-footnote">
-            Open <a href="/reviews/latest">the latest review</a> or <a href="/reviews">browse all reviews</a> after a completed demo call.
+            Open <a href="/reviews/latest">the latest review</a> or
+            <a href="/reviews">browse all reviews</a> after a completed demo
+            call.
           </p>
           <div class="voice-saved-list" id="voice-htmx-result">
             <p class="empty-copy">No saved captures yet.</p>

@@ -2,15 +2,31 @@ export const VOICE_ROUTE_PATH = "/voice/intake";
 export const VOICE_DEMO_GUIDE_TITLE = "Run the guided voice test";
 export const VOICE_DEMO_GUIDE_STEPS = [
   "Click Start voice test to begin the first prompt.",
-  "Answer the question in your own words, then pause so the turn commits.",
-  "Keep following the next prompt after each committed turn.",
-  "Click Stop microphone when you want to stop live capture."
+  "Answer in your own words, then pause so the turn commits.",
+  "You can also say operational phrases like transfer me to billing, escalate this, send it to voicemail, or no answer.",
+  "Keep following the next prompt after each committed turn, or click Stop microphone when you are done."
 ];
 export const VOICE_DEMO_GUIDED_LABEL = "Start guided test";
 export const VOICE_DEMO_GENERAL_LABEL = "Start general recording";
 export const VOICE_DEMO_STOP_LABEL = "Stop microphone";
 export const VOICE_DEMO_MIC_IDLE = "Ready. Start guided test or general recording to begin.";
 export const VOICE_DEMO_MIC_LIVE = "Live. Answer the prompt, then click Stop microphone when finished.";
+export const VOICE_ASSISTANT_CONFIG = {
+  id: "support",
+  recipe: "support-triage",
+  tools: ["intake classifier", "lifecycle router", "review/task recorder"],
+  guardrails: [
+    "Escalate when the caller asks for a human",
+    "Route transfer, voicemail, and no-answer intents into call outcomes"
+  ],
+  experiments: ["baseline guide copy", "direct support copy"],
+  artifacts: [
+    "review artifact",
+    "ops task",
+    "integration event",
+    "trace-ready session"
+  ]
+};
 export const VOICE_TEST_QUESTIONS = [
   "Start with a quick introduction about who you are.",
   "Now describe what you are trying to do or test.",

@@ -83,15 +83,15 @@ const buildTitle = (input: {
 
   if (!summary) {
     if (input.detectedName) {
-      const base = input.scenarioId === "guided"
-        ? `${input.detectedName}'s guided test`
-        : `${input.detectedName}'s recording`;
+      const base =
+        input.scenarioId === "guided"
+          ? `${input.detectedName}'s guided test`
+          : `${input.detectedName}'s recording`;
       return dispositionLabel ? `${base} (${dispositionLabel})` : base;
     }
 
-    const base = input.scenarioId === "guided"
-      ? "Guided voice test"
-      : "General recording";
+    const base =
+      input.scenarioId === "guided" ? "Guided voice test" : "General recording";
     return dispositionLabel ? `${base} (${dispositionLabel})` : base;
   }
 
@@ -109,10 +109,8 @@ export const resolveScenarioFromContext = (context: unknown): VoiceDemoMode => {
     "query" in context &&
     context.query &&
     typeof context.query === "object" &&
-    (
-      ("mode" in context.query && context.query.mode === "general") ||
-      ("scenarioId" in context.query && context.query.scenarioId === "general")
-    )
+    (("mode" in context.query && context.query.mode === "general") ||
+      ("scenarioId" in context.query && context.query.scenarioId === "general"))
   ) {
     return "general";
   }
@@ -121,9 +119,7 @@ export const resolveScenarioFromContext = (context: unknown): VoiceDemoMode => {
 };
 
 const countWords = (value: string) =>
-  cleanText(value)
-    .split(" ")
-    .filter(Boolean).length;
+  cleanText(value).split(" ").filter(Boolean).length;
 
 const getLatestLifecycleEvent = (session: VoiceSessionRecord) =>
   [...(session.call?.events ?? [])]
@@ -170,7 +166,11 @@ const detectLifecycleIntent = (text: string) => {
     };
   }
 
-  if (/\b(no answer|nobody answered|no one answered|could not reach)\b/.test(normalized)) {
+  if (
+    /\b(no answer|nobody answered|no one answered|could not reach)\b/.test(
+      normalized,
+    )
+  ) {
     return {
       assistantText: "Marking this call as no answer.",
       type: "no-answer" as const,
@@ -205,7 +205,9 @@ export const buildSavedIntake = <
   session: TSession,
   mode: VoiceDemoMode = "guided",
 ): SavedIntake => {
-  const turns = session.turns.map((turn) => cleanText(turn.text)).filter(Boolean);
+  const turns = session.turns
+    .map((turn) => cleanText(turn.text))
+    .filter(Boolean);
   const transcript = buildTranscript(turns);
   const detectedName = extractName(turns[0] ?? "");
   const wordCount = countWords(transcript);
@@ -216,8 +218,8 @@ export const buildSavedIntake = <
   const promptAnswers = turns.map((response, index) => ({
     prompt:
       mode === "guided"
-        ? VOICE_TEST_QUESTIONS[index] ??
-          `Additional detail ${index - VOICE_TEST_QUESTIONS.length + 1}`
+        ? (VOICE_TEST_QUESTIONS[index] ??
+          `Additional detail ${index - VOICE_TEST_QUESTIONS.length + 1}`)
         : index === 0
           ? "General recording"
           : `Additional recording ${index + 1}`,

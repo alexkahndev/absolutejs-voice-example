@@ -21,7 +21,16 @@ export const pagesPlugin = (manifest: Record<string, string>) =>
       "/assets/png/absolutejs-temp.png",
       () =>
         new Response(
-          file(join(process.cwd(), "src", "backend", "assets", "png", "absolutejs-temp.png")),
+          file(
+            join(
+              process.cwd(),
+              "src",
+              "backend",
+              "assets",
+              "png",
+              "absolutejs-temp.png",
+            ),
+          ),
           {
             headers: {
               "Content-Type": "image/png",
@@ -33,7 +42,16 @@ export const pagesPlugin = (manifest: Record<string, string>) =>
       "/assets/ico/favicon.ico",
       () =>
         new Response(
-          file(join(process.cwd(), "src", "backend", "assets", "ico", "favicon.ico")),
+          file(
+            join(
+              process.cwd(),
+              "src",
+              "backend",
+              "assets",
+              "ico",
+              "favicon.ico",
+            ),
+          ),
           {
             headers: {
               "Content-Type": "image/x-icon",
@@ -45,7 +63,16 @@ export const pagesPlugin = (manifest: Record<string, string>) =>
       "/favicon.ico",
       () =>
         new Response(
-          file(join(process.cwd(), "src", "backend", "assets", "ico", "favicon.ico")),
+          file(
+            join(
+              process.cwd(),
+              "src",
+              "backend",
+              "assets",
+              "ico",
+              "favicon.ico",
+            ),
+          ),
           {
             headers: {
               "Content-Type": "image/x-icon",

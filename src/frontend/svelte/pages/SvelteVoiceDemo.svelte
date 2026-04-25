@@ -10,6 +10,7 @@
     getVoiceModeLabel,
     getVoiceModePrompt,
     getVoiceRoutePath,
+    VOICE_ASSISTANT_CONFIG,
     VOICE_DEMO_GUIDE_STEPS,
     VOICE_DEMO_GUIDE_TITLE,
     VOICE_DEMO_GENERAL_LABEL,
@@ -165,11 +166,7 @@
 <div class="voice-demo-page">
   <header>
     <a class="logo" href="/">
-      <img
-        src="/assets/png/absolutejs-temp.png"
-        height="24"
-        alt="AbsoluteJS"
-      />
+      <img src="/assets/png/absolutejs-temp.png" height="24" alt="AbsoluteJS" />
       AbsoluteJS
     </a>
     <nav>
@@ -225,6 +222,53 @@
         </ol>
       </article>
 
+      <article class="voice-card voice-assistant-config">
+        <span class="voice-framework-pill">Assistant API</span>
+        <h2>{VOICE_ASSISTANT_CONFIG.id}</h2>
+        <p class="voice-footnote">
+          Powered by createVoiceAssistant with a {VOICE_ASSISTANT_CONFIG.recipe} artifact
+          plan.
+        </p>
+        <div class="voice-config-grid">
+          <div>
+            <div class="voice-assistant-label">Tools</div>
+            <ul class="voice-compact-list">
+              {#each VOICE_ASSISTANT_CONFIG.tools as item}
+                <li>{item}</li>
+              {/each}
+            </ul>
+          </div>
+          <div>
+            <div class="voice-assistant-label">Guardrails</div>
+            <ul class="voice-compact-list">
+              {#each VOICE_ASSISTANT_CONFIG.guardrails as item}
+                <li>{item}</li>
+              {/each}
+            </ul>
+          </div>
+          <div>
+            <div class="voice-assistant-label">Experiments</div>
+            <ul class="voice-compact-list">
+              {#each VOICE_ASSISTANT_CONFIG.experiments as item}
+                <li>{item}</li>
+              {/each}
+            </ul>
+          </div>
+          <div>
+            <div class="voice-assistant-label">Artifacts</div>
+            <ul class="voice-compact-list">
+              {#each VOICE_ASSISTANT_CONFIG.artifacts as item}
+                <li>{item}</li>
+              {/each}
+            </ul>
+          </div>
+        </div>
+        <p class="voice-footnote">
+          <a href="/tasks">Open tasks</a> ·
+          <a href="/integrations">Open integration events</a>
+        </p>
+      </article>
+
       <article class="voice-card voice-card-wide">
         <h2>Conversation</h2>
         <div class="voice-status-list">
@@ -244,7 +288,9 @@
           </div>
           <div class="status-row">
             <span class="label">Current utterance</span>
-            <span class="value">{currentVoice.partial || "No speech captured yet"}</span>
+            <span class="value"
+              >{currentVoice.partial || "No speech captured yet"}</span
+            >
           </div>
           <div class="status-row">
             <span class="label">Errors</span>
@@ -321,7 +367,10 @@
 
       <article class="voice-card voice-hero">
         <h2>Saved captures</h2>
-        <p class="voice-footnote">Open <a href="/reviews/latest">the latest review</a> or <a href="/reviews">browse all reviews</a> after a completed demo call.</p>
+        <p class="voice-footnote">
+          Open <a href="/reviews/latest">the latest review</a> or
+          <a href="/reviews">browse all reviews</a> after a completed demo call.
+        </p>
         <div class="voice-saved-list">
           {#if savedIntakes.length === 0}
             <p class="empty-copy">No saved captures yet.</p>
@@ -333,9 +382,13 @@
                   <span>{formatDateTime(intake.completedAt)}</span>
                 </div>
                 <div class="saved-item-meta">
-                <span class="pill">{getVoiceModeLabel(intake.scenarioId)}</span>
                   <span class="pill"
-                    >{intake.turnCount} turn{intake.turnCount === 1 ? "" : "s"}</span
+                    >{getVoiceModeLabel(intake.scenarioId)}</span
+                  >
+                  <span class="pill"
+                    >{intake.turnCount} turn{intake.turnCount === 1
+                      ? ""
+                      : "s"}</span
                   >
                   {#if intake.detectedName}
                     <span class="pill">{intake.detectedName}</span>
@@ -361,10 +414,8 @@
     <p class="footer">
       <img src="/assets/png/absolutejs-temp.png" alt="" />
       Powered by
-      <a
-        href="https://absolutejs.com"
-        target="_blank"
-        rel="noopener noreferrer">AbsoluteJS</a
+      <a href="https://absolutejs.com" target="_blank" rel="noopener noreferrer"
+        >AbsoluteJS</a
       >
     </p>
   </main>

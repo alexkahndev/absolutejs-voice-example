@@ -125,7 +125,9 @@ export const createVoiceWavePath = (
   height = VOICE_WAVE_HEIGHT,
 ) => {
   const samples =
-    levels.length > 1 ? levels : createInitialVoiceWaveLevels(VOICE_WAVE_POINTS);
+    levels.length > 1
+      ? levels
+      : createInitialVoiceWaveLevels(VOICE_WAVE_POINTS);
   const step = width / (samples.length - 1);
   const center = height / 2;
   const maxAmplitude = height * 0.34;

@@ -3,12 +3,15 @@ import {
   applyPhraseHintCorrections,
   assignVoiceOpsTask,
   completeVoiceOpsTask,
+  createVoiceAssistant,
+  createVoiceAgentTool,
+  createVoiceExperiment,
   createVoiceFileRuntimeStorage,
   createVoiceTaskUpdatedEvent,
   reopenVoiceOpsTask,
-  resolveVoiceOutcomeRecipe,
   startVoiceOpsTask,
   type VoiceCallReviewStore,
+  type VoiceAgentModel,
   type VoiceOpsTaskStatus,
   type VoiceOpsTaskStore,
   type VoiceTurnCorrectionHandler,
@@ -46,9 +49,10 @@ import {
 import {
   buildSavedIntake,
   decideIntakeTurn,
+  resolveScenarioFromContext,
   VOICE_DEMO_PHRASE_HINTS,
 } from "./voiceFlow";
-import type { SavedIntake } from "../shared/demo";
+import { VOICE_ASSISTANT_CONFIG, type SavedIntake } from "../shared/demo";
 
 const { absolutejs, manifest } = await prepare();
 
@@ -81,9 +85,7 @@ const formatCallDisposition = (value: SavedIntake["callDisposition"]) => {
   }
 };
 
-const renderPromptAnswers = (
-  promptAnswers: SavedIntake["promptAnswers"],
-) =>
+const renderPromptAnswers = (promptAnswers: SavedIntake["promptAnswers"]) =>
   promptAnswers
     .map(
       (entry) => `<div class="saved-answer">
@@ -112,13 +114,21 @@ const normalizeReviewFilters = (
       ? query.scenario
       : "all",
   status:
-    query.status === "healthy" || query.status === "partial" || query.status === "failed"
+    query.status === "healthy" ||
+    query.status === "partial" ||
+    query.status === "failed"
       ? query.status
       : "all",
 });
 
 const savedIntakes: SavedIntake[] = [];
-const runtimeDirectory = resolve(import.meta.dir, "..", "..", ".voice-runtime", "voice-demo");
+const runtimeDirectory = resolve(
+  import.meta.dir,
+  "..",
+  "..",
+  ".voice-runtime",
+  "voice-demo",
+);
 const runtimeStorage = createVoiceFileRuntimeStorage<
   VoiceSessionRecord,
   SavedVoiceReviewArtifact,
@@ -128,7 +138,65 @@ const runtimeStorage = createVoiceFileRuntimeStorage<
   directory: runtimeDirectory,
 });
 const deepgramApiKey = getEnv("DEEPGRAM_API_KEY");
-const webhookUrl = getEnv("VOICE_DEMO_WEBHOOK_URL");
+const webhookUrl = process.env.VOICE_DEMO_WEBHOOK_URL;
+const intakeModel: VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake> = {
+  generate: ({ context, session, turn, system }) => {
+    const result = decideIntakeTurn(session, turn, undefined, context);
+
+    if (system?.includes("direct") && result.assistantText === "Received.") {
+      return {
+        ...result,
+        assistantText: "Captured.",
+      };
+    }
+
+    return result;
+  },
+};
+const intakeClassifierTool = createVoiceAgentTool<
+  unknown,
+  VoiceSessionRecord,
+  Record<string, unknown>,
+  unknown,
+  SavedIntake
+>({
+  description:
+    "Classify whether the caller is in guided or general intake mode.",
+  execute: ({ context }) => ({
+    mode: resolveScenarioFromContext(context),
+  }),
+  name: "intake_classifier",
+});
+const lifecycleRouterTool = createVoiceAgentTool<
+  unknown,
+  VoiceSessionRecord,
+  Record<string, unknown>,
+  unknown,
+  SavedIntake
+>({
+  description:
+    "Route transfer, escalation, voicemail, and no-answer phrases into call outcomes.",
+  execute: ({ turn }) => ({
+    text: turn.text,
+  }),
+  name: "lifecycle_router",
+});
+const reviewTaskRecorderTool = createVoiceAgentTool<
+  unknown,
+  VoiceSessionRecord,
+  Record<string, unknown>,
+  unknown,
+  SavedIntake
+>({
+  description:
+    "Expose the runtime stores that record reviews, tasks, and integration events.",
+  execute: () => ({
+    events: true,
+    reviews: true,
+    tasks: true,
+  }),
+  name: "review_task_recorder",
+});
 const correctDemoTurn: VoiceTurnCorrectionHandler<
   unknown,
   VoiceSessionRecord,
@@ -194,7 +262,9 @@ const normalizeTaskFilters = (
       ? query.outcome
       : "all",
   status:
-    query.status === "open" || query.status === "in-progress" || query.status === "done"
+    query.status === "open" ||
+    query.status === "in-progress" ||
+    query.status === "done"
       ? query.status
       : "all",
 });
@@ -225,7 +295,8 @@ const deliverIntegrationEvent = async (
         storedEvent.deliveryError = undefined;
       }
     } catch (error) {
-      storedEvent.deliveryError = error instanceof Error ? error.message : String(error);
+      storedEvent.deliveryError =
+        error instanceof Error ? error.message : String(error);
     }
   }
 
@@ -305,6 +376,73 @@ const redirectToTasks = () =>
     status: 302,
   });
 
+const assistant = createVoiceAssistant<
+  unknown,
+  VoiceSessionRecord,
+  SavedIntake
+>({
+  artifactPlan: {
+    ops: {
+      buildReview: ({ result, session }) =>
+        buildSavedVoiceReview({
+          phraseHints: VOICE_DEMO_PHRASE_HINTS,
+          result: result ?? buildSavedIntake(session),
+          session,
+        }),
+      events: runtimeStorage.events,
+      onEvent: async ({ event }) => {
+        await deliverIntegrationEvent(event as SavedVoiceIntegrationEvent);
+      },
+      reviews: runtimeStorage.reviews as unknown as VoiceCallReviewStore,
+      tasks: runtimeStorage.tasks as unknown as VoiceOpsTaskStore,
+    },
+    preset: {
+      name: "support-triage",
+      options: {
+        assignee: "support-oncall",
+        escalationAssignee: "support-lead",
+        escalationQueue: "support-escalations",
+        queue: "support-triage",
+      },
+    },
+  },
+  experiment: createVoiceExperiment({
+    id: "support-copy",
+    variants: [
+      {
+        id: "baseline",
+        weight: 1,
+      },
+      {
+        id: "direct",
+        system: "direct support copy",
+        weight: 1,
+      },
+    ],
+  }),
+  guardrails: {
+    beforeTurn: ({ context, session, turn }) =>
+      /\b(human|agent|supervisor|manager)\b/i.test(turn.text) &&
+      /\b(please|need|want|get|talk|speak)\b/i.test(turn.text)
+        ? {
+            assistantText: "Escalating this call for human follow-up.",
+            escalate: {
+              reason: "caller-requested-human",
+            },
+            result: buildSavedIntake(
+              session,
+              resolveScenarioFromContext(context),
+            ),
+          }
+        : undefined,
+  },
+  id: "support",
+  model: intakeModel,
+  system: "baseline guide copy",
+  tools: [intakeClassifierTool, lifecycleRouterTool, reviewTaskRecorderTool],
+  trace: runtimeStorage.traces,
+});
+
 const server = new Elysia()
   .use(absolutejs)
   .use(pagesPlugin(manifest))
@@ -348,29 +486,10 @@ const server = new Elysia()
         const savedIntake = result ?? buildSavedIntake(session);
         persistIntake(savedIntake);
       },
-      ops: {
-        ...resolveVoiceOutcomeRecipe("support-triage", {
-          assignee: "support-oncall",
-          escalationAssignee: "support-lead",
-          escalationQueue: "support-escalations",
-          queue: "support-triage",
-        }),
-        buildReview: ({ result, session }) =>
-          buildSavedVoiceReview({
-            phraseHints: VOICE_DEMO_PHRASE_HINTS,
-            result: result ?? buildSavedIntake(session),
-            session,
-          }),
-        events: runtimeStorage.events,
-        onEvent: async ({ event }) => {
-          await deliverIntegrationEvent(event as SavedVoiceIntegrationEvent);
-        },
-        reviews: runtimeStorage.reviews as unknown as VoiceCallReviewStore,
-        tasks: runtimeStorage.tasks as unknown as VoiceOpsTaskStore,
-      },
+      ops: assistant.ops,
       correctTurn: correctDemoTurn,
       phraseHints: VOICE_DEMO_PHRASE_HINTS,
-      onTurn: decideIntakeTurn,
+      onTurn: assistant.onTurn,
       path: "/voice/intake",
       preset: "reliability",
       session: runtimeStorage.session,
@@ -385,12 +504,15 @@ const server = new Elysia()
     }),
   )
   .get("/api/intakes", () => listIntakes())
+  .get("/api/assistant-config", () => VOICE_ASSISTANT_CONFIG)
   .get("/api/reviews", async ({ query }) => {
     const reviews = await listReviews();
     return filterVoiceReviews(reviews, normalizeReviewFilters(query));
   })
-  .get("/api/reviews/latest", async () =>
-    (await listReviews())[0] ?? { error: "No review artifact found" },
+  .get(
+    "/api/reviews/latest",
+    async () =>
+      (await listReviews())[0] ?? { error: "No review artifact found" },
   )
   .get("/api/reviews/:reviewId", async ({ params }) => {
     const review = await runtimeStorage.reviews.get(params.reviewId);
@@ -402,45 +524,68 @@ const server = new Elysia()
   .get("/api/tasks/summary", async () =>
     summarizeVoiceOpsTasks(await listTasks()),
   )
-  .get("/api/tasks/:taskId", async ({ params }) =>
-    (await getTask(params.taskId)) ?? { error: "Task not found" },
+  .get(
+    "/api/tasks/:taskId",
+    async ({ params }) =>
+      (await getTask(params.taskId)) ?? { error: "Task not found" },
   )
-  .get("/api/integrations/events", async () =>
-    await listIntegrationEvents(),
+  .get("/api/integrations/events", async () => await listIntegrationEvents())
+  .get(
+    "/reviews",
+    async ({ query }) =>
+      new Response(
+        renderVoiceReviewIndexPage(
+          await listReviews(),
+          normalizeReviewFilters(query),
+        ),
+        {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+          },
+        },
+      ),
   )
-  .get("/reviews", async ({ query }) =>
-    new Response(
-      renderVoiceReviewIndexPage(await listReviews(), normalizeReviewFilters(query)),
-      {
+  .get(
+    "/reviews/latest",
+    async () =>
+      new Response(renderVoiceReviewPage((await listReviews())[0] ?? null), {
         headers: {
           "Content-Type": "text/html; charset=utf-8",
         },
-      },
-    ),
+      }),
   )
-  .get("/reviews/latest", async () =>
-    new Response(renderVoiceReviewPage((await listReviews())[0] ?? null), {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-      },
-    }),
+  .get(
+    "/tasks",
+    async ({ query }) =>
+      new Response(
+        renderVoiceOpsPage(await listTasks(), normalizeTaskFilters(query)),
+        {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+          },
+        },
+      ),
   )
-  .get("/tasks", async ({ query }) =>
-    new Response(renderVoiceOpsPage(await listTasks(), normalizeTaskFilters(query)), {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-      },
-    }),
-  )
-  .get("/integrations", async () =>
-    new Response(renderVoiceIntegrationEventsPage(await listIntegrationEvents(), webhookUrl), {
-      headers: {
-        "Content-Type": "text/html; charset=utf-8",
-      },
-    }),
+  .get(
+    "/integrations",
+    async () =>
+      new Response(
+        renderVoiceIntegrationEventsPage(
+          await listIntegrationEvents(),
+          webhookUrl,
+        ),
+        {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+          },
+        },
+      ),
   )
   .get("/tasks/:taskId/assign", async ({ params, query }) => {
-    const owner = typeof query.owner === "string" && query.owner.trim() ? query.owner.trim() : "ops-demo";
+    const owner =
+      typeof query.owner === "string" && query.owner.trim()
+        ? query.owner.trim()
+        : "ops-demo";
     await assignTask(params.taskId, owner);
     return redirectToTasks();
   })
@@ -479,10 +624,20 @@ const server = new Elysia()
   })
   .get("/reviews/compare", async ({ query }) => {
     const reviews = await listReviews();
-    const leftId = typeof query.left === "string" && query.left.trim() ? query.left : undefined;
-    const rightId = typeof query.right === "string" && query.right.trim() ? query.right : reviews[0]?.id;
-    const left = leftId ? findVoiceReview(reviews, leftId) : reviews[0] ?? null;
-    const right = rightId ? findVoiceReview(reviews, rightId) : reviews[1] ?? null;
+    const leftId =
+      typeof query.left === "string" && query.left.trim()
+        ? query.left
+        : undefined;
+    const rightId =
+      typeof query.right === "string" && query.right.trim()
+        ? query.right
+        : reviews[0]?.id;
+    const left = leftId
+      ? findVoiceReview(reviews, leftId)
+      : (reviews[0] ?? null);
+    const right = rightId
+      ? findVoiceReview(reviews, rightId)
+      : (reviews[1] ?? null);
 
     return new Response(renderVoiceReviewComparePage(left, right), {
       headers: {
@@ -490,17 +645,19 @@ const server = new Elysia()
       },
     });
   })
-  .get("/reviews/:reviewId", async ({ params }) =>
-    new Response(
-      renderVoiceReviewPage(
-        findVoiceReview(await listReviews(), params.reviewId),
-      ),
-      {
-        headers: {
-          "Content-Type": "text/html; charset=utf-8",
+  .get(
+    "/reviews/:reviewId",
+    async ({ params }) =>
+      new Response(
+        renderVoiceReviewPage(
+          findVoiceReview(await listReviews(), params.reviewId),
+        ),
+        {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+          },
         },
-      },
-    ),
+      ),
   )
   .use(networking)
   .on("error", (error) => {

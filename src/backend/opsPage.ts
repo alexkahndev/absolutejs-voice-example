@@ -46,7 +46,9 @@ const formatTaskKind = (kind: VoiceOpsTaskKind) => {
   }
 };
 
-const formatOutcome = (outcome: SavedVoiceReviewArtifact["summary"]["outcome"]) => {
+const formatOutcome = (
+  outcome: SavedVoiceReviewArtifact["summary"]["outcome"],
+) => {
   switch (outcome) {
     case "transferred":
       return "Transferred";
@@ -107,10 +109,14 @@ const getTaskSlaWindowMs = (task: SavedVoiceOpsTask) => {
 };
 
 const isTaskSlaBreached = (task: SavedVoiceOpsTask) =>
-  task.status !== "done" && Date.now() - task.createdAt > getTaskSlaWindowMs(task);
+  task.status !== "done" &&
+  Date.now() - task.createdAt > getTaskSlaWindowMs(task);
 
 const formatTaskAge = (createdAt: number) => {
-  const elapsedMinutes = Math.max(0, Math.round((Date.now() - createdAt) / 60000));
+  const elapsedMinutes = Math.max(
+    0,
+    Math.round((Date.now() - createdAt) / 60000),
+  );
   if (elapsedMinutes < 60) {
     return `${elapsedMinutes}m`;
   }
@@ -220,17 +226,19 @@ export const buildVoiceOpsTaskFromReview = (
 export const listVoiceOpsTasks = (tasks: SavedVoiceOpsTask[]) =>
   [...tasks].sort((left, right) => right.createdAt - left.createdAt);
 
-export const findVoiceOpsTask = (
-  tasks: SavedVoiceOpsTask[],
-  taskId: string,
-) => tasks.find((task) => task.id === taskId) ?? null;
+export const findVoiceOpsTask = (tasks: SavedVoiceOpsTask[], taskId: string) =>
+  tasks.find((task) => task.id === taskId) ?? null;
 
 export const filterVoiceOpsTasks = (
   tasks: SavedVoiceOpsTask[],
   filters: VoiceOpsTaskFilterInput = {},
 ) =>
   listVoiceOpsTasks(tasks).filter((task) => {
-    if (filters.status && filters.status !== "all" && task.status !== filters.status) {
+    if (
+      filters.status &&
+      filters.status !== "all" &&
+      task.status !== filters.status
+    ) {
       return false;
     }
 
@@ -238,7 +246,11 @@ export const filterVoiceOpsTasks = (
       return false;
     }
 
-    if (filters.outcome && filters.outcome !== "all" && task.outcome !== filters.outcome) {
+    if (
+      filters.outcome &&
+      filters.outcome !== "all" &&
+      task.outcome !== filters.outcome
+    ) {
       return false;
     }
 
@@ -275,7 +287,10 @@ export const summarizeVoiceOpsTasks = (tasks: SavedVoiceOpsTask[]) => {
     }
 
     if (task.target) {
-      summary.topTargets.set(task.target, (summary.topTargets.get(task.target) ?? 0) + 1);
+      summary.topTargets.set(
+        task.target,
+        (summary.topTargets.get(task.target) ?? 0) + 1,
+      );
     }
 
     if (isTaskSlaBreached(task)) {
@@ -283,19 +298,30 @@ export const summarizeVoiceOpsTasks = (tasks: SavedVoiceOpsTask[]) => {
     }
 
     if (task.assignee) {
-      summary.topAssignees.set(task.assignee, (summary.topAssignees.get(task.assignee) ?? 0) + 1);
+      summary.topAssignees.set(
+        task.assignee,
+        (summary.topAssignees.get(task.assignee) ?? 0) + 1,
+      );
     }
   }
 
   return {
-    byKind: [...summary.byKind.entries()].sort((left, right) => right[1] - left[1]),
-    byOutcome: [...summary.byOutcome.entries()].sort((left, right) => right[1] - left[1]),
+    byKind: [...summary.byKind.entries()].sort(
+      (left, right) => right[1] - left[1],
+    ),
+    byOutcome: [...summary.byOutcome.entries()].sort(
+      (left, right) => right[1] - left[1],
+    ),
     breached: summary.breached,
     done: summary.done,
     inProgress: summary.inProgress,
     open: summary.open,
-    topAssignees: [...summary.topAssignees.entries()].sort((left, right) => right[1] - left[1]),
-    topTargets: [...summary.topTargets.entries()].sort((left, right) => right[1] - left[1]),
+    topAssignees: [...summary.topAssignees.entries()].sort(
+      (left, right) => right[1] - left[1],
+    ),
+    topTargets: [...summary.topTargets.entries()].sort(
+      (left, right) => right[1] - left[1],
+    ),
     total: summary.total,
   };
 };
@@ -307,14 +333,17 @@ const renderTaskActions = (task: SavedVoiceOpsTask) => {
       <button type="submit">Assign</button>
     </form>`;
 
-  const statusLinks = task.status === "done"
-    ? `<a href="/tasks/${encodeURIComponent(task.id)}/reopen">Reopen</a>`
-    : [
-        task.status === "open"
-          ? `<a href="/tasks/${encodeURIComponent(task.id)}/start">Start</a>`
-          : "",
-        `<a href="/tasks/${encodeURIComponent(task.id)}/complete">Complete</a>`,
-      ].filter(Boolean).join(" · ");
+  const statusLinks =
+    task.status === "done"
+      ? `<a href="/tasks/${encodeURIComponent(task.id)}/reopen">Reopen</a>`
+      : [
+          task.status === "open"
+            ? `<a href="/tasks/${encodeURIComponent(task.id)}/start">Start</a>`
+            : "",
+          `<a href="/tasks/${encodeURIComponent(task.id)}/complete">Complete</a>`,
+        ]
+          .filter(Boolean)
+          .join(" · ");
 
   return `${assignForm}<span>${statusLinks}</span>`;
 };
@@ -457,7 +486,7 @@ export const renderVoiceOpsPage = (
       </div>
     </form>
     <section class="task-list">
-      ${items || '<p>No ops tasks matched. Complete a lifecycle-heavy call first or clear the filters.</p>'}
+      ${items || "<p>No ops tasks matched. Complete a lifecycle-heavy call first or clear the filters.</p>"}
     </section>
   </main>
 </body>

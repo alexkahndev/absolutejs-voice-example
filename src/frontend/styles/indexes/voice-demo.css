@@ -208,6 +208,33 @@ nav a.active {
   box-shadow: none;
 }
 
+.voice-assistant-config {
+  background:
+    radial-gradient(
+      circle at top right,
+      rgba(245, 158, 11, 0.12),
+      transparent 32%
+    ),
+    rgba(255, 255, 255, 0.03);
+  grid-column: span 8;
+}
+
+.voice-config-grid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.voice-compact-list {
+  color: var(--muted);
+  display: grid;
+  gap: 6px;
+  line-height: 1.45;
+  margin: 0;
+  padding-left: 18px;
+}
+
 .voice-actions {
   display: flex;
   flex-wrap: wrap;
@@ -227,7 +254,11 @@ nav a.active {
 
 .voice-monitor {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.04),
+      rgba(255, 255, 255, 0.02)
+    ),
     radial-gradient(circle at right, rgba(245, 158, 11, 0.08), transparent 45%);
   border: 1px solid var(--line);
   border-radius: 22px;
@@ -582,8 +613,13 @@ nav a.active {
   }
 
   .voice-card-wide,
-  .voice-card-side {
+  .voice-card-side,
+  .voice-assistant-config {
     grid-column: span 12;
+  }
+
+  .voice-config-grid {
+    grid-template-columns: 1fr;
   }
 
   header {

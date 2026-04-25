@@ -8,6 +8,7 @@ import {
   getVoiceModeLabel,
   getVoiceModePrompt,
   getVoiceRoutePath,
+  VOICE_ASSISTANT_CONFIG,
   VOICE_DEMO_GUIDE_STEPS,
   VOICE_DEMO_GUIDE_TITLE,
   VOICE_DEMO_GENERAL_LABEL,
@@ -175,7 +176,9 @@ onUnmounted(() => {
               <div class="voice-metric">
                 <span class="voice-metric-label">Scenario</span>
                 <span class="voice-metric-value">
-                  {{ activeMode ? getVoiceModeLabel(activeMode) : "Choose one" }}
+                  {{
+                    activeMode ? getVoiceModeLabel(activeMode) : "Choose one"
+                  }}
                 </span>
               </div>
               <div class="voice-metric">
@@ -195,6 +198,62 @@ onUnmounted(() => {
               {{ step }}
             </li>
           </ol>
+        </article>
+
+        <article class="voice-card voice-assistant-config">
+          <span class="voice-framework-pill">Assistant API</span>
+          <h2>{{ VOICE_ASSISTANT_CONFIG.id }}</h2>
+          <p class="voice-footnote">
+            Powered by createVoiceAssistant with a
+            {{ VOICE_ASSISTANT_CONFIG.recipe }} artifact plan.
+          </p>
+          <div class="voice-config-grid">
+            <div>
+              <div class="voice-assistant-label">Tools</div>
+              <ul class="voice-compact-list">
+                <li v-for="item in VOICE_ASSISTANT_CONFIG.tools" :key="item">
+                  {{ item }}
+                </li>
+              </ul>
+            </div>
+            <div>
+              <div class="voice-assistant-label">Guardrails</div>
+              <ul class="voice-compact-list">
+                <li
+                  v-for="item in VOICE_ASSISTANT_CONFIG.guardrails"
+                  :key="item"
+                >
+                  {{ item }}
+                </li>
+              </ul>
+            </div>
+            <div>
+              <div class="voice-assistant-label">Experiments</div>
+              <ul class="voice-compact-list">
+                <li
+                  v-for="item in VOICE_ASSISTANT_CONFIG.experiments"
+                  :key="item"
+                >
+                  {{ item }}
+                </li>
+              </ul>
+            </div>
+            <div>
+              <div class="voice-assistant-label">Artifacts</div>
+              <ul class="voice-compact-list">
+                <li
+                  v-for="item in VOICE_ASSISTANT_CONFIG.artifacts"
+                  :key="item"
+                >
+                  {{ item }}
+                </li>
+              </ul>
+            </div>
+          </div>
+          <p class="voice-footnote">
+            <a href="/tasks">Open tasks</a> ·
+            <a href="/integrations">Open integration events</a>
+          </p>
         </article>
 
         <article class="voice-card voice-card-wide">
@@ -241,7 +300,10 @@ onUnmounted(() => {
                 <div class="voice-chat-role">You</div>
                 <p class="voice-turn-text">{{ turn.text }}</p>
               </article>
-              <article v-if="turn.assistantText" class="voice-chat-message assistant">
+              <article
+                v-if="turn.assistantText"
+                class="voice-chat-message assistant"
+              >
                 <div class="voice-chat-role">
                   {{ activeMode ? getVoiceModeLabel(activeMode) : "Guide" }}
                 </div>
@@ -298,7 +360,9 @@ onUnmounted(() => {
         <article class="voice-card voice-hero">
           <h2>Saved captures</h2>
           <p class="voice-footnote">
-            Open <a href="/reviews/latest">the latest review</a> or <a href="/reviews">browse all reviews</a> after a completed demo call.
+            Open <a href="/reviews/latest">the latest review</a> or
+            <a href="/reviews">browse all reviews</a> after a completed demo
+            call.
           </p>
           <div class="voice-saved-list">
             <p v-if="savedIntakes.length === 0" class="empty-copy">
@@ -314,7 +378,9 @@ onUnmounted(() => {
                 <span>{{ formatDateTime(intake.completedAt) }}</span>
               </div>
               <div class="saved-item-meta">
-                <span class="pill">{{ getVoiceModeLabel(intake.scenarioId) }}</span>
+                <span class="pill">{{
+                  getVoiceModeLabel(intake.scenarioId)
+                }}</span>
                 <span class="pill"
                   >{{ intake.turnCount }} turn{{
                     intake.turnCount === 1 ? "" : "s"

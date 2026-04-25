@@ -11,7 +11,10 @@ export type VoiceReviewStatus = "healthy" | "partial" | "failed";
 export type VoiceReviewTimelineEvent = CoreVoiceCallReviewTimelineEvent;
 export type VoiceReviewPostCallSummary = CoreVoiceCallReviewPostCallSummary;
 
-export type SavedVoiceReviewArtifact = Omit<StoredVoiceCallReviewArtifact, "config" | "generatedAt"> & {
+export type SavedVoiceReviewArtifact = Omit<
+  StoredVoiceCallReviewArtifact,
+  "config" | "generatedAt"
+> & {
   config: NonNullable<StoredVoiceCallReviewArtifact["config"]> & {
     phraseHints: string[];
     preset: string;
@@ -72,7 +75,11 @@ const summarizeTurn = (turn: VoiceTurnRecord) => ({
 });
 
 const formatReviewStatusLabel = (status: VoiceReviewStatus) =>
-  status === "healthy" ? "Healthy" : status === "partial" ? "Needs review" : "Failed";
+  status === "healthy"
+    ? "Healthy"
+    : status === "partial"
+      ? "Needs review"
+      : "Failed";
 
 const getStatusClassName = (status: VoiceReviewStatus) => `status-${status}`;
 
@@ -105,7 +112,9 @@ const buildPostCallSummary = (input: {
   reason?: string;
   target?: string;
 }): VoiceReviewPostCallSummary | undefined => {
-  const label = input.outcome ? formatCallOutcomeLabel(input.outcome) : undefined;
+  const label = input.outcome
+    ? formatCallOutcomeLabel(input.outcome)
+    : undefined;
 
   if (!label) {
     return undefined;
@@ -115,7 +124,8 @@ const buildPostCallSummary = (input: {
     case "transferred":
       return {
         label: input.target ? `Transferred to ${input.target}` : label,
-        recommendedAction: "Verify the downstream queue or agent actually received the handoff.",
+        recommendedAction:
+          "Verify the downstream queue or agent actually received the handoff.",
         reason: input.reason,
         summary: input.target
           ? `This call exited the demo flow by transferring to ${input.target}.`
@@ -125,43 +135,52 @@ const buildPostCallSummary = (input: {
     case "escalated":
       return {
         label,
-        recommendedAction: "Review the transcript and assign a human follow-up task.",
+        recommendedAction:
+          "Review the transcript and assign a human follow-up task.",
         reason: input.reason,
-        summary: "This call was marked for human escalation instead of finishing in the automated flow.",
+        summary:
+          "This call was marked for human escalation instead of finishing in the automated flow.",
       };
     case "voicemail":
       return {
         label,
-        recommendedAction: "Review the message and queue a callback or follow-up task.",
+        recommendedAction:
+          "Review the message and queue a callback or follow-up task.",
         reason: input.reason,
-        summary: "This call was routed to the voicemail path instead of a live resolution.",
+        summary:
+          "This call was routed to the voicemail path instead of a live resolution.",
       };
     case "no-answer":
       return {
         label,
-        recommendedAction: "Retry the call or move it to the voicemail/retry workflow.",
+        recommendedAction:
+          "Retry the call or move it to the voicemail/retry workflow.",
         reason: input.reason,
         summary: "This call ended without a successful live contact.",
       };
     case "failed":
       return {
         label,
-        recommendedAction: "Inspect the warnings and timeline before retrying the flow.",
+        recommendedAction:
+          "Inspect the warnings and timeline before retrying the flow.",
         reason: input.reason,
         summary: "The call ended in a failure state and needs operator review.",
       };
     case "closed":
       return {
         label,
-        recommendedAction: "Confirm the caller intentionally ended the session and no follow-up is needed.",
+        recommendedAction:
+          "Confirm the caller intentionally ended the session and no follow-up is needed.",
         reason: input.reason,
-        summary: "The session was closed explicitly without a richer final outcome.",
+        summary:
+          "The session was closed explicitly without a richer final outcome.",
       };
     case "completed":
     default:
       return {
         label,
-        recommendedAction: "No manual action is required unless the warnings suggest otherwise.",
+        recommendedAction:
+          "No manual action is required unless the warnings suggest otherwise.",
         reason: input.reason,
         summary: "The call completed normally inside the demo flow.",
       };
@@ -181,7 +200,9 @@ export const deriveVoiceReviewState = (
   );
 
   if (review.errors.length > 0) {
-    warnings.push(`Captured ${review.errors.length} runtime error${review.errors.length === 1 ? "" : "s"}.`);
+    warnings.push(
+      `Captured ${review.errors.length} runtime error${review.errors.length === 1 ? "" : "s"}.`,
+    );
   }
 
   if (!transcript) {
@@ -197,11 +218,15 @@ export const deriveVoiceReviewState = (
   }
 
   if ((review.summary.firstTurnLatencyMs ?? 0) > 6_000) {
-    warnings.push(`Slow first turn at ${formatMetric(review.summary.firstTurnLatencyMs)}.`);
+    warnings.push(
+      `Slow first turn at ${formatMetric(review.summary.firstTurnLatencyMs)}.`,
+    );
   }
 
   if ((review.summary.elapsedMs ?? 0) > 15_000) {
-    warnings.push(`Long call duration at ${formatMetric(review.summary.elapsedMs)}.`);
+    warnings.push(
+      `Long call duration at ${formatMetric(review.summary.elapsedMs)}.`,
+    );
   }
 
   if (review.notes.some((note) => note.startsWith("Last STT text:"))) {
@@ -229,20 +254,20 @@ export const deriveVoiceReviewState = (
   return { status, warnings };
 };
 
-export const buildSavedVoiceReview = (
-  input: {
-    phraseHints: Array<{ text: string }>;
-    result: SavedIntake;
-    session: VoiceSessionRecord;
-  },
-) => {
-  const sortedTranscripts = [...input.session.transcripts].sort((left, right) => {
-    const leftAt = left.endedAtMs ?? left.startedAtMs ?? 0;
-    const rightAt = right.endedAtMs ?? right.startedAtMs ?? 0;
-    return leftAt - rightAt;
-  });
-  const transcriptTimeline: VoiceReviewTimelineEvent[] = sortedTranscripts
-    .flatMap((transcript) => {
+export const buildSavedVoiceReview = (input: {
+  phraseHints: Array<{ text: string }>;
+  result: SavedIntake;
+  session: VoiceSessionRecord;
+}) => {
+  const sortedTranscripts = [...input.session.transcripts].sort(
+    (left, right) => {
+      const leftAt = left.endedAtMs ?? left.startedAtMs ?? 0;
+      const rightAt = right.endedAtMs ?? right.startedAtMs ?? 0;
+      return leftAt - rightAt;
+    },
+  );
+  const transcriptTimeline: VoiceReviewTimelineEvent[] =
+    sortedTranscripts.flatMap((transcript) => {
       const eventAt = normalizeMs(
         transcript.endedAtMs ?? transcript.startedAtMs,
         input.session.createdAt,
@@ -252,36 +277,41 @@ export const buildSavedVoiceReview = (
         return [];
       }
 
-      return [{
-        atMs: eventAt,
-        confidence: transcript.confidence,
-        event: transcript.isFinal ? "final" : "partial",
-        source: "stt" as const,
-        text: transcript.text,
-      }];
+      return [
+        {
+          atMs: eventAt,
+          confidence: transcript.confidence,
+          event: transcript.isFinal ? "final" : "partial",
+          source: "stt" as const,
+          text: transcript.text,
+        },
+      ];
     });
 
-  const turnTimeline: VoiceReviewTimelineEvent[] = input.session.turns.flatMap((turn) => {
-    const commitAt = normalizeMs(turn.committedAt, input.session.createdAt) ?? 0;
-    const commitEvent: VoiceReviewTimelineEvent = {
-      ...summarizeTurn(turn),
-      atMs: commitAt,
-    };
-
-    if (!turn.assistantText) {
-      return [commitEvent];
-    }
-
-    return [
-      commitEvent,
-      {
+  const turnTimeline: VoiceReviewTimelineEvent[] = input.session.turns.flatMap(
+    (turn) => {
+      const commitAt =
+        normalizeMs(turn.committedAt, input.session.createdAt) ?? 0;
+      const commitEvent: VoiceReviewTimelineEvent = {
+        ...summarizeTurn(turn),
         atMs: commitAt,
-        event: "assistant",
-        source: "turn",
-        text: turn.assistantText,
-      },
-    ];
-  });
+      };
+
+      if (!turn.assistantText) {
+        return [commitEvent];
+      }
+
+      return [
+        commitEvent,
+        {
+          atMs: commitAt,
+          event: "assistant",
+          source: "turn",
+          text: turn.assistantText,
+        },
+      ];
+    },
+  );
 
   const timeline = [
     {
@@ -309,7 +339,8 @@ export const buildSavedVoiceReview = (
           valueMs: firstPartial.atMs,
         }
       : undefined,
-    typeof firstPartial?.atMs === "number" && typeof firstCommit?.atMs === "number"
+    typeof firstPartial?.atMs === "number" &&
+    typeof firstCommit?.atMs === "number"
       ? {
           label: "first partial to first commit",
           valueMs: firstCommit.atMs - firstPartial.atMs,
@@ -347,7 +378,9 @@ export const buildSavedVoiceReview = (
         ? `Call reason: ${input.result.callReason}`
         : undefined,
       `Turns: ${input.result.turnCount}`,
-      lastTranscript?.text ? `Last STT text: "${lastTranscript.text}"` : undefined,
+      lastTranscript?.text
+        ? `Last STT text: "${lastTranscript.text}"`
+        : undefined,
     ].filter((entry): entry is string => typeof entry === "string"),
     postCall: buildPostCallSummary({
       outcome: input.result.callDisposition,
@@ -382,15 +415,27 @@ export const filterVoiceReviews = (
   return listVoiceReviews(reviews).filter((review) => {
     const derived = deriveVoiceReviewState(review);
 
-    if (filters.scenario && filters.scenario !== "all" && review.scenarioId !== filters.scenario) {
+    if (
+      filters.scenario &&
+      filters.scenario !== "all" &&
+      review.scenarioId !== filters.scenario
+    ) {
       return false;
     }
 
-    if (filters.status && filters.status !== "all" && derived.status !== filters.status) {
+    if (
+      filters.status &&
+      filters.status !== "all" &&
+      derived.status !== filters.status
+    ) {
       return false;
     }
 
-    if (filters.outcome && filters.outcome !== "all" && review.summary.outcome !== filters.outcome) {
+    if (
+      filters.outcome &&
+      filters.outcome !== "all" &&
+      review.summary.outcome !== filters.outcome
+    ) {
       return false;
     }
 
@@ -433,7 +478,10 @@ export const renderVoiceReviewIndexPage = (
         summary.outcomes.set(outcome, (summary.outcomes.get(outcome) ?? 0) + 1);
       }
       if (review.postCall?.target) {
-        summary.targets.set(review.postCall.target, (summary.targets.get(review.postCall.target) ?? 0) + 1);
+        summary.targets.set(
+          review.postCall.target,
+          (summary.targets.get(review.postCall.target) ?? 0) + 1,
+        );
       }
       return summary;
     },
@@ -455,7 +503,10 @@ export const renderVoiceReviewIndexPage = (
   const latestId = listVoiceReviews(reviews)[0]?.id;
   const outcomeItems = [...opsSummary.outcomes.entries()]
     .sort((left, right) => right[1] - left[1])
-    .map(([label, count]) => `<li>${escapeHtml(formatCallOutcomeLabel(label as SavedIntake["callDisposition"]) ?? label)}: ${count}</li>`)
+    .map(
+      ([label, count]) =>
+        `<li>${escapeHtml(formatCallOutcomeLabel(label as SavedIntake["callDisposition"]) ?? label)}: ${count}</li>`,
+    )
     .join("");
   const targetItems = [...opsSummary.targets.entries()]
     .sort((left, right) => right[1] - left[1])
@@ -465,7 +516,8 @@ export const renderVoiceReviewIndexPage = (
   const items = filteredReviews
     .map((review) => {
       const derived = deriveVoiceReviewState(review);
-      const compareTarget = latestId && latestId !== review.id ? latestId : undefined;
+      const compareTarget =
+        latestId && latestId !== review.id ? latestId : undefined;
 
       return `<article class="review-item">
   <div class="review-item-header">
@@ -593,7 +645,9 @@ export const renderVoiceReviewIndexPage = (
 </html>`;
 };
 
-export const renderVoiceReviewPage = (artifact: SavedVoiceReviewArtifact | null) => {
+export const renderVoiceReviewPage = (
+  artifact: SavedVoiceReviewArtifact | null,
+) => {
   if (!artifact) {
     return `<!doctype html>
 <html lang="en">
@@ -694,13 +748,17 @@ export const renderVoiceReviewPage = (artifact: SavedVoiceReviewArtifact | null)
     </section>
     <section>
       <h2>Call Outcome</h2>
-      ${artifact.postCall ? `<ul>
+      ${
+        artifact.postCall
+          ? `<ul>
         <li><strong>Outcome:</strong> ${escapeHtml(artifact.postCall.label)}</li>
         <li><strong>Summary:</strong> ${escapeHtml(artifact.postCall.summary)}</li>
         <li><strong>Recommended action:</strong> ${escapeHtml(artifact.postCall.recommendedAction)}</li>
         ${artifact.postCall.target ? `<li><strong>Target:</strong> ${escapeHtml(artifact.postCall.target)}</li>` : ""}
         ${artifact.postCall.reason ? `<li><strong>Reason:</strong> ${escapeHtml(artifact.postCall.reason)}</li>` : ""}
-      </ul>` : `<p>No post-call outcome summary was captured.</p>`}
+      </ul>`
+          : `<p>No post-call outcome summary was captured.</p>`
+      }
     </section>
     <section>
       <h2>Transcript</h2>
@@ -762,7 +820,10 @@ export const renderVoiceReviewComparePage = (
   const leftDerived = deriveVoiceReviewState(left);
   const rightDerived = deriveVoiceReviewState(right);
 
-  const renderColumn = (artifact: SavedVoiceReviewArtifact, derived: VoiceReviewDerivedState) => `
+  const renderColumn = (
+    artifact: SavedVoiceReviewArtifact,
+    derived: VoiceReviewDerivedState,
+  ) => `
     <section>
       <h2>${escapeHtml(artifact.title)}</h2>
       <p><a href="/reviews/${encodeURIComponent(artifact.id)}">Open full review</a></p>

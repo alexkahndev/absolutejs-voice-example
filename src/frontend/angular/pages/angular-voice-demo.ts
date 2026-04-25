@@ -6,6 +6,7 @@ import {
   getVoiceModeLabel,
   getVoiceModePrompt,
   getVoiceRoutePath,
+  VOICE_ASSISTANT_CONFIG,
   VOICE_DEMO_GUIDE_STEPS,
   VOICE_DEMO_GUIDE_TITLE,
   VOICE_DEMO_GENERAL_LABEL,
@@ -74,7 +75,9 @@ import {
                 <div class="voice-metric">
                   <span class="voice-metric-label">Scenario</span>
                   <span class="voice-metric-value">{{
-                    activeMode() ? getVoiceModeLabel(activeMode()!) : "Choose one"
+                    activeMode()
+                      ? getVoiceModeLabel(activeMode()!)
+                      : "Choose one"
                   }}</span>
                 </div>
                 <div class="voice-metric">
@@ -94,6 +97,53 @@ import {
                 <li>{{ step }}</li>
               }
             </ol>
+          </article>
+
+          <article class="voice-card voice-assistant-config">
+            <span class="voice-framework-pill">Assistant API</span>
+            <h2>{{ assistantConfig.id }}</h2>
+            <p class="voice-footnote">
+              Powered by createVoiceAssistant with a
+              {{ assistantConfig.recipe }} artifact plan.
+            </p>
+            <div class="voice-config-grid">
+              <div>
+                <div class="voice-assistant-label">Tools</div>
+                <ul class="voice-compact-list">
+                  @for (item of assistantConfig.tools; track item) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              </div>
+              <div>
+                <div class="voice-assistant-label">Guardrails</div>
+                <ul class="voice-compact-list">
+                  @for (item of assistantConfig.guardrails; track item) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              </div>
+              <div>
+                <div class="voice-assistant-label">Experiments</div>
+                <ul class="voice-compact-list">
+                  @for (item of assistantConfig.experiments; track item) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              </div>
+              <div>
+                <div class="voice-assistant-label">Artifacts</div>
+                <ul class="voice-compact-list">
+                  @for (item of assistantConfig.artifacts; track item) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              </div>
+            </div>
+            <p class="voice-footnote">
+              <a href="/tasks">Open tasks</a> ·
+              <a href="/integrations">Open integration events</a>
+            </p>
           </article>
 
           <article class="voice-card voice-card-wide">
@@ -128,7 +178,9 @@ import {
               <article class="voice-chat-message assistant">
                 <div class="voice-chat-role">
                   {{
-                    activeMode() ? getVoiceModeLabel(activeMode()!) : "Voice demo"
+                    activeMode()
+                      ? getVoiceModeLabel(activeMode()!)
+                      : "Voice demo"
                   }}
                 </div>
                 <p class="voice-turn-text">{{ leadMessage() }}</p>
@@ -143,7 +195,9 @@ import {
                     <article class="voice-chat-message assistant">
                       <div class="voice-chat-role">
                         {{
-                          activeMode() ? getVoiceModeLabel(activeMode()!) : "Guide"
+                          activeMode()
+                            ? getVoiceModeLabel(activeMode()!)
+                            : "Guide"
                         }}
                       </div>
                       <p class="voice-turn-text">{{ turn.assistantText }}</p>
@@ -161,10 +215,7 @@ import {
             <div class="voice-monitor" [class.is-live]="isCapturing()">
               <div class="voice-monitor-header">
                 <span class="voice-monitor-label">Input monitor</span>
-                <span
-                  class="voice-live-pill"
-                  [class.is-live]="isCapturing()"
-                >
+                <span class="voice-live-pill" [class.is-live]="isCapturing()">
                   <span class="voice-live-dot"></span>
                   {{ isCapturing() ? "Microphone live" : "Microphone idle" }}
                 </span>
@@ -185,7 +236,11 @@ import {
                   {{ stopLabel }}
                 </button>
               } @else {
-                <button class="primary" type="button" (click)="startMode('guided')">
+                <button
+                  class="primary"
+                  type="button"
+                  (click)="startMode('guided')"
+                >
                   {{ guidedLabel }}
                 </button>
                 <button type="button" (click)="startMode('general')">
@@ -202,7 +257,9 @@ import {
           <article class="voice-card voice-hero">
             <h2>Saved captures</h2>
             <p class="voice-footnote">
-              Open <a href="/reviews/latest">the latest review</a> or <a href="/reviews">browse all reviews</a> after a completed demo call.
+              Open <a href="/reviews/latest">the latest review</a> or
+              <a href="/reviews">browse all reviews</a> after a completed demo
+              call.
             </p>
             <div class="voice-saved-list">
               @if (savedIntakes().length === 0) {
@@ -215,7 +272,9 @@ import {
                       <span>{{ formatDateTime(intake.completedAt) }}</span>
                     </div>
                     <div class="saved-item-meta">
-                      <span class="pill">{{ getVoiceModeLabel(intake.scenarioId) }}</span>
+                      <span class="pill">{{
+                        getVoiceModeLabel(intake.scenarioId)
+                      }}</span>
                       <span class="pill"
                         >{{ intake.turnCount }} turn{{
                           intake.turnCount === 1 ? "" : "s"
@@ -230,7 +289,9 @@ import {
                     <div class="saved-answer-list">
                       @for (entry of intake.promptAnswers; track entry.prompt) {
                         <div class="saved-answer">
-                          <div class="saved-answer-label">{{ entry.prompt }}</div>
+                          <div class="saved-answer-label">
+                            {{ entry.prompt }}
+                          </div>
                           <p class="saved-answer-text">{{ entry.response }}</p>
                         </div>
                       }
@@ -259,6 +320,7 @@ import {
   `,
 })
 export class AngularVoiceDemoComponent {
+  assistantConfig = VOICE_ASSISTANT_CONFIG;
   description = FRAMEWORK_DESCRIPTIONS.angular;
   guideSteps = VOICE_DEMO_GUIDE_STEPS;
   guideTitle = VOICE_DEMO_GUIDE_TITLE;
@@ -289,8 +351,9 @@ export class AngularVoiceDemoComponent {
   currentPrompt = computed(() =>
     getVoiceModePrompt({
       hasStarted:
-        (this.activeMode() ? this.hasStartedModes()[this.activeMode()!] : false) ||
-        this.currentVoice().turns().length > 0,
+        (this.activeMode()
+          ? this.hasStartedModes()[this.activeMode()!]
+          : false) || this.currentVoice().turns().length > 0,
       mode: this.activeMode(),
       status: this.currentVoice().status(),
       turnCount: this.currentVoice().turns().length,
@@ -299,8 +362,9 @@ export class AngularVoiceDemoComponent {
   leadMessage = computed(() =>
     getVoiceLeadMessage({
       hasStarted:
-        (this.activeMode() ? this.hasStartedModes()[this.activeMode()!] : false) ||
-        this.currentVoice().turns().length > 0,
+        (this.activeMode()
+          ? this.hasStartedModes()[this.activeMode()!]
+          : false) || this.currentVoice().turns().length > 0,
       mode: this.activeMode(),
       status: this.currentVoice().status(),
       turnCount: this.currentVoice().turns().length,
@@ -337,7 +401,9 @@ export class AngularVoiceDemoComponent {
             : this.guidedVoice
           ).sendAudio(audio),
         (level) => {
-          this.waveLevels.update((current) => pushVoiceWaveLevel(current, level));
+          this.waveLevels.update((current) =>
+            pushVoiceWaveLevel(current, level),
+          );
         },
       );
       await this.microphone.start();

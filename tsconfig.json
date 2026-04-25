@@ -11,39 +11,10 @@
     "strict": true,
     "skipLibCheck": true,
     "noUncheckedIndexedAccess": true,
-    "lib": [
-      "DOM",
-      "DOM.Iterable",
-      "ESNext"
-    ],
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "noEmit": true,
     "tsBuildInfoFile": ".absolutejs/tsconfig.tsbuildinfo",
-    "types": [
-      "bun"
-    ],
-    "baseUrl": ".",
-    "paths": {
-      "@absolutejs/voice": [
-        "../../abs/voice/dist/index.d.ts"
-      ],
-      "@absolutejs/voice/client": [
-        "../../abs/voice/dist/client/index.d.ts"
-      ],
-      "@absolutejs/voice/react": [
-        "../../abs/voice/dist/react/index.d.ts"
-      ],
-      "@absolutejs/voice/vue": [
-        "../../abs/voice/dist/vue/index.d.ts"
-      ],
-      "@absolutejs/voice/svelte": [
-        "../../abs/voice/dist/svelte/index.d.ts"
-      ],
-      "@absolutejs/voice/angular": [
-        "../../abs/voice/dist/angular/index.d.ts"
-      ]
-    }
+    "types": ["bun"]
   },
-  "include": [
-    "src/**/*"
-  ]
+  "include": ["src/**/*"]
 }

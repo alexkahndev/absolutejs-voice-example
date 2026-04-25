@@ -18,8 +18,10 @@ The server uses:
 - route-level `phraseHints`
 - route-level `correctTurn` with deterministic phrase correction
 - `createVoiceFileRuntimeStorage(...)` for durable runtime storage
-- `voice({ ops })` for built-in review, task, and integration-event recording
-- `resolveVoiceOutcomeRecipe("support-triage")` for recipe-driven follow-up work
+- `createVoiceAssistant(...)` as the product-level assistant surface
+- assistant `artifactPlan` for built-in review, task, and integration-event recording
+- assistant `support-triage` recipe for recipe-driven follow-up work
+- assistant guardrails and deterministic experiment variants
 - a deterministic intake flow instead of an LLM so the demo works with only vendor voice keys
 
 Each framework page keeps feature parity:
@@ -30,6 +32,7 @@ Each framework page keeps feature parity:
 - show committed turns and assistant replies
 - show completed intakes persisted by the server
 - show the exact framework-specific client primitive being used
+- show the same assistant config panel
 - link directly into reviews and ops pages
 
 ## Run
@@ -57,12 +60,13 @@ Then open:
 The example now follows the same production pattern recommended in `@absolutejs/voice` itself:
 
 - durable runtime storage via `createVoiceFileRuntimeStorage(...)`
-- recipe-driven ops defaults via `resolveVoiceOutcomeRecipe("support-triage")`
-- `voice({ ops })` to record:
+- one assistant surface via `createVoiceAssistant(...)`
+- recipe-driven ops defaults via the assistant `support-triage` artifact plan
+- `voice({ ops: assistant.ops, onTurn: assistant.onTurn })` to record:
   - reviews
   - follow-up tasks
   - integration events
-- thin app-specific customization on top of the core runtime hooks
+- thin app-specific customization through assistant guardrails, experiments, and model logic
 
 The persisted runtime data lives under:
 

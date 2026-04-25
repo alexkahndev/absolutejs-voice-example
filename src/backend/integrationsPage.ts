@@ -10,15 +10,17 @@ const escapeHtml = (value: string) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
-export const listVoiceIntegrationEvents = (events: SavedVoiceIntegrationEvent[]) =>
-  [...events].sort((left, right) => right.createdAt - left.createdAt);
+export const listVoiceIntegrationEvents = (
+  events: SavedVoiceIntegrationEvent[],
+) => [...events].sort((left, right) => right.createdAt - left.createdAt);
 
 export const renderVoiceIntegrationEventsPage = (
   events: SavedVoiceIntegrationEvent[],
   webhookUrl?: string,
 ) => {
   const items = listVoiceIntegrationEvents(events)
-    .map((event) => `
+    .map(
+      (event) => `
       <article class="event-item">
         <div class="event-header">
           <strong>${escapeHtml(event.type)}</strong>
@@ -32,7 +34,8 @@ export const renderVoiceIntegrationEventsPage = (
         ${event.deliveryError ? `<p><strong>Delivery error:</strong> ${escapeHtml(event.deliveryError)}</p>` : ""}
         <pre>${escapeHtml(JSON.stringify(event.payload, null, 2))}</pre>
       </article>
-    `)
+    `,
+    )
     .join("");
 
   return `<!doctype html>
@@ -65,7 +68,7 @@ export const renderVoiceIntegrationEventsPage = (
       <p><a href="/reviews">Back to reviews</a> · <a href="/tasks">Open task queue</a></p>
     </section>
     <section class="event-list">
-      ${items || '<p>No integration events yet. Complete a call or change a task state first.</p>'}
+      ${items || "<p>No integration events yet. Complete a call or change a task state first.</p>"}
     </section>
   </main>
 </body>

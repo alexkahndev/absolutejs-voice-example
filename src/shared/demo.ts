@@ -10,7 +10,14 @@ export type VoiceScenarioId = "guided" | "general";
 export type VoiceDemoMode = VoiceScenarioId;
 
 export type SavedIntake = {
-  callDisposition?: "completed" | "transferred" | "escalated" | "voicemail" | "no-answer" | "failed" | "closed";
+  callDisposition?:
+    | "completed"
+    | "transferred"
+    | "escalated"
+    | "voicemail"
+    | "no-answer"
+    | "failed"
+    | "closed";
   callReason?: string;
   callTarget?: string;
   id: string;
@@ -52,6 +59,23 @@ export const VOICE_DEMO_MIC_IDLE =
 
 export const VOICE_DEMO_MIC_LIVE =
   "Live. Answer the prompt, then click Stop microphone when finished.";
+
+export const VOICE_ASSISTANT_CONFIG = {
+  id: "support",
+  recipe: "support-triage",
+  tools: ["intake classifier", "lifecycle router", "review/task recorder"],
+  guardrails: [
+    "Escalate when the caller asks for a human",
+    "Route transfer, voicemail, and no-answer intents into call outcomes",
+  ],
+  experiments: ["baseline guide copy", "direct support copy"],
+  artifacts: [
+    "review artifact",
+    "ops task",
+    "integration event",
+    "trace-ready session",
+  ],
+} as const;
 
 export const VOICE_TEST_QUESTIONS = [
   "Start with a quick introduction about who you are.",
@@ -199,8 +223,7 @@ export const FRAMEWORK_DESCRIPTIONS: Record<FrameworkId, string> = {
   angular:
     "Angular uses VoiceStreamService to expose computed signals from the shared voice connection.",
   html: "HTML uses the plain client primitive directly and keeps the page reactive with a lightweight DOM renderer.",
-  htmx:
-    "HTMX uses the plugin-owned HTMX render route and package bootstrap so the page stays declarative and never ships its own voice controller.",
+  htmx: "HTMX uses the plugin-owned HTMX render route and package bootstrap so the page stays declarative and never ships its own voice controller.",
   react:
     "React uses useVoiceStream so the page reacts to partials, committed turns, and completion state without custom wiring.",
   svelte:

@@ -78,13 +78,16 @@ if (
 }
 
 const guidedVoice = createVoiceStream<SavedIntake>(getVoiceRoutePath("guided"));
-const generalVoice = createVoiceStream<SavedIntake>(getVoiceRoutePath("general"));
+const generalVoice = createVoiceStream<SavedIntake>(
+  getVoiceRoutePath("general"),
+);
 let activeMode: VoiceDemoMode | null = null;
 let hasStartedModes: Record<VoiceDemoMode, boolean> = {
   general: false,
   guided: false,
 };
-const currentVoice = () => (activeMode === "general" ? generalVoice : guidedVoice);
+const currentVoice = () =>
+  activeMode === "general" ? generalVoice : guidedVoice;
 const microphone = createDemoMicrophone(
   (audio) => currentVoice().sendAudio(audio),
   (level) => {
@@ -110,7 +113,9 @@ const renderWave = () => {
 const renderChat = () => {
   const voice = currentVoice();
   const leadMessage = getVoiceLeadMessage({
-    hasStarted: (activeMode ? hasStartedModes[activeMode] : false) || voice.turns.length > 0,
+    hasStarted:
+      (activeMode ? hasStartedModes[activeMode] : false) ||
+      voice.turns.length > 0,
     mode: activeMode,
     status: voice.status,
     turnCount: voice.turns.length,
@@ -202,7 +207,9 @@ const render = () => {
     ? VOICE_DEMO_MIC_LIVE
     : VOICE_DEMO_MIC_IDLE;
   promptStatus.textContent = getVoiceModePrompt({
-    hasStarted: (activeMode ? hasStartedModes[activeMode] : false) || voice.turns.length > 0,
+    hasStarted:
+      (activeMode ? hasStartedModes[activeMode] : false) ||
+      voice.turns.length > 0,
     mode: activeMode,
     status: voice.status,
     turnCount: voice.turns.length,
@@ -214,7 +221,9 @@ const render = () => {
   startGeneralButton.textContent = VOICE_DEMO_GENERAL_LABEL;
   stopButton.textContent = VOICE_DEMO_STOP_LABEL;
   partialStatus.textContent = voice.partial || "No speech captured yet";
-  sessionMetric.textContent = activeMode ? getVoiceModeLabel(activeMode) : "Choose one";
+  sessionMetric.textContent = activeMode
+    ? getVoiceModeLabel(activeMode)
+    : "Choose one";
   voiceStatus.textContent = voice.status;
   renderWave();
   renderChat();
