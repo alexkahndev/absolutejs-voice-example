@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>AbsoluteJS Voice Demo - HTMX</title>
+    <meta
+      name="description"
+      content="AbsoluteJS chat-style voice demo with guided and general modes in HTMX."
+    />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/assets/ico/favicon.ico" />
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="../../styles/indexes/voice-demo.css"
+    />
+    <script src="/htmx/htmx.min.js"></script>
+  </head>
+  <body class="voice-demo-page" data-framework="htmx">
+    <header>
+      <a class="logo" href="/htmx">
+        <img
+          src="/assets/png/absolutejs-temp.png"
+          height="24"
+          alt="AbsoluteJS"
+        />
+        AbsoluteJS
+      </a>
+      <nav>
+        <a href="/react">React</a>
+        <a href="/svelte">Svelte</a>
+        <a href="/vue">Vue</a>
+        <a href="/angular">Angular</a>
+        <a href="/html">HTML</a>
+        <a class="active" href="/htmx">HTMX</a>
+        <a href="/reviews">Reviews</a>
+      </nav>
+    </header>
+    <main
+      class="voice-shell"
+      data-voice-htmx
+      data-voice-chat="#chat-list"
+      data-voice-connection="#metric-connection"
+      data-voice-error="#status-error"
+      data-voice-general-label="General recording"
+      data-voice-general-path="/voice/intake?scenarioId=general"
+      data-voice-guided-label="Guided test"
+      data-voice-guided-path="/voice/intake?scenarioId=guided"
+      data-voice-guided-prompts='["Start with a quick introduction about who you are.","Now describe what you are trying to do or test.","Finish with any detail that feels blocked, risky, or unclear."]'
+      data-voice-microphone="#status-mic"
+      data-voice-monitor="#voice-monitor"
+      data-voice-monitor-copy="#voice-monitor-copy"
+      data-voice-prompt="#status-prompt"
+      data-voice-start-general="#start-general"
+      data-voice-start-guided="#start-guided"
+      data-voice-stop="#stop-mic"
+      data-voice-sync="#voice-htmx-sync"
+      data-voice-wave-glow="#voice-wave-glow"
+      data-voice-wave-path="#voice-wave-path"
+    >
+      <section class="voice-grid">
+        <article class="voice-card voice-hero">
+          <div class="voice-hero-layout">
+            <div>
+              <span class="voice-framework-pill">HTMX + Client Primitive</span>
+              <h2>Chat-style voice demo in HTMX</h2>
+              <p class="voice-brand-copy">
+                HTMX refreshes the saved capture panel while the voice WebSocket
+                stays on the shared client primitive.
+              </p>
+              <div class="voice-badges">
+                <span class="voice-badge">Deepgram Flux</span>
+                <span class="voice-badge">Phrase hint correction</span>
+                <span class="voice-badge">Plugin HTMX renderers</span>
+              </div>
+            </div>
+            <div class="voice-metrics">
+              <div class="voice-metric">
+                <span class="voice-metric-label">Connection</span>
+                <span class="voice-metric-value" id="metric-connection"
+                  >Waiting</span
+                >
+              </div>
+              <div id="voice-htmx-metrics">
+                <p class="empty-copy">No active voice session yet.</p>
+              </div>
+            </div>
+          </div>
+        </article>
+
+      <article class="voice-card voice-card-side">
+          <h2>Run the guided voice demo</h2>
+          <ol class="voice-guide-list">
+            <li>Use Start guided test for the prompt-driven chat flow.</li>
+            <li>Use Start general recording for a single freeform capture.</li>
+            <li>Pause after speaking so each turn commits cleanly.</li>
+            <li>Click Stop microphone when you want to stop live capture.</li>
+          </ol>
+        </article>
+
+        <article class="voice-card voice-card-wide">
+          <h2>Conversation</h2>
+          <div class="voice-status-list">
+            <div id="voice-htmx-status">
+              <p class="empty-copy">Voice session is idle.</p>
+            </div>
+            <div class="status-row">
+              <span class="label">Current prompt</span>
+              <span class="value" id="status-prompt"
+                >Choose a scenario to begin. Guided test asks follow-up prompts.
+                General recording just captures what you say.</span
+              >
+            </div>
+            <div class="status-row">
+              <span class="label">Microphone</span>
+              <span class="value" id="status-mic"
+                >Ready. Click Start voice test to begin.</span
+              >
+            </div>
+            <div class="status-row">
+              <span class="label">Errors</span>
+              <span class="value" id="status-error">None</span>
+            </div>
+          </div>
+          <div class="voice-chat-list" id="chat-list">
+            <article class="voice-chat-message assistant">
+              <div class="voice-chat-role">Voice demo</div>
+              <p class="voice-turn-text">Pick a scenario to begin the demo.</p>
+            </article>
+          </div>
+          <div class="voice-monitor" id="voice-monitor">
+            <div class="voice-monitor-header">
+              <span class="voice-monitor-label">Input monitor</span>
+              <span class="voice-live-pill" id="voice-monitor-copy"
+                ><span class="voice-live-dot"></span>Microphone idle</span
+              >
+            </div>
+            <svg
+              aria-label="Microphone waveform"
+              class="voice-wave"
+              viewBox="0 0 320 88"
+            >
+              <path class="voice-wave-baseline" d="M 0 44 L 320 44"></path>
+              <path class="voice-wave-glow" id="voice-wave-glow"></path>
+              <path class="voice-wave-line" id="voice-wave-path"></path>
+            </svg>
+          </div>
+          <div class="voice-actions">
+            <button class="primary" id="start-guided" type="button">
+              Start guided test
+            </button>
+            <button id="start-general" type="button">Start general recording</button>
+            <button hidden id="stop-mic" type="button">Stop microphone</button>
+          </div>
+          <p class="voice-footnote">
+            The plugin owns both the HTMX render route and the browser
+            bootstrap. This page stays declarative.
+          </p>
+        </article>
+
+        <article class="voice-card voice-hero">
+          <h2>Saved captures</h2>
+          <p class="voice-footnote">
+            Open <a href="/reviews/latest">the latest review</a> or <a href="/reviews">browse all reviews</a> after a completed demo call.
+          </p>
+          <div class="voice-saved-list" id="voice-htmx-result">
+            <p class="empty-copy">No saved captures yet.</p>
+          </div>
+        </article>
+      </section>
+      <p class="footer">
+        <img src="/assets/png/absolutejs-temp.png" alt="" />
+        Powered by
+        <a
+          href="https://absolutejs.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          >AbsoluteJS</a
+        >
+      </p>
+    </main>
+
+    <div
+      hidden
+      hx-get="/voice/intake/htmx/session"
+      hx-swap="none"
+      hx-trigger="load, voice-refresh"
+      id="voice-htmx-sync"
+    ></div>
+    <div hidden id="voice-htmx-turns"></div>
+    <div hidden id="voice-htmx-assistant"></div>
+
+    <script
+      data-external
+      src="/voice/intake/htmx/bootstrap.js"
+      type="module"
+    ></script>
+  </body>
+</html>

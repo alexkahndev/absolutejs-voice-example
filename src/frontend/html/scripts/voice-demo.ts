@@ -1,0 +1,284 @@
+import { createVoiceStream } from "@absolutejs/voice/client";
+import {
+  createInitialVoiceWaveLevels,
+  createVoiceWavePath,
+  createDemoMicrophone,
+  fetchSavedIntakes,
+  formatErrorMessage,
+  formatDateTime,
+  pushVoiceWaveLevel,
+} from "../../shared/browser";
+import {
+  getVoiceLeadMessage,
+  getVoiceModeLabel,
+  getVoiceModePrompt,
+  getVoiceRoutePath,
+  VOICE_DEMO_GENERAL_LABEL,
+  VOICE_DEMO_GUIDED_LABEL,
+  VOICE_DEMO_MIC_IDLE,
+  VOICE_DEMO_MIC_LIVE,
+  VOICE_DEMO_STOP_LABEL,
+  type SavedIntake,
+  type VoiceDemoMode,
+} from "../../../shared/demo";
+
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+
+type HtmxWindow = Window & {
+  htmx?: {
+    trigger: (target: string | Element, event: string) => void;
+  };
+};
+
+const framework = document.body.dataset.framework ?? "html";
+const chatList = document.querySelector("#chat-list");
+const connectionMetric = document.querySelector("#metric-connection");
+const errorStatus = document.querySelector("#status-error");
+const intakesMetric = document.querySelector("#metric-intakes");
+const microphoneStatus = document.querySelector("#status-mic");
+const partialStatus = document.querySelector("#status-partial");
+const promptStatus = document.querySelector("#status-prompt");
+const savedIntakesRoot = document.querySelector("#saved-intakes");
+const sessionMetric = document.querySelector("#metric-session");
+const startGuidedButton = document.querySelector("#start-guided");
+const startGeneralButton = document.querySelector("#start-general");
+const stopButton = document.querySelector("#stop-mic");
+const voiceStatus = document.querySelector("#status-voice");
+const voiceMonitor = document.querySelector("#voice-monitor");
+const voiceMonitorCopy = document.querySelector("#voice-monitor-copy");
+const voiceWaveGlow = document.querySelector("#voice-wave-glow");
+const voiceWavePath = document.querySelector("#voice-wave-path");
+
+if (
+  !(chatList instanceof HTMLElement) ||
+  !(connectionMetric instanceof HTMLElement) ||
+  !(errorStatus instanceof HTMLElement) ||
+  !(intakesMetric instanceof HTMLElement) ||
+  !(microphoneStatus instanceof HTMLElement) ||
+  !(partialStatus instanceof HTMLElement) ||
+  !(promptStatus instanceof HTMLElement) ||
+  !(savedIntakesRoot instanceof HTMLElement) ||
+  !(sessionMetric instanceof HTMLElement) ||
+  !(startGuidedButton instanceof HTMLButtonElement) ||
+  !(startGeneralButton instanceof HTMLButtonElement) ||
+  !(stopButton instanceof HTMLButtonElement) ||
+  !(voiceMonitor instanceof HTMLElement) ||
+  !(voiceMonitorCopy instanceof HTMLElement) ||
+  !(voiceWaveGlow instanceof SVGPathElement) ||
+  !(voiceWavePath instanceof SVGPathElement) ||
+  !(voiceStatus instanceof HTMLElement)
+) {
+  throw new Error("Voice demo page is missing expected elements.");
+}
+
+const guidedVoice = createVoiceStream<SavedIntake>(getVoiceRoutePath("guided"));
+const generalVoice = createVoiceStream<SavedIntake>(getVoiceRoutePath("general"));
+let activeMode: VoiceDemoMode | null = null;
+let hasStartedModes: Record<VoiceDemoMode, boolean> = {
+  general: false,
+  guided: false,
+};
+const currentVoice = () => (activeMode === "general" ? generalVoice : guidedVoice);
+const microphone = createDemoMicrophone(
+  (audio) => currentVoice().sendAudio(audio),
+  (level) => {
+    waveLevels = pushVoiceWaveLevel(waveLevels, level);
+    renderWave();
+  },
+);
+let isCapturing = false;
+let micError: string | null = null;
+let waveLevels = createInitialVoiceWaveLevels();
+
+const renderWave = () => {
+  const path = createVoiceWavePath(waveLevels);
+  voiceWaveGlow.setAttribute("d", path);
+  voiceWavePath.setAttribute("d", path);
+  voiceMonitorCopy.innerHTML = `<span class="voice-live-dot"></span>${
+    isCapturing ? "Microphone live" : "Microphone idle"
+  }`;
+  voiceMonitorCopy.classList.toggle("is-live", isCapturing);
+  voiceMonitor.classList.toggle("is-live", isCapturing);
+};
+
+const renderChat = () => {
+  const voice = currentVoice();
+  const leadMessage = getVoiceLeadMessage({
+    hasStarted: (activeMode ? hasStartedModes[activeMode] : false) || voice.turns.length > 0,
+    mode: activeMode,
+    status: voice.status,
+    turnCount: voice.turns.length,
+  });
+
+  chatList.innerHTML = `<article class="voice-chat-message assistant">
+  <div class="voice-chat-role">${escapeHtml(activeMode ? getVoiceModeLabel(activeMode) : "Voice demo")}</div>
+  <p class="voice-turn-text">${escapeHtml(leadMessage)}</p>
+</article>${voice.turns
+    .map(
+      (turn) => `<div class="voice-chat-stack">
+  <article class="voice-chat-message user">
+    <div class="voice-chat-role">You</div>
+    <p class="voice-turn-text">${escapeHtml(turn.text)}</p>
+  </article>
+  ${
+    turn.assistantText
+      ? `<article class="voice-chat-message assistant">
+    <div class="voice-chat-role">${escapeHtml(activeMode ? getVoiceModeLabel(activeMode) : "Guide")}</div>
+    <p class="voice-turn-text">${escapeHtml(turn.assistantText)}</p>
+  </article>`
+      : ""
+  }
+</div>`,
+    )
+    .join("")}${
+    voice.partial
+      ? `<article class="voice-chat-message user pending">
+  <div class="voice-chat-role">Speaking</div>
+  <p class="voice-turn-text">${escapeHtml(voice.partial)}</p>
+</article>`
+      : ""
+  }`;
+};
+
+const renderSavedIntakes = async () => {
+  const intakes = await fetchSavedIntakes();
+  intakesMetric.textContent = String(intakes.length);
+
+  if (framework === "htmx") {
+    const htmxWindow = window as unknown as HtmxWindow;
+
+    if (htmxWindow.htmx) {
+      htmxWindow.htmx.trigger(document.body, "refresh");
+    }
+    return;
+  }
+
+  if (intakes.length === 0) {
+    savedIntakesRoot.innerHTML = `<p class="empty-copy">No saved captures yet.</p>`;
+    return;
+  }
+
+  savedIntakesRoot.innerHTML = intakes
+    .map(
+      (intake) => `<article class="saved-item">
+  <div class="saved-item-header">
+    <strong>${escapeHtml(intake.title)}</strong>
+    <span>${formatDateTime(intake.completedAt)}</span>
+  </div>
+  <div class="saved-item-meta">
+    <span class="pill">${escapeHtml(getVoiceModeLabel(intake.scenarioId))}</span>
+    <span class="pill">${intake.turnCount} turn${intake.turnCount === 1 ? "" : "s"}</span>
+    ${intake.detectedName ? `<span class="pill">${escapeHtml(intake.detectedName)}</span>` : ""}
+  </div>
+  <div class="saved-answer-list">
+    ${intake.promptAnswers
+      .map(
+        (entry) => `<div class="saved-answer">
+  <div class="saved-answer-label">${escapeHtml(entry.prompt)}</div>
+  <p class="saved-answer-text">${escapeHtml(entry.response)}</p>
+</div>`,
+      )
+      .join("")}
+  </div>
+  <div class="voice-assistant-label">Full transcript</div>
+  <p>${escapeHtml(intake.transcript)}</p>
+  <p class="saved-summary">${escapeHtml(intake.assistantSummary)}</p>
+</article>`,
+    )
+    .join("");
+};
+
+const render = () => {
+  const voice = currentVoice();
+  connectionMetric.textContent = voice.isConnected ? "Connected" : "Waiting";
+  errorStatus.textContent = micError || voice.error || "None";
+  microphoneStatus.textContent = isCapturing
+    ? VOICE_DEMO_MIC_LIVE
+    : VOICE_DEMO_MIC_IDLE;
+  promptStatus.textContent = getVoiceModePrompt({
+    hasStarted: (activeMode ? hasStartedModes[activeMode] : false) || voice.turns.length > 0,
+    mode: activeMode,
+    status: voice.status,
+    turnCount: voice.turns.length,
+  });
+  startGuidedButton.hidden = isCapturing;
+  startGeneralButton.hidden = isCapturing;
+  stopButton.hidden = !isCapturing;
+  startGuidedButton.textContent = VOICE_DEMO_GUIDED_LABEL;
+  startGeneralButton.textContent = VOICE_DEMO_GENERAL_LABEL;
+  stopButton.textContent = VOICE_DEMO_STOP_LABEL;
+  partialStatus.textContent = voice.partial || "No speech captured yet";
+  sessionMetric.textContent = activeMode ? getVoiceModeLabel(activeMode) : "Choose one";
+  voiceStatus.textContent = voice.status;
+  renderWave();
+  renderChat();
+};
+
+const stopMic = () => {
+  microphone.stop();
+  isCapturing = false;
+  micError = null;
+  waveLevels = createInitialVoiceWaveLevels();
+  render();
+};
+
+const startMode = async (mode: VoiceDemoMode) => {
+  activeMode = mode;
+  hasStartedModes = {
+    ...hasStartedModes,
+    [mode]: true,
+  };
+  try {
+    await microphone.start();
+    micError = null;
+    isCapturing = true;
+    render();
+  } catch (error) {
+    microphone.stop();
+    isCapturing = false;
+    waveLevels = createInitialVoiceWaveLevels();
+    micError = formatErrorMessage(error);
+    render();
+  }
+};
+
+guidedVoice.subscribe(() => {
+  render();
+  if (guidedVoice.status === "completed") {
+    void renderSavedIntakes();
+  }
+});
+
+generalVoice.subscribe(() => {
+  render();
+  if (generalVoice.status === "completed") {
+    void renderSavedIntakes();
+  }
+});
+
+startGuidedButton.addEventListener("click", () => {
+  void startMode("guided");
+});
+
+startGeneralButton.addEventListener("click", () => {
+  void startMode("general");
+});
+
+stopButton.addEventListener("click", () => {
+  stopMic();
+});
+
+window.addEventListener("beforeunload", () => {
+  microphone.stop();
+  guidedVoice.close();
+  generalVoice.close();
+});
+
+render();
+void renderSavedIntakes();

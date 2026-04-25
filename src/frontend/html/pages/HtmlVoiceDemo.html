@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>AbsoluteJS Voice Demo - HTML</title>
+    <meta
+      name="description"
+      content="AbsoluteJS chat-style voice demo with guided and general modes in plain HTML."
+    />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/assets/ico/favicon.ico" />
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="../../styles/indexes/voice-demo.css"
+    />
+  </head>
+  <body class="voice-demo-page" data-framework="html">
+    <header>
+      <a class="logo" href="/html">
+        <img
+          src="/assets/png/absolutejs-temp.png"
+          height="24"
+          alt="AbsoluteJS"
+        />
+        AbsoluteJS
+      </a>
+      <nav>
+        <a href="/react">React</a>
+        <a href="/svelte">Svelte</a>
+        <a href="/vue">Vue</a>
+        <a href="/angular">Angular</a>
+        <a class="active" href="/html">HTML</a>
+        <a href="/htmx">HTMX</a>
+      </nav>
+    </header>
+    <main class="voice-shell">
+      <section class="voice-grid">
+        <article class="voice-card voice-hero">
+          <div class="voice-hero-layout">
+            <div>
+              <span class="voice-framework-pill">HTML Client</span>
+              <h2>Chat-style voice demo in HTML</h2>
+              <p class="voice-brand-copy">
+                HTML uses the raw voice client and microphone helper directly, with
+                no framework runtime in the middle.
+              </p>
+              <div class="voice-badges">
+                <span class="voice-badge">Deepgram Flux</span>
+                <span class="voice-badge">Phrase hint correction</span>
+                <span class="voice-badge">Reconnect-aware sessions</span>
+              </div>
+            </div>
+            <div class="voice-metrics">
+              <div class="voice-metric">
+                <span class="voice-metric-label">Connection</span>
+                <span class="voice-metric-value" id="metric-connection"
+                  >Waiting</span
+                >
+              </div>
+              <div class="voice-metric">
+                <span class="voice-metric-label">Scenario</span>
+                <span class="voice-metric-value" id="metric-session"
+                  >Choose one</span
+                >
+              </div>
+              <div class="voice-metric">
+                <span class="voice-metric-label">Saved captures</span>
+                <span class="voice-metric-value" id="metric-intakes">0</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="voice-card voice-card-side">
+          <h2>Run the guided voice demo</h2>
+          <ol class="voice-guide-list">
+            <li>Use Start guided test for the prompt-driven chat flow.</li>
+            <li>Use Start general recording for a single freeform capture.</li>
+            <li>Pause after speaking so each turn commits cleanly.</li>
+            <li>Click Stop microphone when you want to stop live capture.</li>
+          </ol>
+        </article>
+
+        <article class="voice-card voice-card-wide">
+          <h2>Conversation</h2>
+          <div class="voice-status-list">
+            <div class="status-row">
+              <span class="label">Voice status</span>
+              <span class="value" id="status-voice">idle</span>
+            </div>
+            <div class="status-row">
+              <span class="label">Current prompt</span>
+              <span class="value" id="status-prompt"
+                >Choose a scenario to begin. Guided test asks follow-up prompts.
+                General recording just captures what you say.</span
+              >
+            </div>
+            <div class="status-row">
+              <span class="label">Microphone</span>
+              <span class="value" id="status-mic"
+                >Ready. Click Start voice test to begin.</span
+              >
+            </div>
+            <div class="status-row">
+              <span class="label">Current utterance</span>
+              <span class="value" id="status-partial">No speech captured yet</span>
+            </div>
+            <div class="status-row">
+              <span class="label">Errors</span>
+              <span class="value" id="status-error">None</span>
+            </div>
+          </div>
+          <div class="voice-chat-list" id="chat-list">
+            <article class="voice-chat-message assistant">
+              <div class="voice-chat-role">Voice demo</div>
+              <p class="voice-turn-text">Pick a scenario to begin the demo.</p>
+            </article>
+          </div>
+          <div class="voice-monitor" id="voice-monitor">
+            <div class="voice-monitor-header">
+              <span class="voice-monitor-label">Input monitor</span>
+              <span class="voice-live-pill" id="voice-monitor-copy"
+                ><span class="voice-live-dot"></span>Microphone idle</span
+              >
+            </div>
+            <svg
+              aria-label="Microphone waveform"
+              class="voice-wave"
+              viewBox="0 0 320 88"
+            >
+              <path class="voice-wave-baseline" d="M 0 44 L 320 44"></path>
+              <path class="voice-wave-glow" id="voice-wave-glow"></path>
+              <path class="voice-wave-line" id="voice-wave-path"></path>
+            </svg>
+          </div>
+          <div class="voice-actions">
+            <button class="primary" id="start-guided" type="button">
+              Start guided test
+            </button>
+            <button id="start-general" type="button">Start general recording</button>
+            <button hidden id="stop-mic" type="button">Stop microphone</button>
+          </div>
+          <p class="voice-footnote">
+            This demo uses the dev-only in-memory voice session store. Real
+            deployments should replace it with Redis or Postgres.
+          </p>
+        </article>
+
+        <article class="voice-card voice-hero">
+          <h2>Saved captures</h2>
+          <p class="voice-footnote">
+            Open <a href="/reviews/latest">the latest review</a> or <a href="/reviews">browse all reviews</a> after a completed demo call.
+          </p>
+          <div class="voice-saved-list" id="saved-intakes">
+            <p class="empty-copy">No saved captures yet.</p>
+          </div>
+        </article>
+      </section>
+      <p class="footer">
+        <img src="/assets/png/absolutejs-temp.png" alt="" />
+        Powered by
+        <a
+          href="https://absolutejs.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          >AbsoluteJS</a
+        >
+      </p>
+    </main>
+
+    <script src="../scripts/voice-demo.ts" type="module"></script>
+  </body>
+</html>
