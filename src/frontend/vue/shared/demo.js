@@ -13,6 +13,7 @@ export const VOICE_DEMO_MIC_IDLE = "Ready. Start guided test or general recordin
 export const VOICE_DEMO_MIC_LIVE = "Live. Answer the prompt, then click Stop microphone when finished.";
 export const VOICE_ASSISTANT_CONFIG = {
   id: "support",
+  modelProvider: "deterministic",
   recipe: "support-triage",
   tools: ["intake classifier", "lifecycle router", "review/task recorder"],
   guardrails: [

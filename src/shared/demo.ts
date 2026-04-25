@@ -62,6 +62,7 @@ export const VOICE_DEMO_MIC_LIVE =
 
 export const VOICE_ASSISTANT_CONFIG = {
   id: "support",
+  modelProvider: "deterministic",
   recipe: "support-triage",
   tools: ["intake classifier", "lifecycle router", "review/task recorder"],
   guardrails: [

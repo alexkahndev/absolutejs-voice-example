@@ -21,8 +21,8 @@ The server uses:
 - `createVoiceAssistant(...)` as the product-level assistant surface
 - assistant `artifactPlan` for built-in review, task, and integration-event recording
 - assistant `support-triage` recipe for recipe-driven follow-up work
-- assistant guardrails and deterministic experiment variants
-- a deterministic intake flow instead of an LLM so the demo works with only vendor voice keys
+- assistant guardrails and experiment variants
+- OpenAI assistant model routing when `OPENAI_API_KEY` is present, with deterministic fallback when it is not
 
 Each framework page keeps feature parity:
 
@@ -43,6 +43,14 @@ bun install
 DEEPGRAM_API_KEY=... bun run dev
 ```
 
+Optional LLM routing:
+
+```bash
+OPENAI_API_KEY=... OPENAI_VOICE_MODEL=gpt-4.1-mini bun run dev
+```
+
+`OPENAI_VOICE_MODEL` is optional. If `OPENAI_API_KEY` is missing, the server keeps using the deterministic local intake model so the demo still runs with only the voice/STT key.
+
 Then open:
 
 - `http://localhost:3000/react`
@@ -62,6 +70,7 @@ The example now follows the same production pattern recommended in `@absolutejs/
 
 - durable runtime storage via `createVoiceFileRuntimeStorage(...)`
 - one assistant surface via `createVoiceAssistant(...)`
+- provider-neutral model selection: `createOpenAIVoiceAssistantModel(...)` when `OPENAI_API_KEY` is configured, deterministic fallback otherwise
 - recipe-driven ops defaults via the assistant `support-triage` artifact plan
 - `voice({ ops: assistant.ops, onTurn: assistant.onTurn })` to record:
   - reviews
@@ -99,5 +108,6 @@ The demo uses the support-triage recipe, so completed calls create triage review
 ## Notes
 
 - The example now uses published beta versions of `@absolutejs/voice` and `@absolutejs/voice-deepgram`, not local `file:` dependencies.
+- API keys stay in local environment files only. `.env`, `.env.*`, runtime data, and build outputs are ignored.
 - The route uses the recommended package path for this demo: Deepgram Flux plus phrase hints and deterministic correction.
 - The example still keeps its own richer review UI, but runtime review/task/event creation is handled by the core package.

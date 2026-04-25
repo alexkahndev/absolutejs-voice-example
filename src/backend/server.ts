@@ -8,6 +8,7 @@ import {
   createVoiceExperiment,
   createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
+  createOpenAIVoiceAssistantModel,
   createVoiceTaskUpdatedEvent,
   reopenVoiceOpsTask,
   startVoiceOpsTask,
@@ -145,7 +146,13 @@ const memoryStore = createVoiceFileAssistantMemoryStore({
   directory: resolve(runtimeDirectory, "memories"),
 });
 const deepgramApiKey = getEnv("DEEPGRAM_API_KEY");
+const openAIApiKey = process.env.OPENAI_API_KEY;
 const webhookUrl = process.env.VOICE_DEMO_WEBHOOK_URL;
+const modelProvider = openAIApiKey ? "openai" : "deterministic";
+const assistantConfig = {
+  ...VOICE_ASSISTANT_CONFIG,
+  modelProvider,
+};
 const intakeModel: VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake> = {
   generate: ({ context, session, turn, system }) => {
     const result = decideIntakeTurn(session, turn, undefined, context);
@@ -160,6 +167,12 @@ const intakeModel: VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake> = {
     return result;
   },
 };
+const openAIModel = openAIApiKey
+  ? createOpenAIVoiceAssistantModel<unknown, VoiceSessionRecord, SavedIntake>({
+      apiKey: openAIApiKey,
+      model: process.env.OPENAI_VOICE_MODEL ?? "gpt-4.1-mini",
+    })
+  : undefined;
 const intakeClassifierTool = createVoiceAgentTool<
   unknown,
   VoiceSessionRecord,
@@ -425,7 +438,7 @@ const assistant = createVoiceAssistant<
     id: "support-copy",
     variants: [
       {
-        id: "baseline",
+        id: modelProvider,
         weight: 1,
       },
       {
@@ -473,7 +486,7 @@ const assistant = createVoiceAssistant<
       await memory.get("lastOutcome");
     },
   },
-  model: intakeModel,
+  model: openAIModel ?? intakeModel,
   system: "baseline guide copy",
   tools: [intakeClassifierTool, lifecycleRouterTool, reviewTaskRecorderTool],
   trace: runtimeStorage.traces,
@@ -540,7 +553,7 @@ const server = new Elysia()
     }),
   )
   .get("/api/intakes", () => listIntakes())
-  .get("/api/assistant-config", () => VOICE_ASSISTANT_CONFIG)
+  .get("/api/assistant-config", () => assistantConfig)
   .get("/api/assistant-summary", async () => summarizeAssistantRuns())
   .get("/api/assistant-memory", async () => listAssistantMemory())
   .get("/api/reviews", async ({ query }) => {
@@ -626,6 +639,7 @@ const server = new Elysia()
         renderVoiceAssistantPage(
           await summarizeAssistantRuns(),
           await listAssistantMemory(),
+          assistantConfig,
         ),
         {
           headers: {

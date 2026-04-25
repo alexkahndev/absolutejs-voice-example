@@ -4,6 +4,13 @@ import type {
 } from "@absolutejs/voice";
 import { VOICE_ASSISTANT_CONFIG } from "../shared/demo";
 
+type VoiceAssistantPageConfig = Omit<
+  typeof VOICE_ASSISTANT_CONFIG,
+  "modelProvider"
+> & {
+  modelProvider: string;
+};
+
 const escapeHtml = (value: string) =>
   value
     .replaceAll("&", "&amp;")
@@ -36,6 +43,7 @@ const renderCountMap = (values: Record<string, number>) => {
 export const renderVoiceAssistantPage = (
   summary: VoiceAssistantRunsSummary,
   memories: VoiceAssistantMemoryRecord[] = [],
+  config: VoiceAssistantPageConfig = VOICE_ASSISTANT_CONFIG,
 ) => {
   const assistant = summary.assistants[0];
 
@@ -71,10 +79,11 @@ export const renderVoiceAssistantPage = (
       <p><a href="/react">Back to demo</a> · <a href="/reviews">Reviews</a> · <a href="/tasks">Tasks</a> · <a href="/integrations">Integrations</a></p>
     </section>
     <section>
-      <h2>${escapeHtml(VOICE_ASSISTANT_CONFIG.id)}</h2>
+      <h2>${escapeHtml(config.id)}</h2>
       <div class="pill-list">
-        <span class="pill">recipe: ${escapeHtml(VOICE_ASSISTANT_CONFIG.recipe)}</span>
-        ${VOICE_ASSISTANT_CONFIG.tools.map((tool) => `<span class="pill">${escapeHtml(tool)}</span>`).join("")}
+        <span class="pill">recipe: ${escapeHtml(config.recipe)}</span>
+        <span class="pill">model: ${escapeHtml(config.modelProvider)}</span>
+        ${config.tools.map((tool) => `<span class="pill">${escapeHtml(tool)}</span>`).join("")}
       </div>
     </section>
     <section class="grid">
