@@ -264,8 +264,9 @@
           </div>
         </div>
         <p class="voice-footnote">
-          <a href="/tasks">Open tasks</a> ·
-          <a href="/integrations">Open integration events</a>
+          <a href="/assistant">Open analytics</a> ·
+          <a href="/tasks">Open tasks</a>
+          · <a href="/integrations">Open integration events</a>
         </p>
       </article>
 

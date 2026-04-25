@@ -52,6 +52,7 @@ Then open:
 - `http://localhost:3000/html`
 - `http://localhost:3000/htmx`
 - `http://localhost:3000/reviews`
+- `http://localhost:3000/assistant`
 - `http://localhost:3000/tasks`
 - `http://localhost:3000/integrations`
 
@@ -66,6 +67,7 @@ The example now follows the same production pattern recommended in `@absolutejs/
   - reviews
   - follow-up tasks
   - integration events
+  - assistant run analytics from trace events
 - thin app-specific customization through assistant guardrails, experiments, and model logic
 
 The persisted runtime data lives under:
@@ -74,6 +76,7 @@ The persisted runtime data lives under:
 - `.voice-runtime/voice-demo/reviews`
 - `.voice-runtime/voice-demo/tasks`
 - `.voice-runtime/voice-demo/events`
+- `.voice-runtime/voice-demo/traces`
 
 ## What To Demo
 
@@ -87,8 +90,9 @@ A good end-to-end demo flow is:
    - `send it to voicemail`
    - `no answer`
 4. Open `/reviews` to inspect the call artifact.
-5. Open `/tasks` to see the generated follow-up work.
-6. Open `/integrations` to inspect the portable outbound event payloads.
+5. Open `/assistant` to inspect assistant variants, outcomes, guardrails, and tools.
+6. Open `/tasks` to see the generated follow-up work.
+7. Open `/integrations` to inspect the portable outbound event payloads.
 
 The demo uses the support-triage recipe, so completed calls create triage review tasks, escalations route to `support-escalations`, transfers create handoff checks, and voicemail/no-answer outcomes create callback work.
 

@@ -287,6 +287,7 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                 </div>
               </div>
               <p className="voice-footnote">
+                <a href="/assistant">Open analytics</a> ·{" "}
                 <a href="/tasks">Open tasks</a> ·{" "}
                 <a href="/integrations">Open integration events</a>
               </p>

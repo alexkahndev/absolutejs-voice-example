@@ -251,6 +251,7 @@ onUnmounted(() => {
             </div>
           </div>
           <p class="voice-footnote">
+            <a href="/assistant">Open analytics</a> ·
             <a href="/tasks">Open tasks</a> ·
             <a href="/integrations">Open integration events</a>
           </p>

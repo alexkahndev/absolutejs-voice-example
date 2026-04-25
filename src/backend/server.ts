@@ -10,6 +10,7 @@ import {
   createVoiceTaskUpdatedEvent,
   reopenVoiceOpsTask,
   startVoiceOpsTask,
+  summarizeVoiceAssistantRuns,
   type VoiceCallReviewStore,
   type VoiceAgentModel,
   type VoiceOpsTaskStatus,
@@ -34,6 +35,7 @@ import {
   renderVoiceIntegrationEventsPage,
   type SavedVoiceIntegrationEvent,
 } from "./integrationsPage";
+import { renderVoiceAssistantPage } from "./assistantPage";
 import { pagesPlugin } from "./plugins/pagesPlugin";
 import {
   buildSavedVoiceReview,
@@ -310,6 +312,9 @@ const listIntegrationEvents = async (): Promise<SavedVoiceIntegrationEvent[]> =>
 const listTasks = async (): Promise<SavedVoiceOpsTask[]> =>
   listVoiceOpsTasks(await runtimeStorage.tasks.list());
 
+const summarizeAssistantRuns = async () =>
+  summarizeVoiceAssistantRuns({ store: runtimeStorage.traces });
+
 const getTask = async (taskId: string): Promise<SavedVoiceOpsTask | null> =>
   (await runtimeStorage.tasks.get(taskId)) ?? null;
 
@@ -505,6 +510,7 @@ const server = new Elysia()
   )
   .get("/api/intakes", () => listIntakes())
   .get("/api/assistant-config", () => VOICE_ASSISTANT_CONFIG)
+  .get("/api/assistant-summary", async () => summarizeAssistantRuns())
   .get("/api/reviews", async ({ query }) => {
     const reviews = await listReviews();
     return filterVoiceReviews(reviews, normalizeReviewFilters(query));
@@ -580,6 +586,15 @@ const server = new Elysia()
           },
         },
       ),
+  )
+  .get(
+    "/assistant",
+    async () =>
+      new Response(renderVoiceAssistantPage(await summarizeAssistantRuns()), {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+        },
+      }),
   )
   .get("/tasks/:taskId/assign", async ({ params, query }) => {
     const owner =
