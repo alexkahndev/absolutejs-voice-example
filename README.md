@@ -91,6 +91,16 @@ The persisted runtime data lives under:
 - `.voice-runtime/voice-demo/events`
 - `.voice-runtime/voice-demo/traces`
 
+## Provider Shootout
+
+Run the same assistant cases against every configured model provider in parallel:
+
+```bash
+bun run bench:assistant:providers
+```
+
+The runner always includes the deterministic baseline and automatically includes OpenAI, Anthropic, and Gemini when their API keys are present. Use `VOICE_SHOOTOUT_PROVIDERS=openai,anthropic,gemini` to restrict the run. Results are written to `.voice-runtime/shootouts`, or to `VOICE_SHOOTOUT_OUTPUT_DIR` when set.
+
 ## What To Demo
 
 A good end-to-end demo flow is:

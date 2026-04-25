@@ -506,7 +506,8 @@ const assistant = createVoiceAssistant<
       },
       {
         id: "direct",
-        system: "direct support copy",
+        system:
+          "Use direct support copy. If the caller is in general recording mode, capture one freeform turn and return complete true. If the caller asks for transfer, escalation, voicemail, or no answer, route that exact lifecycle outcome.",
         weight: 1,
       },
     ],
@@ -550,7 +551,8 @@ const assistant = createVoiceAssistant<
     },
   },
   model: assistantModel ?? intakeModel,
-  system: "baseline guide copy",
+  system:
+    "Use baseline guide copy. If the caller is in general recording mode, capture one freeform turn and return complete true. If the caller is in guided mode, ask the next concise guided question until the guided prompts are complete. If the caller asks for transfer, escalation, voicemail, or no answer, route that exact lifecycle outcome.",
   tools: [intakeClassifierTool, lifecycleRouterTool, reviewTaskRecorderTool],
   trace: runtimeStorage.traces,
 });
