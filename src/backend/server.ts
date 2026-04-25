@@ -6,12 +6,14 @@ import {
   createVoiceAssistant,
   createVoiceAgentTool,
   createVoiceExperiment,
+  createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
   createVoiceTaskUpdatedEvent,
   reopenVoiceOpsTask,
   startVoiceOpsTask,
   summarizeVoiceAssistantRuns,
   type VoiceCallReviewStore,
+  type VoiceAssistantMemoryRecord,
   type VoiceAgentModel,
   type VoiceOpsTaskStatus,
   type VoiceOpsTaskStore,
@@ -138,6 +140,9 @@ const runtimeStorage = createVoiceFileRuntimeStorage<
   SavedVoiceIntegrationEvent
 >({
   directory: runtimeDirectory,
+});
+const memoryStore = createVoiceFileAssistantMemoryStore({
+  directory: resolve(runtimeDirectory, "memories"),
 });
 const deepgramApiKey = getEnv("DEEPGRAM_API_KEY");
 const webhookUrl = process.env.VOICE_DEMO_WEBHOOK_URL;
@@ -315,6 +320,11 @@ const listTasks = async (): Promise<SavedVoiceOpsTask[]> =>
 const summarizeAssistantRuns = async () =>
   summarizeVoiceAssistantRuns({ store: runtimeStorage.traces });
 
+const listAssistantMemory = async (): Promise<VoiceAssistantMemoryRecord[]> =>
+  memoryStore.list({
+    assistantId: VOICE_ASSISTANT_CONFIG.id,
+  });
+
 const getTask = async (taskId: string): Promise<SavedVoiceOpsTask | null> =>
   (await runtimeStorage.tasks.get(taskId)) ?? null;
 
@@ -442,6 +452,27 @@ const assistant = createVoiceAssistant<
         : undefined,
   },
   id: "support",
+  memory: {
+    namespace: ({ session }) => session.id,
+    store: memoryStore,
+  },
+  memoryLifecycle: {
+    afterTurn: async ({ memory, result, session }) => {
+      const savedIntake = result.result ?? buildSavedIntake(session);
+
+      if (savedIntake.detectedName) {
+        await memory.set("caller.name", savedIntake.detectedName);
+      }
+
+      if (savedIntake.callDisposition) {
+        await memory.set("lastOutcome", savedIntake.callDisposition);
+      }
+    },
+    beforeTurn: async ({ memory }) => {
+      await memory.get("caller.name");
+      await memory.get("lastOutcome");
+    },
+  },
   model: intakeModel,
   system: "baseline guide copy",
   tools: [intakeClassifierTool, lifecycleRouterTool, reviewTaskRecorderTool],
@@ -511,6 +542,7 @@ const server = new Elysia()
   .get("/api/intakes", () => listIntakes())
   .get("/api/assistant-config", () => VOICE_ASSISTANT_CONFIG)
   .get("/api/assistant-summary", async () => summarizeAssistantRuns())
+  .get("/api/assistant-memory", async () => listAssistantMemory())
   .get("/api/reviews", async ({ query }) => {
     const reviews = await listReviews();
     return filterVoiceReviews(reviews, normalizeReviewFilters(query));
@@ -590,11 +622,17 @@ const server = new Elysia()
   .get(
     "/assistant",
     async () =>
-      new Response(renderVoiceAssistantPage(await summarizeAssistantRuns()), {
-        headers: {
-          "Content-Type": "text/html; charset=utf-8",
+      new Response(
+        renderVoiceAssistantPage(
+          await summarizeAssistantRuns(),
+          await listAssistantMemory(),
+        ),
+        {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+          },
         },
-      }),
+      ),
   )
   .get("/tasks/:taskId/assign", async ({ params, query }) => {
     const owner =

@@ -1,4 +1,7 @@
-import type { VoiceAssistantRunsSummary } from "@absolutejs/voice";
+import type {
+  VoiceAssistantMemoryRecord,
+  VoiceAssistantRunsSummary,
+} from "@absolutejs/voice";
 import { VOICE_ASSISTANT_CONFIG } from "../shared/demo";
 
 const escapeHtml = (value: string) =>
@@ -32,6 +35,7 @@ const renderCountMap = (values: Record<string, number>) => {
 
 export const renderVoiceAssistantPage = (
   summary: VoiceAssistantRunsSummary,
+  memories: VoiceAssistantMemoryRecord[] = [],
 ) => {
   const assistant = summary.assistants[0];
 
@@ -63,7 +67,7 @@ export const renderVoiceAssistantPage = (
   <main>
     <section>
       <h1>Assistant control plane</h1>
-      <p>This page summarizes assistant trace events from <code>createVoiceAssistant(...)</code>: variants, outcomes, guardrails, tools, and artifact plans.</p>
+      <p>This page summarizes assistant trace events from <code>createVoiceAssistant(...)</code>: variants, outcomes, guardrails, tools, memory, and artifact plans.</p>
       <p><a href="/react">Back to demo</a> · <a href="/reviews">Reviews</a> · <a href="/tasks">Tasks</a> · <a href="/integrations">Integrations</a></p>
     </section>
     <section>
@@ -83,7 +87,22 @@ export const renderVoiceAssistantPage = (
       <article><h2>Outcomes</h2>${renderCountMap(assistant?.outcomes ?? {})}</article>
       <article><h2>Variants</h2>${renderCountMap(assistant?.variants ?? {})}</article>
       <article><h2>Tools</h2>${renderCountMap(assistant?.toolCalls ?? {})}</article>
+      <article><h2>Memory ops</h2>${renderCountMap(assistant?.memory ?? {})}</article>
       <article><h2>Artifact plans</h2>${renderCountMap(assistant?.artifactPlans ?? {})}</article>
+      <article><h2>Stored memory</h2>${
+        memories.length
+          ? `<div class="metric-list">${memories
+              .map(
+                (memory) => `
+                  <div class="metric-row">
+                    <span>${escapeHtml(memory.namespace)} / ${escapeHtml(memory.key)}</span>
+                    <strong>${escapeHtml(String(memory.value))}</strong>
+                  </div>
+                `,
+              )
+              .join("")}</div>`
+          : `<p class="empty">No memory records yet. Complete a call with “my name is ...” to persist one.</p>`
+      }</article>
     </section>
   </main>
 </body>
