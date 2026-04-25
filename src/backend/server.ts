@@ -3,6 +3,8 @@ import {
   applyPhraseHintCorrections,
   assignVoiceOpsTask,
   completeVoiceOpsTask,
+  createAnthropicVoiceAssistantModel,
+  createGeminiVoiceAssistantModel,
   createVoiceAssistant,
   createVoiceAgentTool,
   createVoiceExperiment,
@@ -146,9 +148,46 @@ const memoryStore = createVoiceFileAssistantMemoryStore({
   directory: resolve(runtimeDirectory, "memories"),
 });
 const deepgramApiKey = getEnv("DEEPGRAM_API_KEY");
+const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+const geminiApiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
 const openAIApiKey = process.env.OPENAI_API_KEY;
 const webhookUrl = process.env.VOICE_DEMO_WEBHOOK_URL;
-const modelProvider = openAIApiKey ? "openai" : "deterministic";
+const requestedModelProvider = process.env.VOICE_MODEL_PROVIDER?.toLowerCase();
+const resolveModelProvider = () => {
+  if (
+    requestedModelProvider === "openai" ||
+    requestedModelProvider === "anthropic" ||
+    requestedModelProvider === "gemini" ||
+    requestedModelProvider === "deterministic"
+  ) {
+    if (requestedModelProvider === "openai" && !openAIApiKey) {
+      throw new Error("VOICE_MODEL_PROVIDER=openai requires OPENAI_API_KEY.");
+    }
+    if (requestedModelProvider === "anthropic" && !anthropicApiKey) {
+      throw new Error(
+        "VOICE_MODEL_PROVIDER=anthropic requires ANTHROPIC_API_KEY.",
+      );
+    }
+    if (requestedModelProvider === "gemini" && !geminiApiKey) {
+      throw new Error(
+        "VOICE_MODEL_PROVIDER=gemini requires GEMINI_API_KEY or GOOGLE_API_KEY.",
+      );
+    }
+    return requestedModelProvider;
+  }
+
+  if (openAIApiKey) {
+    return "openai";
+  }
+  if (anthropicApiKey) {
+    return "anthropic";
+  }
+  if (geminiApiKey) {
+    return "gemini";
+  }
+  return "deterministic";
+};
+const modelProvider = resolveModelProvider();
 const assistantConfig = {
   ...VOICE_ASSISTANT_CONFIG,
   modelProvider,
@@ -173,6 +212,30 @@ const openAIModel = openAIApiKey
       model: process.env.OPENAI_VOICE_MODEL ?? "gpt-4.1-mini",
     })
   : undefined;
+const anthropicModel = anthropicApiKey
+  ? createAnthropicVoiceAssistantModel<
+      unknown,
+      VoiceSessionRecord,
+      SavedIntake
+    >({
+      apiKey: anthropicApiKey,
+      model: process.env.ANTHROPIC_VOICE_MODEL ?? "claude-sonnet-4-5",
+    })
+  : undefined;
+const geminiModel = geminiApiKey
+  ? createGeminiVoiceAssistantModel<unknown, VoiceSessionRecord, SavedIntake>({
+      apiKey: geminiApiKey,
+      model: process.env.GEMINI_VOICE_MODEL ?? "gemini-2.5-flash",
+    })
+  : undefined;
+const assistantModel =
+  modelProvider === "openai"
+    ? openAIModel
+    : modelProvider === "anthropic"
+      ? anthropicModel
+      : modelProvider === "gemini"
+        ? geminiModel
+        : undefined;
 const intakeClassifierTool = createVoiceAgentTool<
   unknown,
   VoiceSessionRecord,
@@ -486,7 +549,7 @@ const assistant = createVoiceAssistant<
       await memory.get("lastOutcome");
     },
   },
-  model: openAIModel ?? intakeModel,
+  model: assistantModel ?? intakeModel,
   system: "baseline guide copy",
   tools: [intakeClassifierTool, lifecycleRouterTool, reviewTaskRecorderTool],
   trace: runtimeStorage.traces,

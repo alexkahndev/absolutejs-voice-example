@@ -22,7 +22,7 @@ The server uses:
 - assistant `artifactPlan` for built-in review, task, and integration-event recording
 - assistant `support-triage` recipe for recipe-driven follow-up work
 - assistant guardrails and experiment variants
-- OpenAI assistant model routing when `OPENAI_API_KEY` is present, with deterministic fallback when it is not
+- provider-neutral assistant model routing for OpenAI, Anthropic, and Gemini, with deterministic fallback when no LLM key is present
 
 Each framework page keeps feature parity:
 
@@ -47,9 +47,13 @@ Optional LLM routing:
 
 ```bash
 OPENAI_API_KEY=... OPENAI_VOICE_MODEL=gpt-4.1-mini bun run dev
+ANTHROPIC_API_KEY=... ANTHROPIC_VOICE_MODEL=claude-sonnet-4-5 bun run dev
+GEMINI_API_KEY=... GEMINI_VOICE_MODEL=gemini-2.5-flash bun run dev
 ```
 
-`OPENAI_VOICE_MODEL` is optional. If `OPENAI_API_KEY` is missing, the server keeps using the deterministic local intake model so the demo still runs with only the voice/STT key.
+Provider selection is automatic in this order: OpenAI, Anthropic, Gemini, then deterministic fallback. You can force one with `VOICE_MODEL_PROVIDER=openai`, `VOICE_MODEL_PROVIDER=anthropic`, `VOICE_MODEL_PROVIDER=gemini`, or `VOICE_MODEL_PROVIDER=deterministic`.
+
+Provider model env vars are optional. If no LLM key is present, the server keeps using the deterministic local intake model so the demo still runs with only the voice/STT key.
 
 Then open:
 
@@ -70,7 +74,7 @@ The example now follows the same production pattern recommended in `@absolutejs/
 
 - durable runtime storage via `createVoiceFileRuntimeStorage(...)`
 - one assistant surface via `createVoiceAssistant(...)`
-- provider-neutral model selection: `createOpenAIVoiceAssistantModel(...)` when `OPENAI_API_KEY` is configured, deterministic fallback otherwise
+- provider-neutral model selection through `createOpenAIVoiceAssistantModel(...)`, `createAnthropicVoiceAssistantModel(...)`, and `createGeminiVoiceAssistantModel(...)`
 - recipe-driven ops defaults via the assistant `support-triage` artifact plan
 - `voice({ ops: assistant.ops, onTurn: assistant.onTurn })` to record:
   - reviews
