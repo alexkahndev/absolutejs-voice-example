@@ -86,6 +86,29 @@ const renderProviderHealth = (providers: VoiceProviderHealth[]) => {
     .join("")}</div>`;
 };
 
+const renderFailoverControls = (providers: string[] = []) => {
+  const simulatedProviders = providers.filter(
+    (provider) => provider !== "deterministic",
+  );
+
+  if (simulatedProviders.length === 0) {
+    return `<p class="empty">No external model providers are configured for failover simulation.</p>`;
+  }
+
+  return `<div class="failover-panel">
+    <p class="empty">Trigger a simulated HTTP 429 for a provider. The router should suppress it, fall back to another provider, and refresh this page with the updated status.</p>
+    <div class="failover-actions">
+      ${simulatedProviders
+        .map(
+          (provider) =>
+            `<button type="button" data-provider="${escapeHtml(provider)}">Simulate ${escapeHtml(provider)} failure</button>`,
+        )
+        .join("")}
+    </div>
+    <pre id="failover-output" class="failover-output" hidden></pre>
+  </div>`;
+};
+
 export const renderVoiceAssistantPage = (
   summary: VoiceAssistantRunsSummary,
   memories: VoiceAssistantMemoryRecord[] = [],
@@ -118,8 +141,14 @@ export const renderVoiceAssistantPage = (
     .provider-card { background: #0f1217; border: 1px solid #27272a; border-radius: 16px; padding: 16px; }
     .provider-card.healthy { border-color: rgba(34, 197, 94, 0.5); }
     .provider-card.degraded, .provider-card.rate-limited { border-color: rgba(245, 158, 11, 0.6); }
+    .provider-card.suppressed { border-color: rgba(239, 68, 68, 0.7); }
     .provider-card-header { align-items: center; display: flex; gap: 8px; justify-content: space-between; margin-bottom: 12px; }
     .provider-card-header h3 { margin: 0; }
+    .failover-panel { display: grid; gap: 12px; }
+    .failover-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    button { background: #f59e0b; border: 0; border-radius: 999px; color: #111827; cursor: pointer; font-weight: 700; padding: 10px 14px; }
+    button:disabled { cursor: wait; opacity: 0.65; }
+    .failover-output { background: #0f1217; border: 1px solid #27272a; border-radius: 12px; color: #d4d4d8; overflow: auto; padding: 12px; white-space: pre-wrap; }
     a { color: #f59e0b; }
     @media (max-width: 800px) { .grid, .wide-grid, .provider-grid { grid-template-columns: 1fr; } }
   </style>
@@ -143,6 +172,10 @@ export const renderVoiceAssistantPage = (
     <section>
       <h2>Provider status</h2>
       ${renderProviderHealth(providerHealth)}
+    </section>
+    <section>
+      <h2>Test provider failover</h2>
+      ${renderFailoverControls(config.availableProviders)}
     </section>
     <section class="grid">
       <article class="stat"><span>Runs</span><strong>${assistant?.runCount ?? 0}</strong></article>
@@ -172,6 +205,36 @@ export const renderVoiceAssistantPage = (
       }</article>
     </section>
   </main>
+  <script>
+    const output = document.getElementById("failover-output");
+    for (const button of document.querySelectorAll("[data-provider]")) {
+      button.addEventListener("click", async () => {
+        const provider = button.getAttribute("data-provider");
+        if (!provider) return;
+        button.disabled = true;
+        if (output) {
+          output.hidden = false;
+          output.textContent = "Simulating " + provider + " failure...";
+        }
+        try {
+          const response = await fetch("/api/provider-simulate/failure?provider=" + encodeURIComponent(provider), {
+            method: "POST"
+          });
+          const body = await response.json();
+          if (output) {
+            output.textContent = JSON.stringify(body, null, 2);
+          }
+          window.setTimeout(() => window.location.reload(), 500);
+        } catch (error) {
+          if (output) {
+            output.textContent = error instanceof Error ? error.message : String(error);
+          }
+        } finally {
+          button.disabled = false;
+        }
+      });
+    }
+  </script>
 </body>
 </html>`;
 };
