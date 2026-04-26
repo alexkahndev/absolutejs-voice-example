@@ -17,7 +17,8 @@ export type VoiceProviderStatus =
   | "healthy"
   | "idle"
   | "rate-limited"
-  | "degraded";
+  | "degraded"
+  | "suppressed";
 
 export type VoiceProviderStatusRecord = {
   averageElapsedMs?: number;
@@ -28,6 +29,8 @@ export type VoiceProviderStatusRecord = {
   recommended: boolean;
   runCount: number;
   status: VoiceProviderStatus;
+  suppressionRemainingMs?: number;
+  suppressedUntil?: number;
 };
 
 export const VOICE_MODEL_PROVIDERS: Array<{
@@ -154,6 +157,8 @@ export const getVoiceProviderStatusLabel = (status: VoiceProviderStatus) => {
       return "Rate limited";
     case "degraded":
       return "Degraded";
+    case "suppressed":
+      return "Temporarily suppressed";
     case "idle":
       return "Idle";
   }

@@ -20,7 +20,9 @@ type VoiceProviderHealth = {
   provider: string;
   recommended: boolean;
   runCount: number;
-  status: "healthy" | "idle" | "rate-limited" | "degraded";
+  status: "healthy" | "idle" | "rate-limited" | "degraded" | "suppressed";
+  suppressionRemainingMs?: number;
+  suppressedUntil?: number;
 };
 
 const escapeHtml = (value: string) =>
@@ -58,8 +60,13 @@ const renderProviderHealth = (providers: VoiceProviderHealth[]) => {
   }
 
   return `<div class="provider-grid">${providers
-    .map(
-      (provider) => `
+    .map((provider) => {
+      const suppressionSeconds =
+        typeof provider.suppressionRemainingMs === "number"
+          ? Math.ceil(provider.suppressionRemainingMs / 1000)
+          : undefined;
+
+      return `
         <article class="provider-card ${escapeHtml(provider.status)}">
           <div class="provider-card-header">
             <h3>${escapeHtml(provider.provider)}</h3>
@@ -71,10 +78,11 @@ const renderProviderHealth = (providers: VoiceProviderHealth[]) => {
             <div class="metric-row"><span>Errors</span><strong>${provider.errorCount}</strong></div>
             <div class="metric-row"><span>Fallbacks</span><strong>${provider.fallbackCount}</strong></div>
           </div>
+          ${suppressionSeconds ? `<p class="empty">Temporarily suppressed for ${suppressionSeconds}s.</p>` : ""}
           ${provider.lastError ? `<p class="empty">${escapeHtml(provider.lastError)}</p>` : ""}
         </article>
-      `,
-    )
+      `;
+    })
     .join("")}</div>`;
 };
 

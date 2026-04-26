@@ -498,7 +498,9 @@ type VoiceProviderHealth = {
   rateLimited: boolean;
   recommended: boolean;
   runCount: number;
-  status: "healthy" | "idle" | "rate-limited" | "degraded";
+  status: "healthy" | "idle" | "rate-limited" | "degraded" | "suppressed";
+  suppressionRemainingMs?: number;
+  suppressedUntil?: number;
 };
 
 const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
@@ -577,10 +579,32 @@ const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
       event.payload.providerStatus === "error"
         ? event.payload.providerStatus
         : undefined;
+    const applyProviderHealth = () => {
+      const entry = getEntry(provider);
+      const providerHealth = event.payload.providerHealth;
+      if (providerHealth && typeof providerHealth === "object") {
+        const suppressedUntil = (providerHealth as Record<string, unknown>)
+          .suppressedUntil;
+        if (typeof suppressedUntil === "number") {
+          entry.suppressedUntil = suppressedUntil;
+        }
+      }
+      if (typeof event.payload.suppressedUntil === "number") {
+        entry.suppressedUntil = event.payload.suppressedUntil;
+      }
+      if (typeof event.payload.suppressionRemainingMs === "number") {
+        entry.suppressionRemainingMs = event.payload.suppressionRemainingMs;
+      }
+      return entry;
+    };
 
     if (providerStatus === "success" || providerStatus === "fallback") {
-      const entry = getEntry(provider);
+      const entry = applyProviderHealth();
       entry.runCount += 1;
+      if (providerStatus === "success") {
+        entry.suppressedUntil = undefined;
+        entry.suppressionRemainingMs = undefined;
+      }
       if (typeof event.payload.elapsedMs === "number") {
         entry.elapsedCount += 1;
         entry.elapsedTotal += event.payload.elapsedMs;
@@ -596,7 +620,7 @@ const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
       continue;
     }
 
-    const entry = getEntry(provider);
+    const entry = applyProviderHealth();
     entry.errorCount += 1;
     entry.lastError =
       typeof event.payload.error === "string" ? event.payload.error : undefined;
@@ -608,17 +632,24 @@ const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
   }
 
   const summaries = [...entries.values()].map((entry) => {
+    const suppressionRemainingMs =
+      typeof entry.suppressedUntil === "number"
+        ? Math.max(0, entry.suppressedUntil - Date.now())
+        : entry.suppressionRemainingMs;
     const averageElapsedMs =
       entry.elapsedCount > 0
         ? Math.round(entry.elapsedTotal / entry.elapsedCount)
         : undefined;
-    const status: VoiceProviderHealth["status"] = entry.rateLimited
-      ? "rate-limited"
-      : entry.errorCount > 0
-        ? "degraded"
-        : entry.runCount > 0
-          ? "healthy"
-          : "idle";
+    const status: VoiceProviderHealth["status"] =
+      typeof suppressionRemainingMs === "number" && suppressionRemainingMs > 0
+        ? "suppressed"
+        : entry.rateLimited
+          ? "rate-limited"
+          : entry.errorCount > 0
+            ? "degraded"
+            : entry.runCount > 0
+              ? "healthy"
+              : "idle";
 
     return {
       averageElapsedMs,
@@ -631,6 +662,8 @@ const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
       recommended: false,
       runCount: entry.runCount,
       status,
+      suppressionRemainingMs,
+      suppressedUntil: entry.suppressedUntil,
     };
   });
   const recommended = summaries

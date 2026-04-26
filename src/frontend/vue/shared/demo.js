@@ -62,6 +62,8 @@ export const getVoiceProviderStatusLabel = (status) => {
       return "Rate limited";
     case "degraded":
       return "Degraded";
+    case "suppressed":
+      return "Temporarily suppressed";
     case "idle":
       return "Idle";
   }
