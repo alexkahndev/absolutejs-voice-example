@@ -306,11 +306,20 @@ const assistantModel = createVoiceProviderRouter<
   SavedIntake,
   VoiceModelProvider
 >({
+  allowProviders: () => configuredModelProviders,
   fallback: ({ context }) =>
     providerFallbackOrder(resolveRequestedProvider(context)),
+  fallbackMode: "provider-error",
   isProviderError: (error, provider) =>
     provider !== "deterministic" && isAssistantProviderError(error),
   onProviderEvent: traceProviderEvent,
+  policy: "prefer-selected",
+  providerProfiles: {
+    deterministic: { cost: 0, latencyMs: 5, priority: 4 },
+    openai: { cost: 2, latencyMs: 500, priority: 1 },
+    anthropic: { cost: 3, latencyMs: 700, priority: 2 },
+    gemini: { cost: 1, latencyMs: 650, priority: 3 },
+  },
   providers: providerModels,
   selectProvider: ({ context }) => resolveRequestedProvider(context),
 });
