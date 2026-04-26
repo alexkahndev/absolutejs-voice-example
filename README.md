@@ -91,6 +91,51 @@ The persisted runtime data lives under:
 - `.voice-runtime/voice-demo/events`
 - `.voice-runtime/voice-demo/traces`
 
+## Provider Routing And Failover
+
+Every framework page includes the same provider selector. The selected provider is sent to the voice route as `?provider=openai`, `?provider=anthropic`, `?provider=gemini`, or `?provider=deterministic`.
+
+The backend routes every assistant turn through `createVoiceProviderRouter(...)` from `@absolutejs/voice`:
+
+- `prefer-selected` keeps the user-selected provider first.
+- configured fallback order is OpenAI, Anthropic, Gemini, then deterministic.
+- adaptive provider health suppresses providers after provider errors or rate limits.
+- rate-limit suppressions cool down for 120 seconds in this demo.
+- successful recovery retries clear active suppression while preserving historical error counts.
+
+Provider status is visible in `/assistant` and `/api/provider-status`.
+
+Status meanings:
+
+- `healthy`: the provider has a successful recent run and is eligible.
+- `suppressed`: the provider is temporarily skipped by the router; `suppressionRemainingMs` shows the cooldown.
+- `recoverable`: a previous suppression expired and the provider can be retried.
+- `rate-limited`: a rate-limit error was seen without active cooldown timing.
+- `degraded`: the latest provider event is still a failure.
+- `idle`: no provider activity yet.
+
+Use `/assistant` to demo failover without burning model quota:
+
+- Click `Simulate openai failure`, `Simulate anthropic failure`, or `Simulate gemini failure`.
+- The simulator emits a fake HTTP 429 through the same router health path.
+- The selected provider becomes `suppressed`.
+- The router falls back to the next eligible provider.
+- Click `Retry ... recovery` to retry that provider directly and move it back to `healthy`.
+
+The same flow is available from scripts and HTTP endpoints.
+
+```bash
+bun run simulate:provider-failure openai gemini
+```
+
+```bash
+curl -X POST 'http://localhost:3000/api/provider-simulate/failure?provider=openai'
+curl -X POST 'http://localhost:3000/api/provider-simulate/recovery?provider=openai'
+curl 'http://localhost:3000/api/provider-status'
+```
+
+The simulator uses local fake model adapters. It does not call OpenAI, Anthropic, Gemini, Deepgram, or any other external provider.
+
 ## Provider Shootout
 
 Run the same assistant cases against every configured model provider in parallel:
