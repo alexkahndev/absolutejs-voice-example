@@ -12,6 +12,7 @@ import {
   createVoiceFileRuntimeStorage,
   createOpenAIVoiceAssistantModel,
   createVoiceProviderRouter,
+  createVoiceSessionRecord,
   createVoiceTaskUpdatedEvent,
   reopenVoiceOpsTask,
   startVoiceOpsTask,
@@ -328,6 +329,112 @@ const assistantModel = createVoiceProviderRouter<
   providers: providerModels,
   selectProvider: ({ context }) => resolveRequestedProvider(context),
 });
+const resolveSimulatedFailureProvider = (
+  context: unknown,
+): VoiceModelProvider | undefined => {
+  if (
+    context &&
+    typeof context === "object" &&
+    "query" in context &&
+    context.query &&
+    typeof context.query === "object" &&
+    "simulateFailureProvider" in context.query &&
+    isVoiceModelProvider(context.query.simulateFailureProvider)
+  ) {
+    return context.query.simulateFailureProvider;
+  }
+
+  return undefined;
+};
+const simulateProviderModels = Object.fromEntries(
+  (["deterministic", "openai", "anthropic", "gemini"] as const).map(
+    (provider) => [
+      provider,
+      {
+        generate: async ({ context }) => {
+          if (provider === resolveSimulatedFailureProvider(context)) {
+            const label =
+              provider === "openai"
+                ? "OpenAI"
+                : provider === "anthropic"
+                  ? "Anthropic"
+                  : provider === "gemini"
+                    ? "Gemini"
+                    : "Deterministic";
+            throw new Error(`${label} voice assistant model failed: HTTP 429`);
+          }
+
+          return {
+            assistantText: `Simulated ${provider} provider recovered.`,
+          };
+        },
+      } satisfies VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake>,
+    ],
+  ),
+) as Record<
+  VoiceModelProvider,
+  VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake>
+>;
+const providerFailureSimulator = createVoiceProviderRouter<
+  unknown,
+  VoiceSessionRecord,
+  SavedIntake,
+  VoiceModelProvider
+>({
+  allowProviders: () => configuredModelProviders,
+  fallback: ({ context }) =>
+    providerFallbackOrder(resolveRequestedProvider(context)),
+  fallbackMode: "provider-error",
+  isProviderError: (error, provider) =>
+    provider !== "deterministic" && isAssistantProviderError(error),
+  onProviderEvent: traceProviderEvent,
+  policy: "prefer-selected",
+  providerHealth: {
+    cooldownMs: 30_000,
+    failureThreshold: 1,
+    rateLimitCooldownMs: 120_000,
+  },
+  providers: simulateProviderModels,
+  selectProvider: ({ context }) => resolveRequestedProvider(context),
+});
+const runProviderFailureSimulation = async (provider: VoiceModelProvider) => {
+  const session = createVoiceSessionRecord(
+    `provider-sim-${Date.now()}`,
+    "provider-simulation",
+  );
+  const turn = {
+    committedAt: Date.now(),
+    id: `provider-sim-turn-${Date.now()}`,
+    text: `Simulate ${provider} provider failure.`,
+    transcripts: [],
+  };
+
+  const result = await providerFailureSimulator.generate({
+    agentId: "support",
+    context: {
+      query: {
+        provider,
+        simulateFailureProvider: provider,
+      },
+    },
+    messages: [
+      {
+        content: turn.text,
+        role: "user",
+      },
+    ],
+    session,
+    system: "Simulate provider routing without calling external APIs.",
+    tools: [],
+    turn,
+  });
+
+  return {
+    provider,
+    result,
+    status: "simulated",
+  };
+};
 const intakeClassifierTool = createVoiceAgentTool<
   unknown,
   VoiceSessionRecord,
@@ -908,6 +1015,26 @@ const server = new Elysia()
   .get("/api/assistant-config", () => assistantConfig)
   .get("/api/assistant-summary", async () => summarizeAssistantRuns())
   .get("/api/provider-status", async () => summarizeProviderHealth())
+  .post("/api/provider-simulate/failure", async ({ query }) => {
+    const provider =
+      typeof query.provider === "string" && isVoiceModelProvider(query.provider)
+        ? query.provider
+        : undefined;
+
+    if (!provider || provider === "deterministic") {
+      return {
+        error:
+          "Set ?provider=openai, ?provider=anthropic, or ?provider=gemini.",
+      };
+    }
+    if (!configuredModelProviders.includes(provider)) {
+      return {
+        error: `${provider} is not configured in this environment.`,
+      };
+    }
+
+    return runProviderFailureSimulation(provider);
+  })
   .get("/api/assistant-memory", async () => listAssistantMemory())
   .get("/api/reviews", async ({ query }) => {
     const reviews = await listReviews();
