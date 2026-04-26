@@ -1,3 +1,18 @@
+export const VOICE_MODEL_PROVIDERS = [
+  {
+    id: "deterministic",
+    label: "Deterministic local model",
+    shortLabel: "Local",
+  },
+  { id: "openai", label: "OpenAI", shortLabel: "OpenAI" },
+  { id: "anthropic", label: "Anthropic Claude", shortLabel: "Claude" },
+  { id: "gemini", label: "Google Gemini", shortLabel: "Gemini" },
+];
+export const isVoiceModelProvider = (value) =>
+  value === "deterministic" ||
+  value === "openai" ||
+  value === "anthropic" ||
+  value === "gemini";
 export const VOICE_ROUTE_PATH = "/voice/intake";
 export const VOICE_DEMO_GUIDE_TITLE = "Run the guided voice test";
 export const VOICE_DEMO_GUIDE_STEPS = [
@@ -35,8 +50,37 @@ export const VOICE_TEST_QUESTIONS = [
   "Now describe what you are trying to do or test.",
   "Finish with any detail that feels blocked, risky, or unclear.",
 ];
-export const getVoiceRoutePath = (scenarioId) =>
-  `${VOICE_ROUTE_PATH}?scenarioId=${scenarioId}`;
+export const getVoiceRoutePath = (scenarioId, provider) => {
+  const params = new URLSearchParams({
+    scenarioId,
+  });
+  if (provider) {
+    params.set("provider", provider);
+  }
+  return `${VOICE_ROUTE_PATH}?${params.toString()}`;
+};
+export const getVoiceProviderLabel = (provider) =>
+  VOICE_MODEL_PROVIDERS.find((item) => item.id === provider)?.label ?? provider;
+export const getInitialVoiceModelProvider = () => {
+  if (typeof window === "undefined") {
+    return "deterministic";
+  }
+  const urlProvider = new URLSearchParams(window.location.search).get(
+    "provider",
+  );
+  if (isVoiceModelProvider(urlProvider)) {
+    return urlProvider;
+  }
+  const storedProvider = window.localStorage.getItem("voiceModelProvider");
+  return isVoiceModelProvider(storedProvider)
+    ? storedProvider
+    : "deterministic";
+};
+export const rememberVoiceModelProvider = (provider) => {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem("voiceModelProvider", provider);
+  }
+};
 export const getVoiceScenarioLabel = (scenarioId) =>
   scenarioId === "guided" ? "Guided test" : "General recording";
 export const getVoiceModeLabel = getVoiceScenarioLabel;

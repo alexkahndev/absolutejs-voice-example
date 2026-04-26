@@ -68,8 +68,32 @@
                 <span class="voice-metric-label">Saved captures</span>
                 <span class="voice-metric-value" id="metric-intakes">0</span>
               </div>
+              <div class="voice-metric">
+                <span class="voice-metric-label">Model</span>
+                <span class="voice-metric-value" id="metric-provider"
+                  >Local</span
+                >
+              </div>
             </div>
           </div>
+        </article>
+
+        <article class="voice-card voice-provider-card">
+          <span class="voice-framework-pill">Model Provider</span>
+          <h2>Choose the assistant brain</h2>
+          <p class="voice-footnote">
+            Switch providers before starting the microphone. The voice route
+            receives the selected provider on every session.
+          </p>
+          <label class="voice-provider-select">
+            <span>Provider</span>
+            <select id="model-provider-select">
+              <option value="deterministic">Deterministic local model</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic Claude</option>
+              <option value="gemini">Google Gemini</option>
+            </select>
+          </label>
         </article>
 
         <article class="voice-card voice-card-side">

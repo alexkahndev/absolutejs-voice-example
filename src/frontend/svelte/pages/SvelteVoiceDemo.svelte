@@ -6,10 +6,13 @@
   import {
     FRAMEWORKS,
     FRAMEWORK_DESCRIPTIONS,
+    getInitialVoiceModelProvider,
     getVoiceLeadMessage,
     getVoiceModeLabel,
     getVoiceModePrompt,
+    getVoiceProviderLabel,
     getVoiceRoutePath,
+    rememberVoiceModelProvider,
     VOICE_ASSISTANT_CONFIG,
     VOICE_DEMO_GUIDE_STEPS,
     VOICE_DEMO_GUIDE_TITLE,
@@ -18,7 +21,9 @@
     VOICE_DEMO_MIC_IDLE,
     VOICE_DEMO_MIC_LIVE,
     VOICE_DEMO_STOP_LABEL,
+    VOICE_MODEL_PROVIDERS,
     type VoiceDemoMode,
+    type VoiceModelProvider,
     type SavedIntake,
   } from "../../../shared/demo";
   import {
@@ -45,6 +50,9 @@
 
   let { cssPath }: { cssPath?: string } = $props();
   let activeMode = $state<VoiceDemoMode | null>(null);
+  let modelProvider = $state<VoiceModelProvider>(
+    getInitialVoiceModelProvider(),
+  );
   let error = $state<string | null>(null);
   let hasStartedModes = $state<Record<VoiceDemoMode, boolean>>({
     general: false,
@@ -128,9 +136,17 @@
     await startMic();
   };
 
-  onMount(() => {
-    guidedVoice = createVoiceStream<SavedIntake>(getVoiceRoutePath("guided"));
-    generalVoice = createVoiceStream<SavedIntake>(getVoiceRoutePath("general"));
+  const connectVoices = () => {
+    unsubscribeGuided();
+    unsubscribeGeneral();
+    guidedVoice?.close();
+    generalVoice?.close();
+    guidedVoice = createVoiceStream<SavedIntake>(
+      getVoiceRoutePath("guided", modelProvider),
+    );
+    generalVoice = createVoiceStream<SavedIntake>(
+      getVoiceRoutePath("general", modelProvider),
+    );
     guidedState = { ...guidedVoice.getSnapshot() };
     generalState = { ...generalVoice.getSnapshot() };
     unsubscribeGuided = guidedVoice.subscribe(() => {
@@ -139,6 +155,25 @@
     unsubscribeGeneral = generalVoice.subscribe(() => {
       generalState = { ...generalVoice!.getSnapshot() };
     });
+  };
+
+  const changeModelProvider = (provider: VoiceModelProvider) => {
+    stopMic();
+    activeMode = null;
+    modelProvider = provider;
+    rememberVoiceModelProvider(provider);
+    connectVoices();
+  };
+
+  const changeModelProviderFromEvent = (event: Event) => {
+    const target = event.target;
+    if (target instanceof HTMLSelectElement) {
+      changeModelProvider(target.value as VoiceModelProvider);
+    }
+  };
+
+  onMount(() => {
+    connectVoices();
     void refreshIntakes();
     refreshTimer = setInterval(() => {
       void refreshIntakes();
@@ -209,8 +244,34 @@
               <span class="voice-metric-label">Saved captures</span>
               <span class="voice-metric-value">{savedIntakes.length}</span>
             </div>
+            <div class="voice-metric">
+              <span class="voice-metric-label">Model</span>
+              <span class="voice-metric-value"
+                >{getVoiceProviderLabel(modelProvider)}</span
+              >
+            </div>
           </div>
         </div>
+      </article>
+
+      <article class="voice-card voice-provider-card">
+        <span class="voice-framework-pill">Model Provider</span>
+        <h2>Choose the assistant brain</h2>
+        <p class="voice-footnote">
+          Switch providers before starting the microphone. The voice route
+          receives the selected provider on every session.
+        </p>
+        <label class="voice-provider-select">
+          <span>Provider</span>
+          <select
+            value={modelProvider}
+            on:change={changeModelProviderFromEvent}
+          >
+            {#each VOICE_MODEL_PROVIDERS as provider}
+              <option value={provider.id}>{provider.label}</option>
+            {/each}
+          </select>
+        </label>
       </article>
 
       <article class="voice-card voice-card-side">

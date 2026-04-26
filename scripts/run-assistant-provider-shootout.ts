@@ -378,6 +378,14 @@ const runOne = async (
   }
 };
 
+const runProvider = async (provider: ProviderId) => {
+  const results: ShootoutResult[] = [];
+  for (const testCase of cases) {
+    results.push(await runOne(provider, testCase));
+  }
+  return results;
+};
+
 const summarize = (results: ShootoutResult[]) =>
   Object.values(
     results.reduce<
@@ -421,16 +429,14 @@ if (providers.length === 0) {
 }
 
 const results = (
-  await Promise.all(
-    providers.flatMap((provider) =>
-      cases.map((testCase) => runOne(provider, testCase)),
-    ),
-  )
-).sort((left, right) =>
-  left.provider === right.provider
-    ? left.id.localeCompare(right.id)
-    : left.provider.localeCompare(right.provider),
-);
+  await Promise.all(providers.map((provider) => runProvider(provider)))
+)
+  .flat()
+  .sort((left, right) =>
+    left.provider === right.provider
+      ? left.id.localeCompare(right.id)
+      : left.provider.localeCompare(right.provider),
+  );
 
 const output = {
   generatedAt: new Date().toISOString(),

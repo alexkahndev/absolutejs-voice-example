@@ -59,7 +59,12 @@ import {
   resolveScenarioFromContext,
   VOICE_DEMO_PHRASE_HINTS,
 } from "./voiceFlow";
-import { VOICE_ASSISTANT_CONFIG, type SavedIntake } from "../shared/demo";
+import {
+  isVoiceModelProvider,
+  VOICE_ASSISTANT_CONFIG,
+  type SavedIntake,
+  type VoiceModelProvider,
+} from "../shared/demo";
 
 const { absolutejs, manifest } = await prepare();
 
@@ -153,6 +158,12 @@ const geminiApiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
 const openAIApiKey = process.env.OPENAI_API_KEY;
 const webhookUrl = process.env.VOICE_DEMO_WEBHOOK_URL;
 const requestedModelProvider = process.env.VOICE_MODEL_PROVIDER?.toLowerCase();
+const configuredModelProviders: VoiceModelProvider[] = [
+  "deterministic",
+  openAIApiKey ? "openai" : undefined,
+  anthropicApiKey ? "anthropic" : undefined,
+  geminiApiKey ? "gemini" : undefined,
+].filter(Boolean) as VoiceModelProvider[];
 const resolveModelProvider = () => {
   if (
     requestedModelProvider === "openai" ||
@@ -190,6 +201,7 @@ const resolveModelProvider = () => {
 const modelProvider = resolveModelProvider();
 const assistantConfig = {
   ...VOICE_ASSISTANT_CONFIG,
+  availableProviders: configuredModelProviders,
   modelProvider,
 };
 const intakeModel: VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake> = {
@@ -236,6 +248,22 @@ const assistantModel =
       : modelProvider === "gemini"
         ? geminiModel
         : undefined;
+const resolveRequestedProvider = (context: unknown): VoiceModelProvider => {
+  if (
+    context &&
+    typeof context === "object" &&
+    "query" in context &&
+    context.query &&
+    typeof context.query === "object" &&
+    "provider" in context.query &&
+    isVoiceModelProvider(context.query.provider) &&
+    configuredModelProviders.includes(context.query.provider)
+  ) {
+    return context.query.provider;
+  }
+
+  return modelProvider;
+};
 const intakeClassifierTool = createVoiceAgentTool<
   unknown,
   VoiceSessionRecord,
@@ -467,95 +495,116 @@ const redirectToTasks = () =>
     status: 302,
   });
 
-const assistant = createVoiceAssistant<
-  unknown,
-  VoiceSessionRecord,
-  SavedIntake
->({
-  artifactPlan: {
-    ops: {
-      buildReview: ({ result, session }) =>
-        buildSavedVoiceReview({
-          phraseHints: VOICE_DEMO_PHRASE_HINTS,
-          result: result ?? buildSavedIntake(session),
-          session,
-        }),
-      events: runtimeStorage.events,
-      onEvent: async ({ event }) => {
-        await deliverIntegrationEvent(event as SavedVoiceIntegrationEvent);
+const createDemoAssistant = (
+  provider: VoiceModelProvider,
+  model: VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake>,
+) =>
+  createVoiceAssistant<unknown, VoiceSessionRecord, SavedIntake>({
+    artifactPlan: {
+      ops: {
+        buildReview: ({ result, session }) =>
+          buildSavedVoiceReview({
+            phraseHints: VOICE_DEMO_PHRASE_HINTS,
+            result: result ?? buildSavedIntake(session),
+            session,
+          }),
+        events: runtimeStorage.events,
+        onEvent: async ({ event }) => {
+          await deliverIntegrationEvent(event as SavedVoiceIntegrationEvent);
+        },
+        reviews: runtimeStorage.reviews as unknown as VoiceCallReviewStore,
+        tasks: runtimeStorage.tasks as unknown as VoiceOpsTaskStore,
       },
-      reviews: runtimeStorage.reviews as unknown as VoiceCallReviewStore,
-      tasks: runtimeStorage.tasks as unknown as VoiceOpsTaskStore,
+      preset: {
+        name: "support-triage",
+        options: {
+          assignee: "support-oncall",
+          escalationAssignee: "support-lead",
+          escalationQueue: "support-escalations",
+          queue: "support-triage",
+        },
+      },
     },
-    preset: {
-      name: "support-triage",
-      options: {
-        assignee: "support-oncall",
-        escalationAssignee: "support-lead",
-        escalationQueue: "support-escalations",
-        queue: "support-triage",
-      },
+    experiment: createVoiceExperiment({
+      id: "support-copy",
+      variants: [
+        {
+          id: provider,
+          weight: 1,
+        },
+        {
+          id: "direct",
+          system:
+            "Use direct support copy. If the caller is in general recording mode, capture one freeform turn and return complete true. If the caller asks for transfer, escalation, voicemail, or no answer, route that exact lifecycle outcome.",
+          weight: 1,
+        },
+      ],
+    }),
+    guardrails: {
+      beforeTurn: ({ context, session, turn }) =>
+        /\b(human|agent|supervisor|manager)\b/i.test(turn.text) &&
+        /\b(please|need|want|get|talk|speak)\b/i.test(turn.text)
+          ? {
+              assistantText: "Escalating this call for human follow-up.",
+              escalate: {
+                reason: "caller-requested-human",
+              },
+              result: buildSavedIntake(
+                session,
+                resolveScenarioFromContext(context),
+              ),
+            }
+          : undefined,
     },
-  },
-  experiment: createVoiceExperiment({
-    id: "support-copy",
-    variants: [
-      {
-        id: modelProvider,
-        weight: 1,
-      },
-      {
-        id: "direct",
-        system:
-          "Use direct support copy. If the caller is in general recording mode, capture one freeform turn and return complete true. If the caller asks for transfer, escalation, voicemail, or no answer, route that exact lifecycle outcome.",
-        weight: 1,
-      },
-    ],
-  }),
-  guardrails: {
-    beforeTurn: ({ context, session, turn }) =>
-      /\b(human|agent|supervisor|manager)\b/i.test(turn.text) &&
-      /\b(please|need|want|get|talk|speak)\b/i.test(turn.text)
-        ? {
-            assistantText: "Escalating this call for human follow-up.",
-            escalate: {
-              reason: "caller-requested-human",
-            },
-            result: buildSavedIntake(
-              session,
-              resolveScenarioFromContext(context),
-            ),
-          }
-        : undefined,
-  },
-  id: "support",
-  memory: {
-    namespace: ({ session }) => session.id,
-    store: memoryStore,
-  },
-  memoryLifecycle: {
-    afterTurn: async ({ memory, result, session }) => {
-      const savedIntake = result.result ?? buildSavedIntake(session);
+    id: "support",
+    memory: {
+      namespace: ({ session }) => session.id,
+      store: memoryStore,
+    },
+    memoryLifecycle: {
+      afterTurn: async ({ memory, result, session }) => {
+        const savedIntake = result.result ?? buildSavedIntake(session);
 
-      if (savedIntake.detectedName) {
-        await memory.set("caller.name", savedIntake.detectedName);
-      }
+        if (savedIntake.detectedName) {
+          await memory.set("caller.name", savedIntake.detectedName);
+        }
 
-      if (savedIntake.callDisposition) {
-        await memory.set("lastOutcome", savedIntake.callDisposition);
-      }
+        if (savedIntake.callDisposition) {
+          await memory.set("lastOutcome", savedIntake.callDisposition);
+        }
+      },
+      beforeTurn: async ({ memory }) => {
+        await memory.get("caller.name");
+        await memory.get("lastOutcome");
+      },
     },
-    beforeTurn: async ({ memory }) => {
-      await memory.get("caller.name");
-      await memory.get("lastOutcome");
-    },
-  },
-  model: assistantModel ?? intakeModel,
-  system:
-    "Use baseline guide copy. If the caller is in general recording mode, capture one freeform turn and return complete true. If the caller is in guided mode, ask the next concise guided question until the guided prompts are complete. If the caller asks for transfer, escalation, voicemail, or no answer, route that exact lifecycle outcome.",
-  tools: [intakeClassifierTool, lifecycleRouterTool, reviewTaskRecorderTool],
-  trace: runtimeStorage.traces,
-});
+    model,
+    system:
+      "Use baseline guide copy. If the caller is in general recording mode, capture one freeform turn and return complete true. If the caller is in guided mode, ask the next concise guided question until the guided prompts are complete. If the caller asks for transfer, escalation, voicemail, or no answer, route that exact lifecycle outcome.",
+    tools: [intakeClassifierTool, lifecycleRouterTool, reviewTaskRecorderTool],
+    trace: runtimeStorage.traces,
+  });
+
+const assistants = new Map(
+  configuredModelProviders.map((provider) => [
+    provider,
+    createDemoAssistant(
+      provider,
+      provider === "openai"
+        ? (openAIModel ?? intakeModel)
+        : provider === "anthropic"
+          ? (anthropicModel ?? intakeModel)
+          : provider === "gemini"
+            ? (geminiModel ?? intakeModel)
+            : intakeModel,
+    ),
+  ]),
+);
+const assistant =
+  assistants.get(modelProvider) ??
+  createDemoAssistant(modelProvider, assistantModel ?? intakeModel);
+const selectAssistant = (context: unknown) =>
+  assistants.get(resolveRequestedProvider(context)) ?? assistant;
 
 const server = new Elysia()
   .use(absolutejs)
@@ -603,7 +652,8 @@ const server = new Elysia()
       ops: assistant.ops,
       correctTurn: correctDemoTurn,
       phraseHints: VOICE_DEMO_PHRASE_HINTS,
-      onTurn: assistant.onTurn,
+      onTurn: (input: Parameters<(typeof assistant)["onTurn"]>[0]) =>
+        selectAssistant(input.context).onTurn(input),
       path: "/voice/intake",
       preset: "reliability",
       session: runtimeStorage.session,

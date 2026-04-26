@@ -175,7 +175,7 @@ nav a.active {
 .voice-metrics {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
 }
 
 .voice-metric {
@@ -206,6 +206,44 @@ nav a.active {
   grid-column: span 4;
   background: rgba(255, 255, 255, 0.025);
   box-shadow: none;
+}
+
+.voice-provider-card {
+  background:
+    linear-gradient(135deg, rgba(245, 158, 11, 0.18), transparent 42%),
+    rgba(255, 255, 255, 0.045);
+  border-color: rgba(245, 158, 11, 0.26);
+  grid-column: span 4;
+}
+
+.voice-provider-select {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.voice-provider-select span {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.voice-provider-select select {
+  appearance: none;
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.1),
+      rgba(255, 255, 255, 0.04)
+    ),
+    #111114;
+  border: 1px solid rgba(245, 158, 11, 0.38);
+  border-radius: 14px;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+  min-height: 52px;
+  padding: 0 44px 0 14px;
+  width: 100%;
 }
 
 .voice-assistant-config {

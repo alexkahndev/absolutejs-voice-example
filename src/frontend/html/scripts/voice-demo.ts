@@ -12,12 +12,16 @@ import {
   getVoiceLeadMessage,
   getVoiceModeLabel,
   getVoiceModePrompt,
+  getVoiceProviderLabel,
   getVoiceRoutePath,
+  getInitialVoiceModelProvider,
+  rememberVoiceModelProvider,
   VOICE_DEMO_GENERAL_LABEL,
   VOICE_DEMO_GUIDED_LABEL,
   VOICE_DEMO_MIC_IDLE,
   VOICE_DEMO_MIC_LIVE,
   VOICE_DEMO_STOP_LABEL,
+  type VoiceModelProvider,
   type SavedIntake,
   type VoiceDemoMode,
 } from "../../../shared/demo";
@@ -42,6 +46,8 @@ const connectionMetric = document.querySelector("#metric-connection");
 const errorStatus = document.querySelector("#status-error");
 const intakesMetric = document.querySelector("#metric-intakes");
 const microphoneStatus = document.querySelector("#status-mic");
+const modelProviderMetric = document.querySelector("#metric-provider");
+const modelProviderSelect = document.querySelector("#model-provider-select");
 const partialStatus = document.querySelector("#status-partial");
 const promptStatus = document.querySelector("#status-prompt");
 const savedIntakesRoot = document.querySelector("#saved-intakes");
@@ -61,6 +67,8 @@ if (
   !(errorStatus instanceof HTMLElement) ||
   !(intakesMetric instanceof HTMLElement) ||
   !(microphoneStatus instanceof HTMLElement) ||
+  !(modelProviderMetric instanceof HTMLElement) ||
+  !(modelProviderSelect instanceof HTMLSelectElement) ||
   !(partialStatus instanceof HTMLElement) ||
   !(promptStatus instanceof HTMLElement) ||
   !(savedIntakesRoot instanceof HTMLElement) ||
@@ -77,9 +85,13 @@ if (
   throw new Error("Voice demo page is missing expected elements.");
 }
 
-const guidedVoice = createVoiceStream<SavedIntake>(getVoiceRoutePath("guided"));
+const modelProvider = getInitialVoiceModelProvider();
+modelProviderSelect.value = modelProvider;
+const guidedVoice = createVoiceStream<SavedIntake>(
+  getVoiceRoutePath("guided", modelProvider),
+);
 const generalVoice = createVoiceStream<SavedIntake>(
-  getVoiceRoutePath("general"),
+  getVoiceRoutePath("general", modelProvider),
 );
 let activeMode: VoiceDemoMode | null = null;
 let hasStartedModes: Record<VoiceDemoMode, boolean> = {
@@ -221,6 +233,7 @@ const render = () => {
   startGeneralButton.textContent = VOICE_DEMO_GENERAL_LABEL;
   stopButton.textContent = VOICE_DEMO_STOP_LABEL;
   partialStatus.textContent = voice.partial || "No speech captured yet";
+  modelProviderMetric.textContent = getVoiceProviderLabel(modelProvider);
   sessionMetric.textContent = activeMode
     ? getVoiceModeLabel(activeMode)
     : "Choose one";
@@ -228,6 +241,14 @@ const render = () => {
   renderWave();
   renderChat();
 };
+
+modelProviderSelect.addEventListener("change", () => {
+  stopMic();
+  rememberVoiceModelProvider(modelProviderSelect.value as VoiceModelProvider);
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("provider", modelProviderSelect.value);
+  window.location.href = nextUrl.toString();
+});
 
 const stopMic = () => {
   microphone.stop();

@@ -4,10 +4,13 @@ import { useVoiceStream } from "@absolutejs/voice/vue";
 import {
   FRAMEWORKS,
   FRAMEWORK_DESCRIPTIONS,
+  getInitialVoiceModelProvider,
   getVoiceLeadMessage,
   getVoiceModeLabel,
   getVoiceModePrompt,
+  getVoiceProviderLabel,
   getVoiceRoutePath,
+  rememberVoiceModelProvider,
   VOICE_ASSISTANT_CONFIG,
   VOICE_DEMO_GUIDE_STEPS,
   VOICE_DEMO_GUIDE_TITLE,
@@ -16,7 +19,9 @@ import {
   VOICE_DEMO_MIC_IDLE,
   VOICE_DEMO_MIC_LIVE,
   VOICE_DEMO_STOP_LABEL,
+  VOICE_MODEL_PROVIDERS,
   type VoiceDemoMode,
+  type VoiceModelProvider,
   type SavedIntake,
 } from "../../../shared/demo";
 import {
@@ -29,8 +34,13 @@ import {
   pushVoiceWaveLevel,
 } from "../../shared/browser";
 
-const guidedVoice = useVoiceStream<SavedIntake>(getVoiceRoutePath("guided"));
-const generalVoice = useVoiceStream<SavedIntake>(getVoiceRoutePath("general"));
+const modelProvider = ref<VoiceModelProvider>(getInitialVoiceModelProvider());
+const guidedVoice = useVoiceStream<SavedIntake>(
+  getVoiceRoutePath("guided", modelProvider.value),
+);
+const generalVoice = useVoiceStream<SavedIntake>(
+  getVoiceRoutePath("general", modelProvider.value),
+);
 const activeMode = ref<VoiceDemoMode | null>(null);
 const isCapturing = ref(false);
 const hasStartedModes = ref<Record<VoiceDemoMode, boolean>>({
@@ -101,6 +111,21 @@ const stopMic = () => {
   microphone?.stop();
   isCapturing.value = false;
   waveLevels.value = createInitialVoiceWaveLevels();
+};
+
+const changeModelProvider = (provider: VoiceModelProvider) => {
+  stopMic();
+  rememberVoiceModelProvider(provider);
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("provider", provider);
+  window.location.href = nextUrl.toString();
+};
+
+const changeModelProviderFromEvent = (event: Event) => {
+  const target = event.target;
+  if (target instanceof HTMLSelectElement) {
+    changeModelProvider(target.value as VoiceModelProvider);
+  }
 };
 
 const startMode = async (mode: VoiceDemoMode) => {
@@ -187,8 +212,38 @@ onUnmounted(() => {
                   savedIntakes.length
                 }}</span>
               </div>
+              <div class="voice-metric">
+                <span class="voice-metric-label">Model</span>
+                <span class="voice-metric-value">
+                  {{ getVoiceProviderLabel(modelProvider) }}
+                </span>
+              </div>
             </div>
           </div>
+        </article>
+
+        <article class="voice-card voice-provider-card">
+          <span class="voice-framework-pill">Model Provider</span>
+          <h2>Choose the assistant brain</h2>
+          <p class="voice-footnote">
+            Switch providers before starting the microphone. The voice route
+            receives the selected provider on every session.
+          </p>
+          <label class="voice-provider-select">
+            <span>Provider</span>
+            <select
+              :value="modelProvider"
+              @change="changeModelProviderFromEvent"
+            >
+              <option
+                v-for="provider in VOICE_MODEL_PROVIDERS"
+                :key="provider.id"
+                :value="provider.id"
+              >
+                {{ provider.label }}
+              </option>
+            </select>
+          </label>
         </article>
 
         <article class="voice-card voice-card-side">

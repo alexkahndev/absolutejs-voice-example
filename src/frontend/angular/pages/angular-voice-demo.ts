@@ -2,10 +2,13 @@ import { Component, computed, inject, signal } from "@angular/core";
 import { VoiceStreamService } from "@absolutejs/voice/angular";
 import {
   FRAMEWORK_DESCRIPTIONS,
+  getInitialVoiceModelProvider,
   getVoiceLeadMessage,
   getVoiceModeLabel,
   getVoiceModePrompt,
+  getVoiceProviderLabel,
   getVoiceRoutePath,
+  rememberVoiceModelProvider,
   VOICE_ASSISTANT_CONFIG,
   VOICE_DEMO_GUIDE_STEPS,
   VOICE_DEMO_GUIDE_TITLE,
@@ -14,7 +17,9 @@ import {
   VOICE_DEMO_MIC_IDLE,
   VOICE_DEMO_MIC_LIVE,
   VOICE_DEMO_STOP_LABEL,
+  VOICE_MODEL_PROVIDERS,
   type VoiceDemoMode,
+  type VoiceModelProvider,
   type SavedIntake,
 } from "../../../shared/demo";
 import {
@@ -86,8 +91,33 @@ import {
                     savedIntakes().length
                   }}</span>
                 </div>
+                <div class="voice-metric">
+                  <span class="voice-metric-label">Model</span>
+                  <span class="voice-metric-value">{{
+                    getVoiceProviderLabel(modelProvider())
+                  }}</span>
+                </div>
               </div>
             </div>
+          </article>
+
+          <article class="voice-card voice-provider-card">
+            <span class="voice-framework-pill">Model Provider</span>
+            <h2>Choose the assistant brain</h2>
+            <p class="voice-footnote">
+              Switch providers before starting the microphone. The voice route
+              receives the selected provider on every session.
+            </p>
+            <label class="voice-provider-select">
+              <span>Provider</span>
+              <select (change)="changeModelProvider($any($event.target).value)">
+                @for (provider of modelProviders; track provider.id) {
+                  <option value="{{ provider.id }}">
+                    {{ provider.label }}
+                  </option>
+                }
+              </select>
+            </label>
           </article>
 
           <article class="voice-card voice-card-side">
@@ -326,6 +356,9 @@ export class AngularVoiceDemoComponent {
   guideSteps = VOICE_DEMO_GUIDE_STEPS;
   guideTitle = VOICE_DEMO_GUIDE_TITLE;
   activeMode = signal<VoiceDemoMode | null>(null);
+  modelProvider = signal<VoiceModelProvider>(getInitialVoiceModelProvider());
+  modelProviders = VOICE_MODEL_PROVIDERS;
+  getVoiceProviderLabel = getVoiceProviderLabel;
   hasStartedModes = signal<Record<VoiceDemoMode, boolean>>({
     general: false,
     guided: false,
@@ -340,10 +373,10 @@ export class AngularVoiceDemoComponent {
   stopLabel = VOICE_DEMO_STOP_LABEL;
   getVoiceModeLabel = getVoiceModeLabel;
   guidedVoice = inject(VoiceStreamService).connect<SavedIntake>(
-    getVoiceRoutePath("guided"),
+    getVoiceRoutePath("guided", this.modelProvider()),
   );
   generalVoice = inject(VoiceStreamService).connect<SavedIntake>(
-    getVoiceRoutePath("general"),
+    getVoiceRoutePath("general", this.modelProvider()),
   );
   currentVoice = computed(() =>
     this.activeMode() === "general" ? this.generalVoice : this.guidedVoice,
@@ -423,6 +456,14 @@ export class AngularVoiceDemoComponent {
     this.microphone?.stop();
     this.isCapturing.set(false);
     this.waveLevels.set(createInitialVoiceWaveLevels());
+  }
+
+  changeModelProvider(provider: VoiceModelProvider) {
+    this.stopMic();
+    rememberVoiceModelProvider(provider);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("provider", provider);
+    window.location.href = nextUrl.toString();
   }
 
   async startMode(mode: VoiceDemoMode) {

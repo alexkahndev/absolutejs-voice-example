@@ -8,6 +8,34 @@ export type FrameworkId =
 
 export type VoiceScenarioId = "guided" | "general";
 export type VoiceDemoMode = VoiceScenarioId;
+export type VoiceModelProvider =
+  | "deterministic"
+  | "openai"
+  | "anthropic"
+  | "gemini";
+
+export const VOICE_MODEL_PROVIDERS: Array<{
+  id: VoiceModelProvider;
+  label: string;
+  shortLabel: string;
+}> = [
+  {
+    id: "deterministic",
+    label: "Deterministic local model",
+    shortLabel: "Local",
+  },
+  { id: "openai", label: "OpenAI", shortLabel: "OpenAI" },
+  { id: "anthropic", label: "Anthropic Claude", shortLabel: "Claude" },
+  { id: "gemini", label: "Google Gemini", shortLabel: "Gemini" },
+];
+
+export const isVoiceModelProvider = (
+  value: unknown,
+): value is VoiceModelProvider =>
+  value === "deterministic" ||
+  value === "openai" ||
+  value === "anthropic" ||
+  value === "gemini";
 
 export type SavedIntake = {
   callDisposition?:
@@ -84,8 +112,47 @@ export const VOICE_TEST_QUESTIONS = [
   "Finish with any detail that feels blocked, risky, or unclear.",
 ] as const;
 
-export const getVoiceRoutePath = (scenarioId: VoiceScenarioId) =>
-  `${VOICE_ROUTE_PATH}?scenarioId=${scenarioId}`;
+export const getVoiceRoutePath = (
+  scenarioId: VoiceScenarioId,
+  provider?: VoiceModelProvider,
+) => {
+  const params = new URLSearchParams({
+    scenarioId,
+  });
+
+  if (provider) {
+    params.set("provider", provider);
+  }
+
+  return `${VOICE_ROUTE_PATH}?${params.toString()}`;
+};
+
+export const getVoiceProviderLabel = (provider: VoiceModelProvider) =>
+  VOICE_MODEL_PROVIDERS.find((item) => item.id === provider)?.label ?? provider;
+
+export const getInitialVoiceModelProvider = (): VoiceModelProvider => {
+  if (typeof window === "undefined") {
+    return "deterministic";
+  }
+
+  const urlProvider = new URLSearchParams(window.location.search).get(
+    "provider",
+  );
+  if (isVoiceModelProvider(urlProvider)) {
+    return urlProvider;
+  }
+
+  const storedProvider = window.localStorage.getItem("voiceModelProvider");
+  return isVoiceModelProvider(storedProvider)
+    ? storedProvider
+    : "deterministic";
+};
+
+export const rememberVoiceModelProvider = (provider: VoiceModelProvider) => {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem("voiceModelProvider", provider);
+  }
+};
 
 export const getVoiceScenarioLabel = (scenarioId: VoiceScenarioId) =>
   scenarioId === "guided" ? "Guided test" : "General recording";

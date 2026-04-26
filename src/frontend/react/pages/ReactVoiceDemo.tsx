@@ -14,10 +14,13 @@ import {
 import {
   FRAMEWORKS,
   FRAMEWORK_DESCRIPTIONS,
+  getInitialVoiceModelProvider,
   getVoiceLeadMessage,
   getVoiceModeLabel,
   getVoiceModePrompt,
+  getVoiceProviderLabel,
   getVoiceRoutePath,
+  rememberVoiceModelProvider,
   VOICE_ASSISTANT_CONFIG,
   VOICE_DEMO_GUIDE_STEPS,
   VOICE_DEMO_GUIDE_TITLE,
@@ -26,7 +29,9 @@ import {
   VOICE_DEMO_MIC_IDLE,
   VOICE_DEMO_MIC_LIVE,
   VOICE_DEMO_STOP_LABEL,
+  VOICE_MODEL_PROVIDERS,
   type VoiceDemoMode,
+  type VoiceModelProvider,
   type SavedIntake,
 } from "../../../shared/demo";
 
@@ -64,10 +69,15 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
     null,
   );
   const activeModeRef = useRef<VoiceDemoMode | null>(null);
+  const [modelProvider, setModelProvider] = useState<VoiceModelProvider>(
+    getInitialVoiceModelProvider,
+  );
   const guidedVoice =
-    useVoiceStream<SavedIntake>(getVoiceRoutePath("guided")) ?? EMPTY_VOICE;
+    useVoiceStream<SavedIntake>(getVoiceRoutePath("guided", modelProvider)) ??
+    EMPTY_VOICE;
   const generalVoice =
-    useVoiceStream<SavedIntake>(getVoiceRoutePath("general")) ?? EMPTY_VOICE;
+    useVoiceStream<SavedIntake>(getVoiceRoutePath("general", modelProvider)) ??
+    EMPTY_VOICE;
   const [activeMode, setActiveMode] = useState<VoiceDemoMode | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [hasStartedModes, setHasStartedModes] = useState<
@@ -132,6 +142,14 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
     microphoneRef.current?.stop();
     setIsCapturing(false);
     setWaveLevels(createInitialVoiceWaveLevels());
+  };
+
+  const changeModelProvider = (provider: VoiceModelProvider) => {
+    stopMic();
+    activeModeRef.current = null;
+    setActiveMode(null);
+    rememberVoiceModelProvider(provider);
+    setModelProvider(provider);
   };
 
   const startMode = async (mode: VoiceDemoMode) => {
@@ -232,8 +250,40 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                       {savedIntakes.length}
                     </span>
                   </div>
+                  <div className="voice-metric">
+                    <span className="voice-metric-label">Model</span>
+                    <span className="voice-metric-value">
+                      {getVoiceProviderLabel(modelProvider)}
+                    </span>
+                  </div>
                 </div>
               </div>
+            </article>
+
+            <article className="voice-card voice-provider-card">
+              <span className="voice-framework-pill">Model Provider</span>
+              <h2>Choose the assistant brain</h2>
+              <p className="voice-footnote">
+                Switch providers before starting the microphone. The voice route
+                receives the selected provider on every session.
+              </p>
+              <label className="voice-provider-select">
+                <span>Provider</span>
+                <select
+                  value={modelProvider}
+                  onChange={(event) =>
+                    changeModelProvider(
+                      event.currentTarget.value as VoiceModelProvider,
+                    )
+                  }
+                >
+                  {VOICE_MODEL_PROVIDERS.map((provider) => (
+                    <option key={provider.id} value={provider.id}>
+                      {provider.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </article>
 
             <article className="voice-card voice-card-side">
