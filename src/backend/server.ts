@@ -314,6 +314,11 @@ const assistantModel = createVoiceProviderRouter<
     provider !== "deterministic" && isAssistantProviderError(error),
   onProviderEvent: traceProviderEvent,
   policy: "prefer-selected",
+  providerHealth: {
+    cooldownMs: 30_000,
+    failureThreshold: 1,
+    rateLimitCooldownMs: 120_000,
+  },
   providerProfiles: {
     deterministic: { cost: 0, latencyMs: 5, priority: 4 },
     openai: { cost: 2, latencyMs: 500, priority: 1 },
