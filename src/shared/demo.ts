@@ -18,6 +18,7 @@ export type VoiceProviderStatus =
   | "idle"
   | "rate-limited"
   | "degraded"
+  | "recoverable"
   | "suppressed";
 
 export type VoiceProviderStatusRecord = {
@@ -157,6 +158,8 @@ export const getVoiceProviderStatusLabel = (status: VoiceProviderStatus) => {
       return "Rate limited";
     case "degraded":
       return "Degraded";
+    case "recoverable":
+      return "Recoverable";
     case "suppressed":
       return "Temporarily suppressed";
     case "idle":

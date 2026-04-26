@@ -605,7 +605,13 @@ type VoiceProviderHealth = {
   rateLimited: boolean;
   recommended: boolean;
   runCount: number;
-  status: "healthy" | "idle" | "rate-limited" | "degraded" | "suppressed";
+  status:
+    | "healthy"
+    | "idle"
+    | "rate-limited"
+    | "degraded"
+    | "recoverable"
+    | "suppressed";
   suppressionRemainingMs?: number;
   suppressedUntil?: number;
 };
@@ -739,17 +745,24 @@ const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
   }
 
   const summaries = [...entries.values()].map((entry) => {
+    const hadSuppression =
+      typeof entry.suppressedUntil === "number" ||
+      typeof entry.suppressionRemainingMs === "number";
     const suppressionRemainingMs =
       typeof entry.suppressedUntil === "number"
         ? Math.max(0, entry.suppressedUntil - Date.now())
         : entry.suppressionRemainingMs;
+    const activeSuppression =
+      typeof suppressionRemainingMs === "number" && suppressionRemainingMs > 0;
+    const recoverable = hadSuppression && !activeSuppression;
     const averageElapsedMs =
       entry.elapsedCount > 0
         ? Math.round(entry.elapsedTotal / entry.elapsedCount)
         : undefined;
-    const status: VoiceProviderHealth["status"] =
-      typeof suppressionRemainingMs === "number" && suppressionRemainingMs > 0
-        ? "suppressed"
+    const status: VoiceProviderHealth["status"] = activeSuppression
+      ? "suppressed"
+      : recoverable
+        ? "recoverable"
         : entry.rateLimited
           ? "rate-limited"
           : entry.errorCount > 0
@@ -769,7 +782,9 @@ const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
       recommended: false,
       runCount: entry.runCount,
       status,
-      suppressionRemainingMs,
+      suppressionRemainingMs: activeSuppression
+        ? suppressionRemainingMs
+        : undefined,
       suppressedUntil: entry.suppressedUntil,
     };
   });

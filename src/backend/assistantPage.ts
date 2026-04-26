@@ -20,7 +20,13 @@ type VoiceProviderHealth = {
   provider: string;
   recommended: boolean;
   runCount: number;
-  status: "healthy" | "idle" | "rate-limited" | "degraded" | "suppressed";
+  status:
+    | "healthy"
+    | "idle"
+    | "rate-limited"
+    | "degraded"
+    | "recoverable"
+    | "suppressed";
   suppressionRemainingMs?: number;
   suppressedUntil?: number;
 };
@@ -141,6 +147,7 @@ export const renderVoiceAssistantPage = (
     .provider-card { background: #0f1217; border: 1px solid #27272a; border-radius: 16px; padding: 16px; }
     .provider-card.healthy { border-color: rgba(34, 197, 94, 0.5); }
     .provider-card.degraded, .provider-card.rate-limited { border-color: rgba(245, 158, 11, 0.6); }
+    .provider-card.recoverable { border-color: rgba(59, 130, 246, 0.65); }
     .provider-card.suppressed { border-color: rgba(239, 68, 68, 0.7); }
     .provider-card-header { align-items: center; display: flex; gap: 8px; justify-content: space-between; margin-bottom: 12px; }
     .provider-card-header h3 { margin: 0; }
