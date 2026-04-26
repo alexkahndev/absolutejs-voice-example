@@ -12,7 +12,6 @@ import {
   createVoiceFileRuntimeStorage,
   createOpenAIVoiceAssistantModel,
   createVoiceProviderRouter,
-  createVoiceSessionRecord,
   createVoiceTaskUpdatedEvent,
   reopenVoiceOpsTask,
   startVoiceOpsTask,
@@ -45,6 +44,7 @@ import {
   type SavedVoiceIntegrationEvent,
 } from "./integrationsPage";
 import { renderVoiceAssistantPage } from "./assistantPage";
+import { createProviderFailureSimulator } from "./providerSimulator";
 import { pagesPlugin } from "./plugins/pagesPlugin";
 import {
   buildSavedVoiceReview,
@@ -329,148 +329,13 @@ const assistantModel = createVoiceProviderRouter<
   providers: providerModels,
   selectProvider: ({ context }) => resolveRequestedProvider(context),
 });
-const resolveSimulatedFailureProvider = (
-  context: unknown,
-): VoiceModelProvider | undefined => {
-  if (
-    context &&
-    typeof context === "object" &&
-    "query" in context &&
-    context.query &&
-    typeof context.query === "object" &&
-    "simulateFailureProvider" in context.query &&
-    isVoiceModelProvider(context.query.simulateFailureProvider)
-  ) {
-    return context.query.simulateFailureProvider;
-  }
-
-  return undefined;
-};
-const resolveSimulatedRecoveryProvider = (
-  context: unknown,
-): VoiceModelProvider | undefined => {
-  if (
-    context &&
-    typeof context === "object" &&
-    "query" in context &&
-    context.query &&
-    typeof context.query === "object" &&
-    "recoverProvider" in context.query &&
-    isVoiceModelProvider(context.query.recoverProvider)
-  ) {
-    return context.query.recoverProvider;
-  }
-
-  return undefined;
-};
-const simulateProviderModels = Object.fromEntries(
-  (["deterministic", "openai", "anthropic", "gemini"] as const).map(
-    (provider) => [
-      provider,
-      {
-        generate: async ({ context }) => {
-          if (provider === resolveSimulatedFailureProvider(context)) {
-            const label =
-              provider === "openai"
-                ? "OpenAI"
-                : provider === "anthropic"
-                  ? "Anthropic"
-                  : provider === "gemini"
-                    ? "Gemini"
-                    : "Deterministic";
-            throw new Error(`${label} voice assistant model failed: HTTP 429`);
-          }
-
-          return {
-            assistantText: `Simulated ${provider} provider recovered.`,
-          };
-        },
-      } satisfies VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake>,
-    ],
-  ),
-) as Record<
-  VoiceModelProvider,
-  VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake>
->;
-const providerFailureSimulator = createVoiceProviderRouter<
-  unknown,
-  VoiceSessionRecord,
-  SavedIntake,
-  VoiceModelProvider
->({
-  allowProviders: ({ context }) => {
-    const recoverProvider = resolveSimulatedRecoveryProvider(context);
-    return recoverProvider ? [recoverProvider] : configuredModelProviders;
-  },
-  fallback: ({ context }) =>
-    providerFallbackOrder(resolveRequestedProvider(context)),
-  fallbackMode: "provider-error",
+const providerFailureSimulator = createProviderFailureSimulator({
+  allowProviders: () => configuredModelProviders,
+  fallback: providerFallbackOrder,
   isProviderError: (error, provider) =>
     provider !== "deterministic" && isAssistantProviderError(error),
   onProviderEvent: traceProviderEvent,
-  policy: "prefer-selected",
-  providerHealth: {
-    cooldownMs: 30_000,
-    failureThreshold: 1,
-    rateLimitCooldownMs: 120_000,
-  },
-  providers: simulateProviderModels,
-  selectProvider: ({ context }) => resolveRequestedProvider(context),
 });
-const runProviderSimulation = async (
-  provider: VoiceModelProvider,
-  mode: "failure" | "recovery",
-) => {
-  const session = createVoiceSessionRecord(
-    `provider-sim-${Date.now()}`,
-    "provider-simulation",
-  );
-  const turn = {
-    committedAt: Date.now(),
-    id: `provider-sim-turn-${Date.now()}`,
-    text:
-      mode === "failure"
-        ? `Simulate ${provider} provider failure.`
-        : `Simulate ${provider} provider recovery.`,
-    transcripts: [],
-  };
-
-  const result = await providerFailureSimulator.generate({
-    agentId: "support",
-    context: {
-      query: {
-        provider,
-        ...(mode === "recovery"
-          ? {
-              recoverProvider: provider,
-            }
-          : {}),
-        ...(mode === "failure"
-          ? {
-              simulateFailureProvider: provider,
-            }
-          : {}),
-      },
-    },
-    messages: [
-      {
-        content: turn.text,
-        role: "user",
-      },
-    ],
-    session,
-    system: "Simulate provider routing without calling external APIs.",
-    tools: [],
-    turn,
-  });
-
-  return {
-    mode,
-    provider,
-    result,
-    status: "simulated",
-  };
-};
 const intakeClassifierTool = createVoiceAgentTool<
   unknown,
   VoiceSessionRecord,
@@ -1092,7 +957,7 @@ const server = new Elysia()
       };
     }
 
-    return runProviderSimulation(provider, "failure");
+    return providerFailureSimulator.run(provider, "failure");
   })
   .post("/api/provider-simulate/recovery", async ({ query }) => {
     const provider =
@@ -1112,7 +977,7 @@ const server = new Elysia()
       };
     }
 
-    return runProviderSimulation(provider, "recovery");
+    return providerFailureSimulator.run(provider, "recovery");
   })
   .get("/api/assistant-memory", async () => listAssistantMemory())
   .get("/api/reviews", async ({ query }) => {
