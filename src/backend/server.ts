@@ -16,10 +16,11 @@ import {
   reopenVoiceOpsTask,
   startVoiceOpsTask,
   summarizeVoiceAssistantRuns,
-  type StoredVoiceTraceEvent,
+  summarizeVoiceProviderHealth,
   type VoiceCallReviewStore,
   type VoiceAssistantMemoryRecord,
   type VoiceAgentModel,
+  type VoiceProviderHealthSummary,
   type VoiceProviderRouterEvent,
   type VoiceOpsTaskStatus,
   type VoiceOpsTaskStore,
@@ -496,221 +497,13 @@ const listTasks = async (): Promise<SavedVoiceOpsTask[]> =>
 const summarizeAssistantRuns = async () =>
   summarizeVoiceAssistantRuns({ store: runtimeStorage.traces });
 
-type VoiceProviderHealth = {
-  averageElapsedMs?: number;
-  errorCount: number;
-  fallbackCount: number;
-  lastError?: string;
-  lastErrorAt?: number;
-  lastSuccessAt?: number;
-  provider: VoiceModelProvider;
-  rateLimited: boolean;
-  recommended: boolean;
-  runCount: number;
-  status:
-    | "healthy"
-    | "idle"
-    | "rate-limited"
-    | "degraded"
-    | "recoverable"
-    | "suppressed";
-  suppressionRemainingMs?: number;
-  suppressedUntil?: number;
-};
-
-const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
-  const events =
-    (await runtimeStorage.traces.list()) as StoredVoiceTraceEvent[];
-  const hasProviderRouterEvents = events.some(
-    (event) =>
-      event.type === "session.error" &&
-      isVoiceModelProvider(event.payload.provider) &&
-      (event.payload.providerStatus === "success" ||
-        event.payload.providerStatus === "fallback" ||
-        event.payload.providerStatus === "error"),
-  );
-  const entries = new Map<
-    VoiceModelProvider,
-    VoiceProviderHealth & {
-      elapsedCount: number;
-      elapsedTotal: number;
-    }
-  >();
-  const getEntry = (provider: VoiceModelProvider) => {
-    const existing = entries.get(provider);
-    if (existing) {
-      return existing;
-    }
-    const entry: VoiceProviderHealth & {
-      elapsedCount: number;
-      elapsedTotal: number;
-    } = {
-      elapsedCount: 0,
-      elapsedTotal: 0,
-      errorCount: 0,
-      fallbackCount: 0,
-      provider,
-      rateLimited: false,
-      recommended: false,
-      runCount: 0,
-      status: "idle",
-    };
-    entries.set(provider, entry);
-    return entry;
-  };
-
-  for (const provider of configuredModelProviders) {
-    getEntry(provider);
-  }
-
-  for (const event of events) {
-    if (event.type === "assistant.run") {
-      if (hasProviderRouterEvents) {
-        continue;
-      }
-      const provider = event.payload.variantId;
-      if (isVoiceModelProvider(provider)) {
-        const entry = getEntry(provider);
-        entry.runCount += 1;
-        if (typeof event.payload.elapsedMs === "number") {
-          entry.elapsedCount += 1;
-          entry.elapsedTotal += event.payload.elapsedMs;
-        }
-      }
-      continue;
-    }
-
-    if (event.type !== "session.error") {
-      continue;
-    }
-
-    const provider = event.payload.provider;
-    if (!isVoiceModelProvider(provider)) {
-      continue;
-    }
-    const providerStatus =
-      event.payload.providerStatus === "success" ||
-      event.payload.providerStatus === "fallback" ||
-      event.payload.providerStatus === "error"
-        ? event.payload.providerStatus
-        : undefined;
-    const applyProviderHealth = () => {
-      const entry = getEntry(provider);
-      const providerHealth = event.payload.providerHealth;
-      if (providerHealth && typeof providerHealth === "object") {
-        const suppressedUntil = (providerHealth as Record<string, unknown>)
-          .suppressedUntil;
-        if (typeof suppressedUntil === "number") {
-          entry.suppressedUntil = suppressedUntil;
-        }
-      }
-      if (typeof event.payload.suppressedUntil === "number") {
-        entry.suppressedUntil = event.payload.suppressedUntil;
-      }
-      if (typeof event.payload.suppressionRemainingMs === "number") {
-        entry.suppressionRemainingMs = event.payload.suppressionRemainingMs;
-      }
-      return entry;
-    };
-
-    if (providerStatus === "success" || providerStatus === "fallback") {
-      const entry = applyProviderHealth();
-      entry.runCount += 1;
-      entry.lastSuccessAt = event.at;
-      if (providerStatus === "success") {
-        entry.lastError = undefined;
-        entry.rateLimited = false;
-        entry.suppressedUntil = undefined;
-        entry.suppressionRemainingMs = undefined;
-      }
-      if (typeof event.payload.elapsedMs === "number") {
-        entry.elapsedCount += 1;
-        entry.elapsedTotal += event.payload.elapsedMs;
-      }
-      const selectedProvider = event.payload.selectedProvider;
-      if (
-        providerStatus === "fallback" &&
-        isVoiceModelProvider(selectedProvider) &&
-        selectedProvider !== provider
-      ) {
-        getEntry(selectedProvider).fallbackCount += 1;
-      }
-      continue;
-    }
-
-    const entry = applyProviderHealth();
-    entry.errorCount += 1;
-    entry.lastError =
-      typeof event.payload.error === "string" ? event.payload.error : undefined;
-    entry.lastErrorAt = event.at;
-    entry.rateLimited ||= event.payload.rateLimited === true;
-    if (event.payload.fallbackProvider) {
-      entry.fallbackCount += 1;
-    }
-  }
-
-  const summaries = [...entries.values()].map((entry) => {
-    const hadSuppression =
-      typeof entry.suppressedUntil === "number" ||
-      typeof entry.suppressionRemainingMs === "number";
-    const suppressionRemainingMs =
-      typeof entry.suppressedUntil === "number"
-        ? Math.max(0, entry.suppressedUntil - Date.now())
-        : entry.suppressionRemainingMs;
-    const activeSuppression =
-      typeof suppressionRemainingMs === "number" && suppressionRemainingMs > 0;
-    const recoverable = hadSuppression && !activeSuppression;
-    const averageElapsedMs =
-      entry.elapsedCount > 0
-        ? Math.round(entry.elapsedTotal / entry.elapsedCount)
-        : undefined;
-    const status: VoiceProviderHealth["status"] = activeSuppression
-      ? "suppressed"
-      : recoverable
-        ? "recoverable"
-        : entry.rateLimited
-          ? "rate-limited"
-          : entry.errorCount > 0 &&
-              (!entry.lastSuccessAt ||
-                !entry.lastErrorAt ||
-                entry.lastErrorAt > entry.lastSuccessAt)
-            ? "degraded"
-            : entry.runCount > 0
-              ? "healthy"
-              : "idle";
-
-    return {
-      averageElapsedMs,
-      errorCount: entry.errorCount,
-      fallbackCount: entry.fallbackCount,
-      lastError: entry.lastError,
-      lastErrorAt: entry.lastErrorAt,
-      lastSuccessAt: entry.lastSuccessAt,
-      provider: entry.provider,
-      rateLimited: entry.rateLimited,
-      recommended: false,
-      runCount: entry.runCount,
-      status,
-      suppressionRemainingMs: activeSuppression
-        ? suppressionRemainingMs
-        : undefined,
-      suppressedUntil: entry.suppressedUntil,
-    };
+const summarizeProviderHealth = async (): Promise<
+  VoiceProviderHealthSummary<VoiceModelProvider>[]
+> =>
+  summarizeVoiceProviderHealth({
+    providers: configuredModelProviders,
+    store: runtimeStorage.traces,
   });
-  const recommended = summaries
-    .filter((entry) => entry.status === "healthy")
-    .sort(
-      (left, right) =>
-        (left.averageElapsedMs ?? Number.MAX_SAFE_INTEGER) -
-        (right.averageElapsedMs ?? Number.MAX_SAFE_INTEGER),
-    )[0];
-
-  if (recommended) {
-    recommended.recommended = true;
-  }
-
-  return summaries;
-};
 
 const listAssistantMemory = async (): Promise<VoiceAssistantMemoryRecord[]> =>
   memoryStore.list({
