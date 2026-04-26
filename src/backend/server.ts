@@ -15,6 +15,7 @@ import {
   reopenVoiceOpsTask,
   startVoiceOpsTask,
   summarizeVoiceAssistantRuns,
+  type StoredVoiceTraceEvent,
   type VoiceCallReviewStore,
   type VoiceAssistantMemoryRecord,
   type VoiceAgentModel,
@@ -204,6 +205,22 @@ const assistantConfig = {
   availableProviders: configuredModelProviders,
   modelProvider,
 };
+const isProviderError = (error: unknown) =>
+  error instanceof Error &&
+  /\b(OpenAI|Anthropic|Gemini)\b.*\b(HTTP|failed|Unable to connect)/i.test(
+    error.message,
+  );
+const isRateLimitError = (error: unknown) =>
+  error instanceof Error && /\bHTTP 429\b|rate limit/i.test(error.message);
+const toErrorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error);
+const providerFallbackOrder = (provider: VoiceModelProvider) => [
+  provider,
+  ...(["openai", "anthropic", "gemini", "deterministic"] as const).filter(
+    (candidate) =>
+      candidate !== provider && configuredModelProviders.includes(candidate),
+  ),
+];
 const intakeModel: VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake> = {
   generate: ({ context, session, turn, system }) => {
     const result = decideIntakeTurn(session, turn, undefined, context);
@@ -424,6 +441,130 @@ const listTasks = async (): Promise<SavedVoiceOpsTask[]> =>
 const summarizeAssistantRuns = async () =>
   summarizeVoiceAssistantRuns({ store: runtimeStorage.traces });
 
+type VoiceProviderHealth = {
+  averageElapsedMs?: number;
+  errorCount: number;
+  fallbackCount: number;
+  lastError?: string;
+  lastErrorAt?: number;
+  provider: VoiceModelProvider;
+  rateLimited: boolean;
+  recommended: boolean;
+  runCount: number;
+  status: "healthy" | "idle" | "rate-limited" | "degraded";
+};
+
+const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
+  const events =
+    (await runtimeStorage.traces.list()) as StoredVoiceTraceEvent[];
+  const entries = new Map<
+    VoiceModelProvider,
+    VoiceProviderHealth & {
+      elapsedCount: number;
+      elapsedTotal: number;
+    }
+  >();
+  const getEntry = (provider: VoiceModelProvider) => {
+    const existing = entries.get(provider);
+    if (existing) {
+      return existing;
+    }
+    const entry: VoiceProviderHealth & {
+      elapsedCount: number;
+      elapsedTotal: number;
+    } = {
+      elapsedCount: 0,
+      elapsedTotal: 0,
+      errorCount: 0,
+      fallbackCount: 0,
+      provider,
+      rateLimited: false,
+      recommended: false,
+      runCount: 0,
+      status: "idle",
+    };
+    entries.set(provider, entry);
+    return entry;
+  };
+
+  for (const provider of configuredModelProviders) {
+    getEntry(provider);
+  }
+
+  for (const event of events) {
+    if (event.type === "assistant.run") {
+      const provider = event.payload.variantId;
+      if (isVoiceModelProvider(provider)) {
+        const entry = getEntry(provider);
+        entry.runCount += 1;
+        if (typeof event.payload.elapsedMs === "number") {
+          entry.elapsedCount += 1;
+          entry.elapsedTotal += event.payload.elapsedMs;
+        }
+      }
+      continue;
+    }
+
+    if (event.type !== "session.error") {
+      continue;
+    }
+
+    const provider = event.payload.provider;
+    if (!isVoiceModelProvider(provider)) {
+      continue;
+    }
+    const entry = getEntry(provider);
+    entry.errorCount += 1;
+    entry.lastError =
+      typeof event.payload.error === "string" ? event.payload.error : undefined;
+    entry.lastErrorAt = event.at;
+    entry.rateLimited ||= event.payload.rateLimited === true;
+    if (event.payload.fallbackProvider) {
+      entry.fallbackCount += 1;
+    }
+  }
+
+  const summaries = [...entries.values()].map((entry) => {
+    const averageElapsedMs =
+      entry.elapsedCount > 0
+        ? Math.round(entry.elapsedTotal / entry.elapsedCount)
+        : undefined;
+    const status: VoiceProviderHealth["status"] = entry.rateLimited
+      ? "rate-limited"
+      : entry.errorCount > 0
+        ? "degraded"
+        : entry.runCount > 0
+          ? "healthy"
+          : "idle";
+
+    return {
+      averageElapsedMs,
+      errorCount: entry.errorCount,
+      fallbackCount: entry.fallbackCount,
+      lastError: entry.lastError,
+      lastErrorAt: entry.lastErrorAt,
+      provider: entry.provider,
+      rateLimited: entry.rateLimited,
+      recommended: false,
+      runCount: entry.runCount,
+      status,
+    };
+  });
+  const recommended = summaries
+    .filter((entry) => entry.status === "healthy")
+    .sort(
+      (left, right) =>
+        (left.averageElapsedMs ?? Number.MAX_SAFE_INTEGER) -
+        (right.averageElapsedMs ?? Number.MAX_SAFE_INTEGER),
+    )[0];
+
+  if (recommended) {
+    recommended.recommended = true;
+  }
+
+  return summaries;
+};
+
 const listAssistantMemory = async (): Promise<VoiceAssistantMemoryRecord[]> =>
   memoryStore.list({
     assistantId: VOICE_ASSISTANT_CONFIG.id,
@@ -603,8 +744,64 @@ const assistants = new Map(
 const assistant =
   assistants.get(modelProvider) ??
   createDemoAssistant(modelProvider, assistantModel ?? intakeModel);
-const selectAssistant = (context: unknown) =>
-  assistants.get(resolveRequestedProvider(context)) ?? assistant;
+const runAssistantWithFallback: (
+  input: Parameters<(typeof assistant)["onTurn"]>[0],
+) => ReturnType<(typeof assistant)["onTurn"]> = async (input) => {
+  const requestedProvider = resolveRequestedProvider(input.context);
+  const providers = providerFallbackOrder(requestedProvider);
+  let lastError: unknown;
+
+  for (const provider of providers) {
+    const nextAssistant = assistants.get(provider) ?? assistant;
+    const startedAt = Date.now();
+
+    try {
+      const result = await nextAssistant.onTurn(input);
+      if (provider !== requestedProvider) {
+        await runtimeStorage.traces.append({
+          at: Date.now(),
+          payload: {
+            elapsedMs: Date.now() - startedAt,
+            fallbackProvider: provider,
+            provider: requestedProvider,
+            recovered: true,
+          },
+          scenarioId: input.session.scenarioId,
+          sessionId: input.session.id,
+          turnId: input.turn.id,
+          type: "session.error",
+        });
+      }
+      return result;
+    } catch (error) {
+      lastError = error;
+      const shouldFallback =
+        provider !== "deterministic" && isProviderError(error);
+      await runtimeStorage.traces.append({
+        at: Date.now(),
+        payload: {
+          elapsedMs: Date.now() - startedAt,
+          error: toErrorMessage(error),
+          fallbackProvider: shouldFallback
+            ? providers.find((candidate) => candidate !== provider)
+            : undefined,
+          provider,
+          rateLimited: isRateLimitError(error),
+        },
+        scenarioId: input.session.scenarioId,
+        sessionId: input.session.id,
+        turnId: input.turn.id,
+        type: "session.error",
+      });
+
+      if (!shouldFallback) {
+        throw error;
+      }
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
+};
 
 const server = new Elysia()
   .use(absolutejs)
@@ -652,8 +849,7 @@ const server = new Elysia()
       ops: assistant.ops,
       correctTurn: correctDemoTurn,
       phraseHints: VOICE_DEMO_PHRASE_HINTS,
-      onTurn: (input: Parameters<(typeof assistant)["onTurn"]>[0]) =>
-        selectAssistant(input.context).onTurn(input),
+      onTurn: runAssistantWithFallback,
       path: "/voice/intake",
       preset: "reliability",
       session: runtimeStorage.session,
@@ -670,6 +866,7 @@ const server = new Elysia()
   .get("/api/intakes", () => listIntakes())
   .get("/api/assistant-config", () => assistantConfig)
   .get("/api/assistant-summary", async () => summarizeAssistantRuns())
+  .get("/api/provider-status", async () => summarizeProviderHealth())
   .get("/api/assistant-memory", async () => listAssistantMemory())
   .get("/api/reviews", async ({ query }) => {
     const reviews = await listReviews();
@@ -755,6 +952,7 @@ const server = new Elysia()
           await summarizeAssistantRuns(),
           await listAssistantMemory(),
           assistantConfig,
+          await summarizeProviderHealth(),
         ),
         {
           headers: {

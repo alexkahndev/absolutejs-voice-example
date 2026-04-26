@@ -13,6 +13,22 @@ export type VoiceModelProvider =
   | "openai"
   | "anthropic"
   | "gemini";
+export type VoiceProviderStatus =
+  | "healthy"
+  | "idle"
+  | "rate-limited"
+  | "degraded";
+
+export type VoiceProviderStatusRecord = {
+  averageElapsedMs?: number;
+  errorCount: number;
+  fallbackCount: number;
+  lastError?: string;
+  provider: VoiceModelProvider;
+  recommended: boolean;
+  runCount: number;
+  status: VoiceProviderStatus;
+};
 
 export const VOICE_MODEL_PROVIDERS: Array<{
   id: VoiceModelProvider;
@@ -129,6 +145,24 @@ export const getVoiceRoutePath = (
 
 export const getVoiceProviderLabel = (provider: VoiceModelProvider) =>
   VOICE_MODEL_PROVIDERS.find((item) => item.id === provider)?.label ?? provider;
+
+export const getVoiceProviderStatusLabel = (status: VoiceProviderStatus) => {
+  switch (status) {
+    case "healthy":
+      return "Healthy";
+    case "rate-limited":
+      return "Rate limited";
+    case "degraded":
+      return "Degraded";
+    case "idle":
+      return "Idle";
+  }
+};
+
+export const fetchVoiceProviderStatus = async () => {
+  const response = await fetch("/api/provider-status");
+  return (await response.json()) as VoiceProviderStatusRecord[];
+};
 
 export const getInitialVoiceModelProvider = (): VoiceModelProvider => {
   if (typeof window === "undefined") {
