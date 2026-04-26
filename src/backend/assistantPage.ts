@@ -17,6 +17,8 @@ type VoiceProviderHealth = {
   errorCount: number;
   fallbackCount: number;
   lastError?: string;
+  lastErrorAt?: number;
+  lastSuccessAt?: number;
   provider: string;
   recommended: boolean;
   runCount: number;
@@ -108,6 +110,15 @@ const renderFailoverControls = (providers: string[] = []) => {
         .map(
           (provider) =>
             `<button type="button" data-provider="${escapeHtml(provider)}">Simulate ${escapeHtml(provider)} failure</button>`,
+        )
+        .join("")}
+    </div>
+    <p class="empty">Retry a provider after its cooldown expires to mark it healthy again without waiting for a voice turn.</p>
+    <div class="failover-actions">
+      ${simulatedProviders
+        .map(
+          (provider) =>
+            `<button type="button" data-recover-provider="${escapeHtml(provider)}">Retry ${escapeHtml(provider)} recovery</button>`,
         )
         .join("")}
     </div>
@@ -225,6 +236,33 @@ export const renderVoiceAssistantPage = (
         }
         try {
           const response = await fetch("/api/provider-simulate/failure?provider=" + encodeURIComponent(provider), {
+            method: "POST"
+          });
+          const body = await response.json();
+          if (output) {
+            output.textContent = JSON.stringify(body, null, 2);
+          }
+          window.setTimeout(() => window.location.reload(), 500);
+        } catch (error) {
+          if (output) {
+            output.textContent = error instanceof Error ? error.message : String(error);
+          }
+        } finally {
+          button.disabled = false;
+        }
+      });
+    }
+    for (const button of document.querySelectorAll("[data-recover-provider]")) {
+      button.addEventListener("click", async () => {
+        const provider = button.getAttribute("data-recover-provider");
+        if (!provider) return;
+        button.disabled = true;
+        if (output) {
+          output.hidden = false;
+          output.textContent = "Retrying " + provider + " recovery...";
+        }
+        try {
+          const response = await fetch("/api/provider-simulate/recovery?provider=" + encodeURIComponent(provider), {
             method: "POST"
           });
           const body = await response.json();

@@ -26,6 +26,8 @@ export type VoiceProviderStatusRecord = {
   errorCount: number;
   fallbackCount: number;
   lastError?: string;
+  lastErrorAt?: number;
+  lastSuccessAt?: number;
   provider: VoiceModelProvider;
   recommended: boolean;
   runCount: number;

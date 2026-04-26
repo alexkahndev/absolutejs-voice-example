@@ -346,6 +346,23 @@ const resolveSimulatedFailureProvider = (
 
   return undefined;
 };
+const resolveSimulatedRecoveryProvider = (
+  context: unknown,
+): VoiceModelProvider | undefined => {
+  if (
+    context &&
+    typeof context === "object" &&
+    "query" in context &&
+    context.query &&
+    typeof context.query === "object" &&
+    "recoverProvider" in context.query &&
+    isVoiceModelProvider(context.query.recoverProvider)
+  ) {
+    return context.query.recoverProvider;
+  }
+
+  return undefined;
+};
 const simulateProviderModels = Object.fromEntries(
   (["deterministic", "openai", "anthropic", "gemini"] as const).map(
     (provider) => [
@@ -381,7 +398,10 @@ const providerFailureSimulator = createVoiceProviderRouter<
   SavedIntake,
   VoiceModelProvider
 >({
-  allowProviders: () => configuredModelProviders,
+  allowProviders: ({ context }) => {
+    const recoverProvider = resolveSimulatedRecoveryProvider(context);
+    return recoverProvider ? [recoverProvider] : configuredModelProviders;
+  },
   fallback: ({ context }) =>
     providerFallbackOrder(resolveRequestedProvider(context)),
   fallbackMode: "provider-error",
@@ -397,7 +417,10 @@ const providerFailureSimulator = createVoiceProviderRouter<
   providers: simulateProviderModels,
   selectProvider: ({ context }) => resolveRequestedProvider(context),
 });
-const runProviderFailureSimulation = async (provider: VoiceModelProvider) => {
+const runProviderSimulation = async (
+  provider: VoiceModelProvider,
+  mode: "failure" | "recovery",
+) => {
   const session = createVoiceSessionRecord(
     `provider-sim-${Date.now()}`,
     "provider-simulation",
@@ -405,7 +428,10 @@ const runProviderFailureSimulation = async (provider: VoiceModelProvider) => {
   const turn = {
     committedAt: Date.now(),
     id: `provider-sim-turn-${Date.now()}`,
-    text: `Simulate ${provider} provider failure.`,
+    text:
+      mode === "failure"
+        ? `Simulate ${provider} provider failure.`
+        : `Simulate ${provider} provider recovery.`,
     transcripts: [],
   };
 
@@ -414,7 +440,16 @@ const runProviderFailureSimulation = async (provider: VoiceModelProvider) => {
     context: {
       query: {
         provider,
-        simulateFailureProvider: provider,
+        ...(mode === "recovery"
+          ? {
+              recoverProvider: provider,
+            }
+          : {}),
+        ...(mode === "failure"
+          ? {
+              simulateFailureProvider: provider,
+            }
+          : {}),
       },
     },
     messages: [
@@ -430,6 +465,7 @@ const runProviderFailureSimulation = async (provider: VoiceModelProvider) => {
   });
 
   return {
+    mode,
     provider,
     result,
     status: "simulated",
@@ -601,6 +637,7 @@ type VoiceProviderHealth = {
   fallbackCount: number;
   lastError?: string;
   lastErrorAt?: number;
+  lastSuccessAt?: number;
   provider: VoiceModelProvider;
   rateLimited: boolean;
   recommended: boolean;
@@ -714,7 +751,10 @@ const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
     if (providerStatus === "success" || providerStatus === "fallback") {
       const entry = applyProviderHealth();
       entry.runCount += 1;
+      entry.lastSuccessAt = event.at;
       if (providerStatus === "success") {
+        entry.lastError = undefined;
+        entry.rateLimited = false;
         entry.suppressedUntil = undefined;
         entry.suppressionRemainingMs = undefined;
       }
@@ -765,7 +805,10 @@ const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
         ? "recoverable"
         : entry.rateLimited
           ? "rate-limited"
-          : entry.errorCount > 0
+          : entry.errorCount > 0 &&
+              (!entry.lastSuccessAt ||
+                !entry.lastErrorAt ||
+                entry.lastErrorAt > entry.lastSuccessAt)
             ? "degraded"
             : entry.runCount > 0
               ? "healthy"
@@ -777,6 +820,7 @@ const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
       fallbackCount: entry.fallbackCount,
       lastError: entry.lastError,
       lastErrorAt: entry.lastErrorAt,
+      lastSuccessAt: entry.lastSuccessAt,
       provider: entry.provider,
       rateLimited: entry.rateLimited,
       recommended: false,
@@ -1048,7 +1092,27 @@ const server = new Elysia()
       };
     }
 
-    return runProviderFailureSimulation(provider);
+    return runProviderSimulation(provider, "failure");
+  })
+  .post("/api/provider-simulate/recovery", async ({ query }) => {
+    const provider =
+      typeof query.provider === "string" && isVoiceModelProvider(query.provider)
+        ? query.provider
+        : undefined;
+
+    if (!provider || provider === "deterministic") {
+      return {
+        error:
+          "Set ?provider=openai, ?provider=anthropic, or ?provider=gemini.",
+      };
+    }
+    if (!configuredModelProviders.includes(provider)) {
+      return {
+        error: `${provider} is not configured in this environment.`,
+      };
+    }
+
+    return runProviderSimulation(provider, "recovery");
   })
   .get("/api/assistant-memory", async () => listAssistantMemory())
   .get("/api/reviews", async ({ query }) => {
