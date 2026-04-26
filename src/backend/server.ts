@@ -11,6 +11,7 @@ import {
   createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
   createOpenAIVoiceAssistantModel,
+  createVoiceProviderRouter,
   createVoiceTaskUpdatedEvent,
   reopenVoiceOpsTask,
   startVoiceOpsTask,
@@ -19,6 +20,7 @@ import {
   type VoiceCallReviewStore,
   type VoiceAssistantMemoryRecord,
   type VoiceAgentModel,
+  type VoiceProviderRouterEvent,
   type VoiceOpsTaskStatus,
   type VoiceOpsTaskStore,
   type VoiceTurnCorrectionHandler,
@@ -205,15 +207,11 @@ const assistantConfig = {
   availableProviders: configuredModelProviders,
   modelProvider,
 };
-const isProviderError = (error: unknown) =>
+const isAssistantProviderError = (error: unknown) =>
   error instanceof Error &&
   /\b(OpenAI|Anthropic|Gemini)\b.*\b(HTTP|failed|Unable to connect)/i.test(
     error.message,
   );
-const isRateLimitError = (error: unknown) =>
-  error instanceof Error && /\bHTTP 429\b|rate limit/i.test(error.message);
-const toErrorMessage = (error: unknown) =>
-  error instanceof Error ? error.message : String(error);
 const providerFallbackOrder = (provider: VoiceModelProvider) => [
   provider,
   ...(["openai", "anthropic", "gemini", "deterministic"] as const).filter(
@@ -257,14 +255,6 @@ const geminiModel = geminiApiKey
       model: process.env.GEMINI_VOICE_MODEL ?? "gemini-2.5-flash",
     })
   : undefined;
-const assistantModel =
-  modelProvider === "openai"
-    ? openAIModel
-    : modelProvider === "anthropic"
-      ? anthropicModel
-      : modelProvider === "gemini"
-        ? geminiModel
-        : undefined;
 const resolveRequestedProvider = (context: unknown): VoiceModelProvider => {
   if (
     context &&
@@ -281,6 +271,49 @@ const resolveRequestedProvider = (context: unknown): VoiceModelProvider => {
 
   return modelProvider;
 };
+const providerModels: Partial<
+  Record<
+    VoiceModelProvider,
+    VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake>
+  >
+> = {
+  deterministic: intakeModel,
+  openai: openAIModel,
+  anthropic: anthropicModel,
+  gemini: geminiModel,
+};
+const traceProviderEvent = async (
+  event: VoiceProviderRouterEvent<VoiceModelProvider>,
+  input: Parameters<
+    VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake>["generate"]
+  >[0],
+) => {
+  await runtimeStorage.traces.append({
+    at: event.at,
+    payload: {
+      ...event,
+      providerStatus: event.status,
+    },
+    scenarioId: input.session.scenarioId,
+    sessionId: input.session.id,
+    turnId: input.turn.id,
+    type: "session.error",
+  });
+};
+const assistantModel = createVoiceProviderRouter<
+  unknown,
+  VoiceSessionRecord,
+  SavedIntake,
+  VoiceModelProvider
+>({
+  fallback: ({ context }) =>
+    providerFallbackOrder(resolveRequestedProvider(context)),
+  isProviderError: (error, provider) =>
+    provider !== "deterministic" && isAssistantProviderError(error),
+  onProviderEvent: traceProviderEvent,
+  providers: providerModels,
+  selectProvider: ({ context }) => resolveRequestedProvider(context),
+});
 const intakeClassifierTool = createVoiceAgentTool<
   unknown,
   VoiceSessionRecord,
@@ -457,6 +490,14 @@ type VoiceProviderHealth = {
 const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
   const events =
     (await runtimeStorage.traces.list()) as StoredVoiceTraceEvent[];
+  const hasProviderRouterEvents = events.some(
+    (event) =>
+      event.type === "session.error" &&
+      isVoiceModelProvider(event.payload.provider) &&
+      (event.payload.providerStatus === "success" ||
+        event.payload.providerStatus === "fallback" ||
+        event.payload.providerStatus === "error"),
+  );
   const entries = new Map<
     VoiceModelProvider,
     VoiceProviderHealth & {
@@ -493,6 +534,9 @@ const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
 
   for (const event of events) {
     if (event.type === "assistant.run") {
+      if (hasProviderRouterEvents) {
+        continue;
+      }
       const provider = event.payload.variantId;
       if (isVoiceModelProvider(provider)) {
         const entry = getEntry(provider);
@@ -513,6 +557,31 @@ const summarizeProviderHealth = async (): Promise<VoiceProviderHealth[]> => {
     if (!isVoiceModelProvider(provider)) {
       continue;
     }
+    const providerStatus =
+      event.payload.providerStatus === "success" ||
+      event.payload.providerStatus === "fallback" ||
+      event.payload.providerStatus === "error"
+        ? event.payload.providerStatus
+        : undefined;
+
+    if (providerStatus === "success" || providerStatus === "fallback") {
+      const entry = getEntry(provider);
+      entry.runCount += 1;
+      if (typeof event.payload.elapsedMs === "number") {
+        entry.elapsedCount += 1;
+        entry.elapsedTotal += event.payload.elapsedMs;
+      }
+      const selectedProvider = event.payload.selectedProvider;
+      if (
+        providerStatus === "fallback" &&
+        isVoiceModelProvider(selectedProvider) &&
+        selectedProvider !== provider
+      ) {
+        getEntry(selectedProvider).fallbackCount += 1;
+      }
+      continue;
+    }
+
     const entry = getEntry(provider);
     entry.errorCount += 1;
     entry.lastError =
@@ -726,82 +795,7 @@ const createDemoAssistant = (
     trace: runtimeStorage.traces,
   });
 
-const assistants = new Map(
-  configuredModelProviders.map((provider) => [
-    provider,
-    createDemoAssistant(
-      provider,
-      provider === "openai"
-        ? (openAIModel ?? intakeModel)
-        : provider === "anthropic"
-          ? (anthropicModel ?? intakeModel)
-          : provider === "gemini"
-            ? (geminiModel ?? intakeModel)
-            : intakeModel,
-    ),
-  ]),
-);
-const assistant =
-  assistants.get(modelProvider) ??
-  createDemoAssistant(modelProvider, assistantModel ?? intakeModel);
-const runAssistantWithFallback: (
-  input: Parameters<(typeof assistant)["onTurn"]>[0],
-) => ReturnType<(typeof assistant)["onTurn"]> = async (input) => {
-  const requestedProvider = resolveRequestedProvider(input.context);
-  const providers = providerFallbackOrder(requestedProvider);
-  let lastError: unknown;
-
-  for (const provider of providers) {
-    const nextAssistant = assistants.get(provider) ?? assistant;
-    const startedAt = Date.now();
-
-    try {
-      const result = await nextAssistant.onTurn(input);
-      if (provider !== requestedProvider) {
-        await runtimeStorage.traces.append({
-          at: Date.now(),
-          payload: {
-            elapsedMs: Date.now() - startedAt,
-            fallbackProvider: provider,
-            provider: requestedProvider,
-            recovered: true,
-          },
-          scenarioId: input.session.scenarioId,
-          sessionId: input.session.id,
-          turnId: input.turn.id,
-          type: "session.error",
-        });
-      }
-      return result;
-    } catch (error) {
-      lastError = error;
-      const shouldFallback =
-        provider !== "deterministic" && isProviderError(error);
-      await runtimeStorage.traces.append({
-        at: Date.now(),
-        payload: {
-          elapsedMs: Date.now() - startedAt,
-          error: toErrorMessage(error),
-          fallbackProvider: shouldFallback
-            ? providers.find((candidate) => candidate !== provider)
-            : undefined,
-          provider,
-          rateLimited: isRateLimitError(error),
-        },
-        scenarioId: input.session.scenarioId,
-        sessionId: input.session.id,
-        turnId: input.turn.id,
-        type: "session.error",
-      });
-
-      if (!shouldFallback) {
-        throw error;
-      }
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error(String(lastError));
-};
+const assistant = createDemoAssistant(modelProvider, assistantModel);
 
 const server = new Elysia()
   .use(absolutejs)
@@ -849,7 +843,7 @@ const server = new Elysia()
       ops: assistant.ops,
       correctTurn: correctDemoTurn,
       phraseHints: VOICE_DEMO_PHRASE_HINTS,
-      onTurn: runAssistantWithFallback,
+      onTurn: assistant.onTurn,
       path: "/voice/intake",
       preset: "reliability",
       session: runtimeStorage.session,
