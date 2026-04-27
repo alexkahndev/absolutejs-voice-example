@@ -11,6 +11,7 @@ import {
   createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
   createOpenAIVoiceAssistantModel,
+  createVoiceAssistantHealthRoutes,
   createVoiceProviderHealthRoutes,
   createVoiceProviderRouter,
   createVoiceTaskUpdatedEvent,
@@ -740,6 +741,12 @@ const server = new Elysia()
   )
   .use(
     createVoiceProviderHealthRoutes({
+      providers: configuredModelProviders,
+      store: runtimeStorage.traces,
+    }),
+  )
+  .use(
+    createVoiceAssistantHealthRoutes({
       providers: configuredModelProviders,
       store: runtimeStorage.traces,
     }),
