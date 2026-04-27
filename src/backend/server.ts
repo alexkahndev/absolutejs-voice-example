@@ -8,6 +8,7 @@ import {
   createVoiceDiagnosticsRoutes,
   createVoiceEvalRoutes,
   createVoiceFileEvalBaselineStore,
+  createVoiceFileScenarioFixtureStore,
   createVoiceAssistant,
   createVoiceAgentTool,
   createVoiceExperiment,
@@ -1094,6 +1095,7 @@ const server = new Elysia()
         { href: "/quality", label: "Quality" },
         { href: "/evals/baseline", label: "Baseline" },
         { href: "/evals/scenarios", label: "Scenarios" },
+        { href: "/evals/fixtures", label: "Fixtures" },
         { href: "/resilience", label: "Resilience" },
         { href: "/diagnostics", label: "Diagnostics" },
         { href: "/sessions", label: "Sessions" },
@@ -1103,6 +1105,9 @@ const server = new Elysia()
       ],
       baselineStore: createVoiceFileEvalBaselineStore(
         resolve(runtimeDirectory, "eval-baseline.json"),
+      ),
+      fixtureStore: createVoiceFileScenarioFixtureStore(
+        resolve(import.meta.dir, "fixtures", "voice-scenario-fixtures.json"),
       ),
       scenarios: [
         {
@@ -1136,6 +1141,7 @@ const server = new Elysia()
           minSessions: 0,
           requiredDisposition: "transferred",
           requiredHandoffActions: ["transfer"],
+          scenarioId: "transfer",
         },
       ],
       store: runtimeStorage.traces,
@@ -1171,6 +1177,13 @@ const server = new Elysia()
           href: "/evals/scenarios",
           label: "Scenario Evals",
           statusHref: "/evals/scenarios/status",
+        },
+        {
+          description:
+            "Seeded certification fixtures that prove workflows pass before live traffic.",
+          href: "/evals/fixtures",
+          label: "Fixture Evals",
+          statusHref: "/evals/fixtures/status",
         },
         {
           description: "Provider failover, degradation, and simulator controls.",
