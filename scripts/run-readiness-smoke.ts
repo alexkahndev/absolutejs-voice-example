@@ -148,12 +148,14 @@ const endpoints: Array<{
     path: "/api/voice/simulations",
     summarize: (body) => {
       const report = body as {
+        actions?: unknown[];
         failed?: unknown;
         status?: unknown;
         summary?: unknown;
         total?: unknown;
       };
       return {
+        actions: Array.isArray(report.actions) ? report.actions.length : 0,
         failed: report.failed,
         status: report.status,
         summary: report.summary,

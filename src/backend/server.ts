@@ -2146,6 +2146,13 @@ const server = new Elysia()
   )
   .use(
     createVoiceSimulationSuiteRoutes({
+      actionLinks: {
+        fixtures: "/evals/fixtures",
+        outcomes: "/outcome-contracts",
+        scenarios: "/evals/scenarios",
+        sessions: "/quality",
+        tools: "/tool-contracts",
+      },
       htmlPath: "/voice/simulations",
       path: "/api/voice/simulations",
       store: runtimeStorage.traces,
