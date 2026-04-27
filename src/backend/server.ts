@@ -20,6 +20,7 @@ import {
   createVoiceSTTProviderRouter,
   createVoiceTaskUpdatedEvent,
   createVoiceTelephonyOutcomePolicy,
+  createVoiceTelephonyWebhookRoutes,
   createVoiceToolContractRoutes,
   createVoiceToolRuntimeContractDefaults,
   createVoiceTurnQualityRoutes,
@@ -1017,6 +1018,10 @@ const renderTelephonyOutcomePreviewHTML = () => {
     )
     .join("");
 
+  const webhookExample = escapeHtml(
+    "curl -X POST http://localhost:3000/api/telephony-webhook -H 'content-type: application/x-www-form-urlencoded' --data 'CallSid=demo-call&CallStatus=busy&SipResponseCode=486'",
+  );
+
   return `<!doctype html>
   <html lang="en">
     <head>
@@ -1039,6 +1044,8 @@ const renderTelephonyOutcomePreviewHTML = () => {
         <p class="muted">Telephony primitive preview</p>
         <h1>Carrier events become AbsoluteJS lifecycle outcomes</h1>
         <p class="muted">Use <code>resolveVoiceTelephonyOutcome</code>, <code>voiceTelephonyOutcomeToRouteResult</code>, or <code>applyVoiceTelephonyOutcome</code> in carrier webhooks to keep transfer, voicemail, and no-answer behavior deterministic.</p>
+        <p class="muted">This demo also mounts <code>createVoiceTelephonyWebhookRoutes</code> at <code>/api/telephony-webhook</code>.</p>
+        <p><code>${webhookExample}</code></p>
         <table>
           <thead><tr><th>Case</th><th>Provider Event</th><th>Decision</th><th>Route Result</th></tr></thead>
           <tbody>${rows}</tbody>
@@ -1630,6 +1637,20 @@ const server = new Elysia()
       sessions: runtimeStorage.session,
       tasks: runtimeStorage.tasks,
       title: "AbsoluteJS Voice Demo Outcome Contracts",
+    }),
+  )
+  .use(
+    createVoiceTelephonyWebhookRoutes({
+      onDecision: ({ decision }) => {
+        console.info("telephony outcome webhook", {
+          action: decision.action,
+          disposition: decision.disposition,
+          source: decision.source,
+        });
+      },
+      path: "/api/telephony-webhook",
+      policy: telephonyOutcomePolicy,
+      provider: "twilio",
     }),
   )
   .use(
