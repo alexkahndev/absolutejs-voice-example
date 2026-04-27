@@ -16,6 +16,7 @@ import {
   createVoiceHandoffHealthRoutes,
   createVoiceProviderHealthRoutes,
   createVoiceProviderRouter,
+  createVoiceResilienceRoutes,
   createVoiceSessionListRoutes,
   createVoiceSessionReplayRoutes,
   createVoiceSTTProviderRouter,
@@ -67,10 +68,6 @@ import {
   type SavedVoiceIntegrationEvent,
 } from "./integrationsPage";
 import { renderVoiceAssistantPage } from "./assistantPage";
-import {
-  listVoiceRoutingEvents,
-  renderVoiceResiliencePage,
-} from "./resiliencePage";
 import {
   createVoiceIOProviderFailureSimulator,
   createVoiceProviderFailureSimulator,
@@ -745,26 +742,11 @@ const summarizeProviderHealth = async (): Promise<
     store: runtimeStorage.traces,
   });
 
-const summarizeSTTProviderHealth = async (): Promise<
-  VoiceProviderHealthSummary<string>[]
-> => {
-  const events = (await runtimeStorage.traces.list()).filter(
-    (event) => event.payload.kind === "stt",
-  );
-  return summarizeVoiceProviderHealth({
-    events,
-    providers: configuredSTTProviders,
-  });
-};
-
 const sttProviderSimulationStatus = () =>
   (["deepgram", "assemblyai"] as const).map((provider) => ({
     configured: configuredSTTProviders.includes(provider),
     provider,
   }));
-
-const isVoiceSTTProvider = (value: unknown): value is VoiceSTTProvider =>
-  value === "deepgram" || value === "assemblyai";
 
 const sttProviderFailureSimulator = createVoiceIOProviderFailureSimulator<
   VoiceSTTProvider
@@ -794,38 +776,6 @@ const sttProviderFailureSimulator = createVoiceIOProviderFailureSimulator<
   },
   sessionId: ({ now }) => `stt-sim-${now}`,
 });
-
-const simulateSTTProviderFailure = async (provider: VoiceSTTProvider) => {
-  if (!configuredSTTProviders.includes(provider)) {
-    return {
-      error: `${provider} is not configured in this environment.`,
-    };
-  }
-  if (provider !== "deepgram") {
-    return {
-      error:
-        "This demo currently simulates Deepgram failure because Deepgram is the primary STT provider.",
-    };
-  }
-  if (!configuredSTTProviders.includes("assemblyai")) {
-    return {
-      error:
-        "ASSEMBLYAI_API_KEY is required before simulating a real STT fallback path.",
-    };
-  }
-
-  return sttProviderFailureSimulator.run(provider, "failure");
-};
-
-const simulateSTTProviderRecovery = async (provider: VoiceSTTProvider) => {
-  if (!configuredSTTProviders.includes(provider)) {
-    return {
-      error: `${provider} is not configured in this environment.`,
-    };
-  }
-
-  return sttProviderFailureSimulator.run(provider, "recovery");
-};
 
 const listAssistantMemory = async (): Promise<VoiceAssistantMemoryRecord[]> =>
   memoryStore.list({
@@ -1078,6 +1028,33 @@ const server = new Elysia()
     }),
   )
   .use(
+    createVoiceResilienceRoutes({
+      links: [
+        { href: "/react", label: "Back to demo" },
+        { href: "/assistant", label: "Assistant" },
+        { href: "/sessions", label: "Sessions" },
+        { href: "/handoffs", label: "Handoffs" },
+        { href: "/reviews", label: "Reviews" },
+        { href: "/tasks", label: "Tasks" },
+        { href: "/integrations", label: "Integrations" },
+      ],
+      llmProviders: configuredModelProviders,
+      sttProviders: configuredSTTProviders,
+      sttSimulation: {
+        failureMessage:
+          "Simulate Deepgram failure to prove the realtime route falls back to AssemblyAI without changing provider credentials.",
+        failureProviders: ["deepgram"],
+        fallbackRequiredMessage:
+          "Add ASSEMBLYAI_API_KEY to enable the real fallback provider.",
+        fallbackRequiredProvider: "assemblyai",
+        providers: sttProviderSimulationStatus(),
+        run: (provider, mode) =>
+          sttProviderFailureSimulator.run(provider as VoiceSTTProvider, mode),
+      },
+      store: runtimeStorage.traces,
+    }),
+  )
+  .use(
     createVoiceOpsWebhookReceiverRoutes({
       onEnvelope: ({ envelope }) => {
         receivedWebhookEnvelopes.unshift(envelope);
@@ -1129,42 +1106,6 @@ const server = new Elysia()
     }
 
     return providerFailureSimulator.run(provider, "recovery");
-  })
-  .post("/api/stt-simulate/failure", async ({ query, set }) => {
-    const provider = isVoiceSTTProvider(query.provider)
-      ? query.provider
-      : undefined;
-
-    if (!provider) {
-      set.status = 400;
-      return {
-        error: "Set ?provider=deepgram.",
-      };
-    }
-
-    const result = await simulateSTTProviderFailure(provider);
-    if ("error" in result) {
-      set.status = 400;
-    }
-    return result;
-  })
-  .post("/api/stt-simulate/recovery", async ({ query, set }) => {
-    const provider = isVoiceSTTProvider(query.provider)
-      ? query.provider
-      : undefined;
-
-    if (!provider) {
-      set.status = 400;
-      return {
-        error: "Set ?provider=deepgram or ?provider=assemblyai.",
-      };
-    }
-
-    const result = await simulateSTTProviderRecovery(provider);
-    if ("error" in result) {
-      set.status = 400;
-    }
-    return result;
   })
   .get("/api/assistant-memory", async () => listAssistantMemory())
   .get("/api/reviews", async ({ query }) => {
@@ -1241,23 +1182,6 @@ const server = new Elysia()
             webhookUrl,
           },
         ),
-        {
-          headers: {
-            "Content-Type": "text/html; charset=utf-8",
-          },
-        },
-      ),
-  )
-  .get(
-    "/resilience",
-    async () =>
-      new Response(
-        renderVoiceResiliencePage({
-          llmProviderHealth: await summarizeProviderHealth(),
-          routingEvents: listVoiceRoutingEvents(await runtimeStorage.traces.list()),
-          sttProviderHealth: await summarizeSTTProviderHealth(),
-          sttProviders: sttProviderSimulationStatus(),
-        }),
         {
           headers: {
             "Content-Type": "text/html; charset=utf-8",
