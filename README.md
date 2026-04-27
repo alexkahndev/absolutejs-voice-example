@@ -149,6 +149,28 @@ bun run bench:assistant:providers
 
 The runner always includes the deterministic baseline and automatically includes OpenAI, Anthropic, and Gemini when their API keys are present. Use `VOICE_SHOOTOUT_PROVIDERS=openai,anthropic,gemini` to restrict the run. Results are written to `.voice-runtime/shootouts`, or to `VOICE_SHOOTOUT_OUTPUT_DIR` when set.
 
+## Readiness Smoke
+
+Use the readiness smoke runner before a demo or after changing voice primitives:
+
+```bash
+bun run smoke:readiness:server
+```
+
+That starts the demo on `PORT=3004` when `PORT` is not already set, waits for `/api/production-readiness`, runs the smoke checks, and stops the server. If you already have the server running, use:
+
+```bash
+bun run smoke:readiness
+```
+
+The smoke runner checks the readiness, carrier, provider capability, handoff, and app-kit status endpoints in parallel. Local development can still report `readinessStatus: "fail"` when production-only gates are missing, such as a public carrier webhook URL or live carrier credentials. The default smoke passes when the control-plane endpoints are reachable and returning valid JSON.
+
+For production-like environments where every readiness gate should pass:
+
+```bash
+VOICE_READINESS_SMOKE_STRICT=true bun run smoke:readiness
+```
+
 ## What To Demo
 
 A good end-to-end demo flow is:

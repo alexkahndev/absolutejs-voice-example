@@ -9,6 +9,7 @@
     "format": "absolute prettier --write",
     "lint": "absolute eslint",
     "smoke:readiness": "bun run ./scripts/run-readiness-smoke.ts",
+    "smoke:readiness:server": "bun run ./scripts/run-readiness-smoke-server.ts",
     "smoke:telephony:tts": "bun run ./scripts/run-telephony-tts-smoke.ts",
     "simulate:provider-failure": "bun run ./scripts/run-provider-failure-simulation.ts",
     "start": "absolute start",
