@@ -15,6 +15,7 @@ import {
   createVoiceAssistantHealthRoutes,
   createVoiceHandoffDeliveryWorker,
   createVoiceHandoffHealthRoutes,
+  createVoiceOpsConsoleRoutes,
   createVoiceProviderHealthRoutes,
   createVoiceQualityRoutes,
   createVoiceProviderRouter,
@@ -1033,6 +1034,7 @@ const server = new Elysia()
     createVoiceResilienceRoutes({
       links: [
         { href: "/react", label: "Back to demo" },
+        { href: "/ops-console", label: "Ops Console" },
         { href: "/assistant", label: "Assistant" },
         { href: "/quality", label: "Quality" },
         { href: "/diagnostics", label: "Diagnostics" },
@@ -1068,6 +1070,7 @@ const server = new Elysia()
     createVoiceQualityRoutes({
       links: [
         { href: "/react", label: "Back to demo" },
+        { href: "/ops-console", label: "Ops Console" },
         { href: "/resilience", label: "Resilience" },
         { href: "/diagnostics", label: "Diagnostics" },
         { href: "/sessions", label: "Sessions" },
@@ -1077,6 +1080,52 @@ const server = new Elysia()
         { href: "/integrations", label: "Integrations" },
       ],
       store: runtimeStorage.traces,
+    }),
+  )
+  .use(
+    createVoiceOpsConsoleRoutes({
+      links: [
+        {
+          description: "Acceptance gates for production readiness.",
+          href: "/quality",
+          label: "Quality",
+          statusHref: "/quality/status",
+        },
+        {
+          description: "Provider failover, degradation, and simulator controls.",
+          href: "/resilience",
+          label: "Resilience",
+        },
+        {
+          description: "Redacted trace exports for debugging and support.",
+          href: "/diagnostics",
+          label: "Diagnostics",
+        },
+        {
+          description: "Recent calls with replay links.",
+          href: "/sessions",
+          label: "Sessions",
+        },
+        {
+          description: "Transfer and webhook delivery health.",
+          href: "/handoffs",
+          label: "Handoffs",
+        },
+        {
+          description: "Follow-up tasks created from call outcomes.",
+          href: "/tasks",
+          label: "Tasks",
+        },
+        {
+          description: "CRM/helpdesk sync and integration events.",
+          href: "/integrations",
+          label: "Integrations",
+        },
+      ],
+      llmProviders: configuredModelProviders,
+      store: runtimeStorage.traces,
+      sttProviders: configuredSTTProviders,
+      title: "AbsoluteJS Voice Demo Ops Console",
     }),
   )
   .use(
