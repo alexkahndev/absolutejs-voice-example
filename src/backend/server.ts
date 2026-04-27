@@ -287,6 +287,8 @@ const geminiApiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
 const openAIApiKey = process.env.OPENAI_API_KEY;
 const publicBaseUrl = process.env.VOICE_DEMO_PUBLIC_BASE_URL;
 const handoffWebhookUrl = process.env.VOICE_DEMO_HANDOFF_WEBHOOK_URL;
+const telephonyWebhookSigningSecret =
+  process.env.VOICE_DEMO_TELEPHONY_WEBHOOK_SECRET;
 const webhookSigningSecret = process.env.VOICE_DEMO_WEBHOOK_SECRET;
 const webhookUrl = process.env.VOICE_DEMO_WEBHOOK_URL;
 const requestedModelProvider = process.env.VOICE_MODEL_PROVIDER?.toLowerCase();
@@ -1651,6 +1653,10 @@ const server = new Elysia()
       path: "/api/telephony-webhook",
       policy: telephonyOutcomePolicy,
       provider: "twilio",
+      signingSecret: telephonyWebhookSigningSecret,
+      verificationUrl: publicBaseUrl
+        ? `${publicBaseUrl.replace(/\/$/, "")}/api/telephony-webhook`
+        : undefined,
     }),
   )
   .use(
