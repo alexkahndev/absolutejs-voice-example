@@ -12,12 +12,14 @@ import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoBargeInEvidence,
+  createDemoLiveTurnLatencyEvidence,
   createDemoMicrophone,
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
   mountDemoBargeInProof,
   pushVoiceWaveLevel,
+  renderDemoLiveTurnLatencyHTML,
 } from "../../shared/browser";
 import {
   getVoiceLeadMessage,
@@ -91,6 +93,7 @@ const providerSimulationHost = document.querySelector(
 const routingModeCopy = document.querySelector("#routing-mode-copy");
 const routingDecisionRoot = document.querySelector("#routing-decision");
 const bargeInProofHost = document.querySelector("#barge-in-proof-card");
+const liveLatencyProofHost = document.querySelector("#live-latency-proof-card");
 const turnQualityHost = document.querySelector("#turn-quality-card");
 const routingModeMetric = document.querySelector("#metric-routing");
 const routingModeSelect = document.querySelector("#routing-mode-select");
@@ -123,6 +126,7 @@ if (
   !(routingModeCopy instanceof HTMLElement) ||
   !(routingDecisionRoot instanceof HTMLElement) ||
   !(bargeInProofHost instanceof HTMLElement) ||
+  !(liveLatencyProofHost instanceof HTMLElement) ||
   !(turnQualityHost instanceof HTMLElement) ||
   !(routingModeMetric instanceof HTMLElement) ||
   !(routingModeSelect instanceof HTMLSelectElement) ||
@@ -190,8 +194,17 @@ let hasStartedModes: Record<VoiceDemoMode, boolean> = {
 const currentVoice = () =>
   activeMode === "general" ? generalVoice : guidedVoice;
 const bargeInEvidence = createDemoBargeInEvidence(() => currentVoice());
+const liveLatencyEvidence = createDemoLiveTurnLatencyEvidence(() =>
+  currentVoice(),
+);
 const microphone = createDemoMicrophone(
-  (audio) => bargeInEvidence.sendAudio(audio),
+  (audio) => {
+    liveLatencyEvidence.recordAudio(audio);
+    liveLatencyProofHost.innerHTML = renderDemoLiveTurnLatencyHTML(
+      liveLatencyEvidence.getSnapshot(),
+    );
+    bargeInEvidence.sendAudio(audio);
+  },
   (level) => {
     waveLevels = pushVoiceWaveLevel(waveLevels, level);
     renderWave();
@@ -337,6 +350,9 @@ const render = () => {
   voiceStatus.textContent = voice.status;
   renderWave();
   renderChat();
+  liveLatencyProofHost.innerHTML = renderDemoLiveTurnLatencyHTML(
+    liveLatencyEvidence.getSnapshot(),
+  );
 };
 
 callControlRoot.innerHTML = VOICE_CALL_CONTROL_ACTIONS.map(
@@ -407,6 +423,7 @@ const startMode = async (mode: VoiceDemoMode) => {
 
 guidedVoice.subscribe(() => {
   bargeInEvidence.syncAssistantOutput();
+  liveLatencyEvidence.syncAssistantOutput();
   render();
   if (guidedVoice.status === "completed") {
     void renderSavedIntakes();
@@ -415,6 +432,7 @@ guidedVoice.subscribe(() => {
 
 generalVoice.subscribe(() => {
   bargeInEvidence.syncAssistantOutput();
+  liveLatencyEvidence.syncAssistantOutput();
   render();
   if (generalVoice.status === "completed") {
     void renderSavedIntakes();

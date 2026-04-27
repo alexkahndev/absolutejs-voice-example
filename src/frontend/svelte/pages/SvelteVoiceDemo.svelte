@@ -46,12 +46,14 @@
     createInitialVoiceWaveLevels,
     createVoiceWavePath,
     createDemoBargeInEvidence,
+    createDemoLiveTurnLatencyEvidence,
     createDemoMicrophone,
     fetchSavedIntakes,
     formatErrorMessage,
     formatDateTime,
     mountDemoBargeInProof,
     pushVoiceWaveLevel,
+    renderDemoLiveTurnLatencyHTML,
   } from "../../shared/browser";
 
   const createInitialVoiceState = (): VoiceStreamState<SavedIntake> => ({
@@ -86,6 +88,7 @@
   let providerStatusHTML = $state("");
   let routingStatusHTML = $state("");
   let traceTimelineHTML = $state("");
+  let liveLatencyHTML = $state("");
   let turnLatencyHTML = $state("");
   let turnQualityHTML = $state("");
   let guidedState = $state(createInitialVoiceState());
@@ -167,6 +170,14 @@
       sessionId: currentVoice.sessionId,
     };
   });
+  const liveLatencyEvidence = createDemoLiveTurnLatencyEvidence(() => ({
+    assistantAudio: currentVoice.assistantAudio,
+    assistantTexts: currentVoice.assistantTexts,
+    sessionId: currentVoice.sessionId,
+  }));
+  liveLatencyHTML = renderDemoLiveTurnLatencyHTML(
+    liveLatencyEvidence.getSnapshot(),
+  );
   let wavePath = $derived(createVoiceWavePath(waveLevels));
   let errorMessage = $derived(error || currentVoice.error || "None");
   let currentPrompt = $derived(
@@ -206,6 +217,10 @@
           const activeVoice =
             activeMode === "general" ? generalVoice : guidedVoice;
 
+          liveLatencyEvidence.recordAudio(audio);
+          liveLatencyHTML = renderDemoLiveTurnLatencyHTML(
+            liveLatencyEvidence.getSnapshot(),
+          );
           bargeInEvidence.sendAudio(audio);
         },
         (level) => {
@@ -260,10 +275,18 @@
     unsubscribeGuided = guidedVoice.subscribe(() => {
       guidedState = { ...guidedVoice!.getSnapshot() };
       bargeInEvidence.syncAssistantOutput();
+      liveLatencyEvidence.syncAssistantOutput();
+      liveLatencyHTML = renderDemoLiveTurnLatencyHTML(
+        liveLatencyEvidence.getSnapshot(),
+      );
     });
     unsubscribeGeneral = generalVoice.subscribe(() => {
       generalState = { ...generalVoice!.getSnapshot() };
       bargeInEvidence.syncAssistantOutput();
+      liveLatencyEvidence.syncAssistantOutput();
+      liveLatencyHTML = renderDemoLiveTurnLatencyHTML(
+        liveLatencyEvidence.getSnapshot(),
+      );
     });
   };
 
@@ -523,6 +546,8 @@
       </div>
 
       <div bind:this={bargeInProofElement}></div>
+
+      {@html liveLatencyHTML}
 
       <article class="voice-card voice-card-side">
         <h2>{VOICE_DEMO_GUIDE_TITLE}</h2>

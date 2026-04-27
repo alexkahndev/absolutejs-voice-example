@@ -2,6 +2,9 @@ import {
   createMicrophoneCapture,
   createVoiceAudioPlayer,
   createVoiceBargeInMonitor,
+  createVoiceLiveTurnLatencyMonitor,
+  type VoiceLiveTurnLatencyMonitorOptions,
+  type VoiceLiveTurnLatencySnapshot,
 } from "@absolutejs/voice/client";
 import type {
   VoiceAudioPlayer,
@@ -642,6 +645,73 @@ export const createDemoBargeInEvidence = <TResult = unknown>(
     },
     getSnapshot: monitor.getSnapshot,
     sendAudio,
+    subscribe: monitor.subscribe,
+    syncAssistantOutput,
+  };
+};
+
+type DemoLiveTurnLatencyVoice<TResult = unknown> = Pick<
+  VoiceStreamState<TResult>,
+  "assistantAudio" | "assistantTexts" | "sessionId"
+>;
+
+const formatLatencyMs = (value?: number) =>
+  typeof value === "number" ? `${Math.round(value)}ms` : "n/a";
+
+export const renderDemoLiveTurnLatencyHTML = (
+  snapshot: VoiceLiveTurnLatencySnapshot,
+) => {
+  const label =
+    snapshot.pending?.startedAt !== undefined
+      ? "Measuring live turn"
+      : snapshot.averageLatencyMs !== undefined
+        ? `${formatLatencyMs(snapshot.averageLatencyMs)} avg`
+        : "Waiting for speech";
+  const last = snapshot.pending ?? snapshot.lastEvent;
+  const rows: Array<[string, string]> = [
+    ["Status", snapshot.status],
+    ["Last live turn", formatLatencyMs(last?.latencyMs)],
+    ["Target", `< ${formatLatencyMs(snapshot.thresholdMs)}`],
+    ["Passed", String(snapshot.passed)],
+  ];
+
+  return `<article class="voice-card voice-live-latency-proof voice-live-latency-proof--${escapeHtml(snapshot.status)}">
+  <span class="voice-framework-pill">Live Latency Proof</span>
+  <h2>${escapeHtml(label)}</h2>
+  <p class="voice-footnote">Measures real browser speech audio sent to the voice websocket until the next assistant audio or text is observed.</p>
+  <div class="voice-live-latency-proof__grid">
+    ${rows
+      .map(
+        ([name, value]) => `<div>
+      <span>${escapeHtml(name)}</span>
+      <strong>${escapeHtml(value)}</strong>
+    </div>`,
+      )
+      .join("")}
+  </div>
+  ${
+    last
+      ? `<p class="voice-footnote">Session ${escapeHtml(last.sessionId ?? "pending")} · ${escapeHtml(last.status)}</p>`
+      : `<p class="voice-footnote">Start the microphone and speak; this card updates when the assistant responds.</p>`
+  }
+</article>`;
+};
+
+export const createDemoLiveTurnLatencyEvidence = <TResult = unknown>(
+  getVoice: () => DemoLiveTurnLatencyVoice<TResult>,
+  options: VoiceLiveTurnLatencyMonitorOptions = {},
+) => {
+  const monitor = createVoiceLiveTurnLatencyMonitor(options);
+  const syncAssistantOutput = () => {
+    monitor.observe(getVoice());
+  };
+
+  return {
+    getSnapshot: monitor.getSnapshot,
+    recordAudio: (audio: Uint8Array | ArrayBuffer) => {
+      syncAssistantOutput();
+      monitor.recordAudio(audio);
+    },
     subscribe: monitor.subscribe,
     syncAssistantOutput,
   };

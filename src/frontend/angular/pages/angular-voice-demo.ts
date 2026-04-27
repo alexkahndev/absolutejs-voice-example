@@ -2,6 +2,7 @@ import {
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
   computed,
+  effect,
   inject,
   signal,
 } from "@angular/core";
@@ -48,6 +49,7 @@ import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoBargeInEvidence,
+  createDemoLiveTurnLatencyEvidence,
   createDemoMicrophone,
   fetchBargeInReport,
   fetchSavedIntakes,
@@ -55,6 +57,7 @@ import {
   formatErrorMessage,
   formatDateTime,
   renderDemoBargeInProofHTML,
+  renderDemoLiveTurnLatencyHTML,
   pushVoiceWaveLevel,
 } from "../../shared/browser";
 
@@ -448,6 +451,8 @@ import {
 
           <div [innerHTML]="bargeInProofHtml()"></div>
 
+          <div [innerHTML]="liveLatencyHtml()"></div>
+
           <article class="voice-card voice-card-side">
             <h2>{{ guideTitle }}</h2>
             <ol class="voice-guide-list">
@@ -713,6 +718,7 @@ export class AngularVoiceDemoComponent {
   liveMicCopy = VOICE_DEMO_MIC_LIVE;
   micError = signal<string | null>(null);
   bargeInProofHtml = signal(renderDemoBargeInProofHTML(null));
+  liveLatencyHtml = signal("");
   savedIntakes = signal<SavedIntake[]>([]);
   generalLabel = VOICE_DEMO_GENERAL_LABEL;
   guidedLabel = VOICE_DEMO_GUIDED_LABEL;
@@ -802,6 +808,14 @@ export class AngularVoiceDemoComponent {
       sessionId: voice.sessionId(),
     };
   });
+  liveLatencyEvidence = createDemoLiveTurnLatencyEvidence(() => {
+    const voice = this.currentVoice();
+    return {
+      assistantAudio: voice.assistantAudio(),
+      assistantTexts: voice.assistantTexts(),
+      sessionId: voice.sessionId(),
+    };
+  });
   routingDescription = computed(
     () =>
       this.routingModes.find((item) => item.id === this.routingMode())
@@ -814,6 +828,13 @@ export class AngularVoiceDemoComponent {
 
   constructor() {
     defineVoiceProviderSimulationControlsElement();
+    effect(() => {
+      const voice = this.currentVoice();
+      voice.assistantAudio().length;
+      voice.assistantTexts().length;
+      voice.sessionId();
+      queueMicrotask(() => this.syncLiveLatencyProof());
+    });
     if (typeof window !== "undefined") {
       void this.refreshBargeInProof();
       this.bargeInProofTimer = setInterval(() => {
@@ -823,6 +844,7 @@ export class AngularVoiceDemoComponent {
       this.refreshTimer = setInterval(() => {
         void this.refreshIntakes();
       }, 4_000);
+      this.syncLiveLatencyProof();
     }
   }
 
@@ -847,7 +869,11 @@ export class AngularVoiceDemoComponent {
   async startMic() {
     try {
       this.microphone ??= createDemoMicrophone(
-        (audio) => this.bargeInEvidence.sendAudio(audio),
+        (audio) => {
+          this.liveLatencyEvidence.recordAudio(audio);
+          this.syncLiveLatencyProof();
+          this.bargeInEvidence.sendAudio(audio);
+        },
         (level) => {
           this.waveLevels.update((current) =>
             pushVoiceWaveLevel(current, level),
@@ -904,6 +930,13 @@ export class AngularVoiceDemoComponent {
 
   runTurnLatencyProof() {
     void this.turnLatency.runProof().catch(() => {});
+  }
+
+  syncLiveLatencyProof() {
+    this.liveLatencyEvidence.syncAssistantOutput();
+    this.liveLatencyHtml.set(
+      renderDemoLiveTurnLatencyHTML(this.liveLatencyEvidence.getSnapshot()),
+    );
   }
 
   ngOnDestroy() {

@@ -16,12 +16,14 @@ import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoBargeInEvidence,
+  createDemoLiveTurnLatencyEvidence,
   createDemoMicrophone,
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
   mountDemoBargeInProof,
   pushVoiceWaveLevel,
+  renderDemoLiveTurnLatencyHTML,
 } from "../../shared/browser";
 import {
   FRAMEWORKS,
@@ -94,6 +96,9 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
   const bargeInRef = useRef<ReturnType<typeof createDemoBargeInEvidence> | null>(
     null,
   );
+  const liveLatencyRef = useRef<ReturnType<
+    typeof createDemoLiveTurnLatencyEvidence
+  > | null>(null);
   const activeModeRef = useRef<VoiceDemoMode | null>(null);
   const voicesRef = useRef({ general: EMPTY_VOICE, guided: EMPTY_VOICE });
   const [modelProvider, setModelProvider] = useState<VoiceModelProvider>(
@@ -124,9 +129,20 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
   const [micError, setMicError] = useState<string | null>(null);
   const [savedIntakes, setSavedIntakes] = useState<SavedIntake[]>([]);
   const [waveLevels, setWaveLevels] = useState(createInitialVoiceWaveLevels);
+  const [liveLatencyHTML, setLiveLatencyHTML] = useState(() =>
+    renderDemoLiveTurnLatencyHTML(
+      createDemoLiveTurnLatencyEvidence(() => EMPTY_VOICE).getSnapshot(),
+    ),
+  );
   const currentVoice = activeMode === "general" ? generalVoice : guidedVoice;
   useEffect(() => {
     bargeInRef.current?.syncAssistantOutput();
+    liveLatencyRef.current?.syncAssistantOutput();
+    if (liveLatencyRef.current) {
+      setLiveLatencyHTML(
+        renderDemoLiveTurnLatencyHTML(liveLatencyRef.current.getSnapshot()),
+      );
+    }
   }, [
     currentVoice.assistantAudio.length,
     currentVoice.assistantTexts.length,
@@ -170,6 +186,15 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
               activeModeRef.current === "general"
                 ? voicesRef.current.general
                 : voicesRef.current.guided,
+            );
+            liveLatencyRef.current ??= createDemoLiveTurnLatencyEvidence(() =>
+              activeModeRef.current === "general"
+                ? voicesRef.current.general
+                : voicesRef.current.guided,
+            );
+            liveLatencyRef.current.recordAudio(audio);
+            setLiveLatencyHTML(
+              renderDemoLiveTurnLatencyHTML(liveLatencyRef.current.getSnapshot()),
             );
             bargeInRef.current.sendAudio(audio);
           },
@@ -431,6 +456,8 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
             />
 
             <div ref={bargeInProofRef} />
+
+            <div dangerouslySetInnerHTML={{ __html: liveLatencyHTML }} />
 
             <article className="voice-card voice-card-side">
               <h2>{VOICE_DEMO_GUIDE_TITLE}</h2>

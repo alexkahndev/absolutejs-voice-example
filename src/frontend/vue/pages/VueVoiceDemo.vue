@@ -45,12 +45,14 @@ import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoBargeInEvidence,
+  createDemoLiveTurnLatencyEvidence,
   createDemoMicrophone,
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
   mountDemoBargeInProof,
   pushVoiceWaveLevel,
+  renderDemoLiveTurnLatencyHTML,
 } from "../../shared/browser";
 
 const modelProvider = ref<VoiceModelProvider>(getInitialVoiceModelProvider());
@@ -74,6 +76,7 @@ const micError = ref<string | null>(null);
 const savedIntakes = ref<SavedIntake[]>([]);
 const waveLevels = ref(createInitialVoiceWaveLevels());
 const bargeInProofEl = ref<HTMLElement | null>(null);
+const liveLatencyHTML = ref("");
 let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
@@ -89,6 +92,17 @@ const bargeInEvidence = createDemoBargeInEvidence(() => {
     sessionId: voice.sessionId.value,
   };
 });
+const liveLatencyEvidence = createDemoLiveTurnLatencyEvidence(() => {
+  const voice = currentVoice.value;
+  return {
+    assistantAudio: voice.assistantAudio.value,
+    assistantTexts: voice.assistantTexts.value,
+    sessionId: voice.sessionId.value,
+  };
+});
+liveLatencyHTML.value = renderDemoLiveTurnLatencyHTML(
+  liveLatencyEvidence.getSnapshot(),
+);
 const wavePath = computed(() => createVoiceWavePath(waveLevels.value));
 const errorMessage = computed(
   () => micError.value || currentVoice.value.error.value || "None",
@@ -135,6 +149,10 @@ watchEffect(() => {
   currentVoice.value.assistantTexts.value.length;
   currentVoice.value.sessionId.value;
   bargeInEvidence.syncAssistantOutput();
+  liveLatencyEvidence.syncAssistantOutput();
+  liveLatencyHTML.value = renderDemoLiveTurnLatencyHTML(
+    liveLatencyEvidence.getSnapshot(),
+  );
 });
 
 const refreshIntakes = async () => {
@@ -144,7 +162,13 @@ const refreshIntakes = async () => {
 const startMic = async () => {
   try {
     microphone ??= createDemoMicrophone(
-      (audio) => bargeInEvidence.sendAudio(audio),
+      (audio) => {
+        liveLatencyEvidence.recordAudio(audio);
+        liveLatencyHTML.value = renderDemoLiveTurnLatencyHTML(
+          liveLatencyEvidence.getSnapshot(),
+        );
+        bargeInEvidence.sendAudio(audio);
+      },
       (level) => {
         waveLevels.value = pushVoiceWaveLevel(waveLevels.value, level);
       },
@@ -436,6 +460,8 @@ onUnmounted(() => {
         </article>
 
         <div ref="bargeInProofEl" />
+
+        <div v-html="liveLatencyHTML" />
 
         <article class="voice-card voice-card-side">
           <h2>{{ VOICE_DEMO_GUIDE_TITLE }}</h2>
