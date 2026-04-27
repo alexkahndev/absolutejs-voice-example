@@ -19,6 +19,7 @@ import {
   createVoiceRoutingDecisionSummary,
   createVoiceSTTProviderRouter,
   createVoiceTaskUpdatedEvent,
+  createVoiceTelephonyOutcomePolicy,
   createVoiceToolContractRoutes,
   createVoiceToolRuntimeContractDefaults,
   createVoiceTurnQualityRoutes,
@@ -32,6 +33,7 @@ import {
   reopenVoiceOpsTask,
   renderVoiceHandoffHealthHTML,
   renderVoiceSessionsHTML,
+  resolveVoiceTelephonyOutcome,
   startVoiceOpsTask,
   summarizeVoiceAssistantRuns,
   summarizeVoiceHandoffDeliveries,
@@ -50,12 +52,14 @@ import {
   type VoiceOpsTaskStatus,
   type VoiceOpsTaskStore,
   type VoiceOutcomeContractDefinition,
+  type VoiceTelephonyOutcomeProviderEvent,
   type VoiceToolContractDefinition,
   type VoiceOpsWebhookEnvelope,
   type VoiceTurnCorrectionHandler,
   type VoiceTurnRecord,
   type VoiceSessionRecord,
   voice,
+  voiceTelephonyOutcomeToRouteResult,
 } from "@absolutejs/voice";
 import { assemblyai } from "@absolutejs/voice-assemblyai";
 import { deepgram } from "@absolutejs/voice-deepgram";
@@ -944,6 +948,106 @@ const demoOutcomeContracts = [
   },
 ] satisfies VoiceOutcomeContractDefinition[];
 
+const telephonyOutcomePolicy = createVoiceTelephonyOutcomePolicy({
+  metadata: {
+    app: "absolutejs-voice-example",
+  },
+  minAnsweredDurationMs: 1_000,
+  transferTarget: ({ metadata }) =>
+    typeof metadata?.queue === "string" ? metadata.queue : undefined,
+});
+
+const telephonyOutcomeSamples = [
+  {
+    label: "Carrier no-answer",
+    event: {
+      provider: "twilio",
+      sipCode: 486,
+      status: "busy",
+    },
+  },
+  {
+    label: "Machine detection voicemail",
+    event: {
+      answeredBy: "machine_start",
+      provider: "twilio",
+      status: "completed",
+    },
+  },
+  {
+    label: "Warm transfer bridge",
+    event: {
+      metadata: {
+        queue: "billing",
+      },
+      provider: "twilio",
+      reason: "warm-transfer",
+      status: "bridged",
+    },
+  },
+] satisfies Array<{
+  event: VoiceTelephonyOutcomeProviderEvent;
+  label: string;
+}>;
+
+const listTelephonyOutcomePreviews = () =>
+  telephonyOutcomeSamples.map((sample) => {
+    const decision = resolveVoiceTelephonyOutcome(
+      sample.event,
+      telephonyOutcomePolicy,
+    );
+
+    return {
+      decision,
+      event: sample.event,
+      label: sample.label,
+      routeResult: voiceTelephonyOutcomeToRouteResult(decision),
+    };
+  });
+
+const renderTelephonyOutcomePreviewHTML = () => {
+  const rows = listTelephonyOutcomePreviews()
+    .map(
+      (preview) => `<tr>
+        <td>${escapeHtml(preview.label)}</td>
+        <td><code>${escapeHtml(JSON.stringify(preview.event))}</code></td>
+        <td><strong>${escapeHtml(preview.decision.action)}</strong><br /><span class="muted">${escapeHtml(preview.decision.source)} / ${escapeHtml(preview.decision.confidence)}</span></td>
+        <td><code>${escapeHtml(JSON.stringify(preview.routeResult))}</code></td>
+      </tr>`,
+    )
+    .join("");
+
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Telephony Outcome Preview</title>
+      <style>
+        body{font-family:ui-sans-serif,system-ui,sans-serif;background:#111827;color:#f8fafc;margin:0}
+        main{max-width:1120px;margin:auto;padding:32px}
+        a{color:#93c5fd}
+        .muted{color:#9ca3af}
+        table{width:100%;border-collapse:collapse;background:#1f2937;border-radius:18px;overflow:hidden}
+        th,td{border-bottom:1px solid #374151;padding:14px;text-align:left;vertical-align:top}
+        code{white-space:normal;word-break:break-word;color:#bfdbfe}
+      </style>
+    </head>
+    <body>
+      <main>
+        <p><a href="/app-kit">Back to App Kit</a></p>
+        <p class="muted">Telephony primitive preview</p>
+        <h1>Carrier events become AbsoluteJS lifecycle outcomes</h1>
+        <p class="muted">Use <code>resolveVoiceTelephonyOutcome</code>, <code>voiceTelephonyOutcomeToRouteResult</code>, or <code>applyVoiceTelephonyOutcome</code> in carrier webhooks to keep transfer, voicemail, and no-answer behavior deterministic.</p>
+        <table>
+          <thead><tr><th>Case</th><th>Provider Event</th><th>Decision</th><th>Route Result</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </main>
+    </body>
+  </html>`;
+};
+
 const appKitLinks = [
   { href: "/react", label: "Back to demo" },
   {
@@ -1016,6 +1120,13 @@ const appKitLinks = [
     href: "/outcome-contracts",
     label: "Outcome Contracts",
     statusHref: "/api/outcome-contracts",
+  },
+  {
+    description:
+      "Normalize carrier events into transfer, voicemail, no-answer, and route-result primitives.",
+    href: "/telephony-outcomes",
+    label: "Telephony Outcomes",
+    statusHref: "/api/telephony-outcomes",
   },
   {
     description: "Redacted trace exports for debugging and support.",
@@ -1534,6 +1645,18 @@ const server = new Elysia()
   .get("/api/routing/latest", async () => await getLatestRoutingDecision())
   .get("/api/assistant-config", () => assistantConfig)
   .get("/api/assistant-summary", async () => summarizeAssistantRuns())
+  .get("/api/telephony-outcomes", () => ({
+    generatedAt: Date.now(),
+    policy: telephonyOutcomePolicy,
+    previews: listTelephonyOutcomePreviews(),
+  }))
+  .get(
+    "/telephony-outcomes",
+    () =>
+      new Response(renderTelephonyOutcomePreviewHTML(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+  )
   .post("/api/voice-handoffs/retry", async () => retryVoiceHandoffDeliveries())
   .post("/api/provider-simulate/failure", async ({ query }) => {
     const provider =
