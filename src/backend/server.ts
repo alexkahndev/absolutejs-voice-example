@@ -14,6 +14,7 @@ import {
   createVoiceAssistantHealthRoutes,
   createVoiceProviderHealthRoutes,
   createVoiceProviderRouter,
+  createVoiceSessionReplayRoutes,
   createVoiceTaskUpdatedEvent,
   reopenVoiceOpsTask,
   startVoiceOpsTask,
@@ -748,6 +749,11 @@ const server = new Elysia()
   .use(
     createVoiceAssistantHealthRoutes({
       providers: configuredModelProviders,
+      store: runtimeStorage.traces,
+    }),
+  )
+  .use(
+    createVoiceSessionReplayRoutes({
       store: runtimeStorage.traces,
     }),
   )
