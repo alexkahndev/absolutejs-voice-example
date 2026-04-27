@@ -11,6 +11,7 @@ import {
   createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
   createOpenAIVoiceAssistantModel,
+  createVoiceProviderHealthRoutes,
   createVoiceProviderRouter,
   createVoiceTaskUpdatedEvent,
   reopenVoiceOpsTask,
@@ -728,10 +729,15 @@ const server = new Elysia()
       }),
     }),
   )
+  .use(
+    createVoiceProviderHealthRoutes({
+      providers: configuredModelProviders,
+      store: runtimeStorage.traces,
+    }),
+  )
   .get("/api/intakes", () => listIntakes())
   .get("/api/assistant-config", () => assistantConfig)
   .get("/api/assistant-summary", async () => summarizeAssistantRuns())
-  .get("/api/provider-status", async () => summarizeProviderHealth())
   .post("/api/provider-simulate/failure", async ({ query }) => {
     const provider =
       typeof query.provider === "string" && isVoiceModelProvider(query.provider)
