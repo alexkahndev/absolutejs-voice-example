@@ -3,6 +3,7 @@ export {};
 type EndpointName =
   | "appKit"
   | "bargeIn"
+  | "campaignProof"
   | "campaigns"
   | "carriers"
   | "handoffs"
@@ -286,7 +287,59 @@ const fetchJson = async (
   }
 };
 
+const postCampaignProof = async (): Promise<EndpointResult> => {
+  const url = `${baseUrl}/api/voice/campaigns/proof`;
+  const startedAt = performance.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+    });
+    const body = (await response.json()) as {
+      final?: {
+        attempts?: unknown[];
+        recipients?: unknown[];
+      };
+      summary?: unknown;
+      tick?: {
+        attempted?: unknown;
+      };
+    };
+
+    return {
+      elapsedMs: Math.round(performance.now() - startedAt),
+      name: "campaignProof",
+      ok: response.ok,
+      status: response.status,
+      summary: {
+        attempts: Array.isArray(body.final?.attempts)
+          ? body.final?.attempts.length
+          : undefined,
+        recipients: Array.isArray(body.final?.recipients)
+          ? body.final?.recipients.length
+          : undefined,
+        tickAttempted: body.tick?.attempted,
+      },
+      url,
+    };
+  } catch (error) {
+    return {
+      elapsedMs: Math.round(performance.now() - startedAt),
+      error: error instanceof Error ? error.message : String(error),
+      name: "campaignProof",
+      ok: false,
+      url,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 const results = await Promise.all(endpoints.map((endpoint) => fetchJson(endpoint)));
+results.push(await postCampaignProof());
 const readinessStatus = results.find(
   (result) => result.name === "productionReadiness",
 )?.summary?.readinessStatus;

@@ -43,6 +43,7 @@ import {
   renderVoiceHandoffHealthHTML,
   renderVoiceSessionsHTML,
   resolveVoiceTelephonyOutcome,
+  runVoiceCampaignProof,
   startVoiceOpsTask,
   summarizeVoiceAssistantRuns,
   summarizeVoiceHandoffDeliveries,
@@ -2382,6 +2383,9 @@ const server = new Elysia()
       store: campaignStore,
       title: "AbsoluteJS Voice Demo Campaigns",
     }),
+  )
+  .post("/api/voice/campaigns/proof", () =>
+    runVoiceCampaignProof({ store: campaignStore }),
   )
   .use(
     createVoiceOpsWebhookReceiverRoutes({
