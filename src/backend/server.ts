@@ -15,6 +15,7 @@ import {
   createVoiceExperiment,
   createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
+  createVoiceSQLiteCampaignStore,
   createOpenAIVoiceAssistantModel,
   createOpenAIVoiceTTS,
   createVoiceHandoffDeliveryWorker,
@@ -1093,7 +1094,9 @@ const telephonyWebhookIdempotencyStore =
   createVoiceSQLiteTelephonyWebhookIdempotencyStore<SavedIntake>({
     path: resolve(runtimeDirectory, "telephony-webhook-idempotency.sqlite"),
   });
-const campaignStore = runtimeStorage.campaigns;
+const campaignStore = createVoiceSQLiteCampaignStore({
+  path: resolve(runtimeDirectory, "campaigns.sqlite"),
+});
 
 const telephonyOutcomeSamples = [
   {
