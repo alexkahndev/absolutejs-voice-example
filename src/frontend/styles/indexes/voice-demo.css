@@ -372,30 +372,90 @@ nav a.active {
   border-color: rgba(245, 158, 11, 0.28);
 }
 
-.voice-routing-grid {
+.voice-routing-card.absolute-voice-routing-status,
+.voice-routing-card .absolute-voice-routing-status {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: inherit;
+  font-family: inherit;
+  padding: 0;
+}
+
+.absolute-voice-routing-status__header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.absolute-voice-routing-status__eyebrow {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: var(--accent);
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 6px 10px;
+  text-transform: uppercase;
+}
+
+.absolute-voice-routing-status__label {
+  color: var(--text);
+  font-family: var(--display-font);
+  font-size: clamp(2rem, 5vw, 4rem);
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+}
+
+.absolute-voice-routing-status__description,
+.absolute-voice-routing-status__grid span,
+.absolute-voice-routing-status__empty {
+  color: var(--muted);
+}
+
+.absolute-voice-routing-status__description,
+.absolute-voice-routing-status__empty {
+  margin: 14px 0 0;
+}
+
+.voice-routing-grid,
+.absolute-voice-routing-status__grid {
   display: grid;
   gap: 10px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 16px;
 }
 
-.voice-routing-grid div {
+.voice-routing-grid div,
+.absolute-voice-routing-status__grid div {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 12px;
 }
 
-.voice-routing-grid span {
+.voice-routing-grid span,
+.absolute-voice-routing-status__grid span {
   color: var(--muted);
   display: block;
   font-size: 0.78rem;
   margin-bottom: 5px;
 }
 
-.voice-routing-grid strong {
+.voice-routing-grid strong,
+.absolute-voice-routing-status__grid strong {
   color: var(--ink);
   overflow-wrap: anywhere;
+}
+
+.absolute-voice-routing-status__error {
+  color: #fca5a5;
+  font-weight: 800;
+  margin: 12px 0 0;
 }
 
 .voice-assistant-config {

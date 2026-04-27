@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from "@angular/core";
-import type { VoiceRoutingDecisionSummary } from "@absolutejs/voice";
 import {
   VoiceAppKitStatusService,
+  VoiceRoutingStatusService,
   VoiceStreamService,
 } from "@absolutejs/voice/angular";
 import {
@@ -36,7 +36,6 @@ import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoMicrophone,
-  fetchLatestRoutingDecision,
   fetchSavedIntakes,
   getAppKitStatusLabel,
   formatErrorMessage,
@@ -167,7 +166,7 @@ import {
             <p class="voice-footnote">
               Latest router event from the self-hosted trace store.
             </p>
-            @if (routingDecision(); as decision) {
+            @if (routingStatus.decision(); as decision) {
               <div class="voice-routing-grid">
                 <div>
                   <span>Policy</span>
@@ -495,7 +494,6 @@ export class AngularVoiceDemoComponent {
   idleMicCopy = VOICE_DEMO_MIC_IDLE;
   liveMicCopy = VOICE_DEMO_MIC_LIVE;
   micError = signal<string | null>(null);
-  routingDecision = signal<VoiceRoutingDecisionSummary | null>(null);
   savedIntakes = signal<SavedIntake[]>([]);
   generalLabel = VOICE_DEMO_GENERAL_LABEL;
   guidedLabel = VOICE_DEMO_GUIDED_LABEL;
@@ -510,6 +508,12 @@ export class AngularVoiceDemoComponent {
   appKitStatus = inject(VoiceAppKitStatusService).connect("/app-kit/status", {
     intervalMs: 5_000,
   });
+  routingStatus = inject(VoiceRoutingStatusService).connect(
+    "/api/routing/latest",
+    {
+      intervalMs: 4_000,
+    },
+  );
   currentVoice = computed(() =>
     this.activeMode() === "general" ? this.generalVoice : this.guidedVoice,
   );
@@ -567,7 +571,6 @@ export class AngularVoiceDemoComponent {
 
   async refreshIntakes() {
     this.savedIntakes.set(await fetchSavedIntakes());
-    this.routingDecision.set(await fetchLatestRoutingDecision());
   }
 
   async startMic() {
@@ -640,6 +643,7 @@ export class AngularVoiceDemoComponent {
     this.guidedVoice.close();
     this.generalVoice.close();
     this.appKitStatus.close();
+    this.routingStatus.close();
   }
 }
 

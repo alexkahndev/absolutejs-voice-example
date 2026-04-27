@@ -1,12 +1,12 @@
 import {
   createVoiceStream,
   mountVoiceOpsStatus,
+  mountVoiceRoutingStatus,
 } from "@absolutejs/voice/client";
 import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoMicrophone,
-  fetchLatestRoutingDecision,
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
@@ -122,6 +122,13 @@ const generalVoice = createVoiceStream<SavedIntake>(
 const opsStatus = mountVoiceOpsStatus(workflowStatusHost, "/app-kit/status", {
   intervalMs: 5_000,
 });
+const routingStatus = mountVoiceRoutingStatus(
+  routingDecisionRoot,
+  "/api/routing/latest",
+  {
+    intervalMs: 4_000,
+  },
+);
 let activeMode: VoiceDemoMode | null = null;
 let hasStartedModes: Record<VoiceDemoMode, boolean> = {
   general: false,
@@ -194,18 +201,7 @@ const renderChat = () => {
 
 const renderSavedIntakes = async () => {
   const intakes = await fetchSavedIntakes();
-  const routingDecision = await fetchLatestRoutingDecision();
   intakesMetric.textContent = String(intakes.length);
-  routingDecisionRoot.innerHTML = routingDecision
-    ? `<div class="voice-routing-grid">
-  <div><span>Policy</span><strong>${escapeHtml(getVoiceRoutingLabel(routingDecision.routing))}</strong></div>
-  <div><span>Provider</span><strong>${escapeHtml(routingDecision.provider ?? "Unknown")}</strong></div>
-  <div><span>Selected</span><strong>${escapeHtml(routingDecision.selectedProvider ?? "Unknown")}</strong></div>
-  <div><span>Fallback</span><strong>${escapeHtml(routingDecision.fallbackProvider ?? "None")}</strong></div>
-  <div><span>Status</span><strong>${escapeHtml(routingDecision.status ?? "unknown")}</strong></div>
-  <div><span>Latency budget</span><strong>${routingDecision.latencyBudgetMs ? `${routingDecision.latencyBudgetMs}ms` : "None"}</strong></div>
-</div>`
-    : `<p class="empty-copy">Start a voice session to see the selected STT provider.</p>`;
 
   if (framework === "htmx") {
     const htmxWindow = window as unknown as HtmxWindow;
@@ -391,4 +387,5 @@ render();
 void renderSavedIntakes();
 window.addEventListener("beforeunload", () => {
   opsStatus.close();
+  routingStatus.close();
 });

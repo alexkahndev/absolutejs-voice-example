@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import type { VoiceRoutingDecisionSummary } from "@absolutejs/voice";
-import { useVoiceStream, VoiceOpsStatus } from "@absolutejs/voice/vue";
+import {
+  useVoiceStream,
+  VoiceOpsStatus,
+  VoiceRoutingStatus,
+} from "@absolutejs/voice/vue";
 import {
   FRAMEWORKS,
   FRAMEWORK_DESCRIPTIONS,
@@ -35,7 +38,6 @@ import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoMicrophone,
-  fetchLatestRoutingDecision,
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
@@ -57,7 +59,6 @@ const hasStartedModes = ref<Record<VoiceDemoMode, boolean>>({
   guided: false,
 });
 const micError = ref<string | null>(null);
-const routingDecision = ref<VoiceRoutingDecisionSummary | null>(null);
 const savedIntakes = ref<SavedIntake[]>([]);
 const waveLevels = ref(createInitialVoiceWaveLevels());
 let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
@@ -98,7 +99,6 @@ const callLifecycleLabel = computed(() => {
 
 const refreshIntakes = async () => {
   savedIntakes.value = await fetchSavedIntakes();
-  routingDecision.value = await fetchLatestRoutingDecision();
 };
 
 const startMic = async () => {
@@ -309,48 +309,10 @@ onUnmounted(() => {
           </p>
         </article>
 
-        <article class="voice-card voice-routing-card">
-          <span class="voice-framework-pill">Routing Trace</span>
-          <h2>Why this STT provider?</h2>
-          <p class="voice-footnote">
-            Latest router event from the self-hosted trace store.
-          </p>
-          <div v-if="routingDecision" class="voice-routing-grid">
-            <div>
-              <span>Policy</span>
-              <strong>{{ getVoiceRoutingLabel(routingDecision.routing) }}</strong>
-            </div>
-            <div>
-              <span>Provider</span>
-              <strong>{{ routingDecision.provider }}</strong>
-            </div>
-            <div>
-              <span>Selected</span>
-              <strong>{{ routingDecision.selectedProvider }}</strong>
-            </div>
-            <div>
-              <span>Fallback</span>
-              <strong>{{ routingDecision.fallbackProvider ?? "None" }}</strong>
-            </div>
-            <div>
-              <span>Status</span>
-              <strong>{{ routingDecision.status }}</strong>
-            </div>
-            <div>
-              <span>Latency budget</span>
-              <strong>
-                {{
-                  routingDecision.latencyBudgetMs
-                    ? `${routingDecision.latencyBudgetMs}ms`
-                    : "None"
-                }}
-              </strong>
-            </div>
-          </div>
-          <p v-else class="empty-copy">
-            Start a voice session to see the selected STT provider.
-          </p>
-        </article>
+        <VoiceRoutingStatus
+          class="voice-card voice-routing-card"
+          :interval-ms="4000"
+        />
 
         <VoiceOpsStatus
           class="voice-card voice-workflow-card"

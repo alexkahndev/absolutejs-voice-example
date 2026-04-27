@@ -1,3 +1,7 @@
-import { defineVoiceOpsStatusElement } from "@absolutejs/voice/client";
+import {
+  defineVoiceOpsStatusElement,
+  defineVoiceRoutingStatusElement,
+} from "@absolutejs/voice/client";
 
 defineVoiceOpsStatusElement();
+defineVoiceRoutingStatusElement();

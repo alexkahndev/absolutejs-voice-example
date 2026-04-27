@@ -130,18 +130,10 @@
           </p>
         </article>
 
-        <article class="voice-card voice-routing-card">
-          <span class="voice-framework-pill">Routing Trace</span>
-          <h2>Why this STT provider?</h2>
-          <p class="voice-footnote">
-            Latest router event from the self-hosted trace store.
-          </p>
-          <div id="routing-decision">
-            <p class="empty-copy">
-              Start a voice session to see the selected STT provider.
-            </p>
-          </div>
-        </article>
+        <absolute-voice-routing-status
+          class="voice-card voice-routing-card"
+          interval-ms="4000"
+        ></absolute-voice-routing-status>
 
         <absolute-voice-ops-status
           class="voice-card voice-workflow-card"
@@ -378,32 +370,6 @@
         if (routingModeCopy) {
           routingModeCopy.textContent = routingCopy[routing] ?? "";
         }
-        const renderRoutingDecision = (decision) => {
-          const host = document.querySelector("#routing-decision");
-          if (!host) return;
-          if (!decision) {
-            host.innerHTML = '<p class="empty-copy">Start a voice session to see the selected STT provider.</p>';
-            return;
-          }
-          host.innerHTML = `<div class="voice-routing-grid">
-            <div><span>Policy</span><strong>${routingLabels[decision.routing] ?? decision.routing}</strong></div>
-            <div><span>Provider</span><strong>${decision.provider}</strong></div>
-            <div><span>Selected</span><strong>${decision.selectedProvider}</strong></div>
-            <div><span>Fallback</span><strong>${decision.fallbackProvider ?? "None"}</strong></div>
-            <div><span>Status</span><strong>${decision.status}</strong></div>
-            <div><span>Latency budget</span><strong>${decision.latencyBudgetMs ? decision.latencyBudgetMs + "ms" : "None"}</strong></div>
-          </div>`;
-        };
-        const refreshRoutingDecision = async () => {
-          try {
-            const response = await fetch("/api/routing/latest");
-            renderRoutingDecision(response.ok ? await response.json() : null);
-          } catch {
-            renderRoutingDecision(null);
-          }
-        };
-        refreshRoutingDecision();
-        window.setInterval(refreshRoutingDecision, 4000);
       })();
     </script>
     <script src="../../html/scripts/voice-ops-status.ts" type="module"></script>

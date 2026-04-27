@@ -3,13 +3,10 @@
   import Head from "@absolutejs/absolute/svelte/components/Head.js";
   import {
     createVoiceOpsStatus,
+    createVoiceRoutingStatus,
     createVoiceStream,
   } from "@absolutejs/voice/svelte";
-  import type {
-    VoiceRoutingDecisionSummary,
-    VoiceStream,
-    VoiceStreamState,
-  } from "@absolutejs/voice";
+  import type { VoiceStream, VoiceStreamState } from "@absolutejs/voice";
   import {
     FRAMEWORKS,
     FRAMEWORK_DESCRIPTIONS,
@@ -43,7 +40,6 @@
     createInitialVoiceWaveLevels,
     createVoiceWavePath,
     createDemoMicrophone,
-    fetchLatestRoutingDecision,
     fetchSavedIntakes,
     formatErrorMessage,
     formatDateTime,
@@ -75,9 +71,9 @@
     guided: false,
   });
   let isCapturing = $state(false);
-  let routingDecision = $state<VoiceRoutingDecisionSummary | null>(null);
   let savedIntakes = $state<SavedIntake[]>([]);
   let opsStatusHTML = $state("");
+  let routingStatusHTML = $state("");
   let guidedState = $state(createInitialVoiceState());
   let generalState = $state(createInitialVoiceState());
   let waveLevels = $state(createInitialVoiceWaveLevels());
@@ -88,9 +84,13 @@
   const opsStatus = createVoiceOpsStatus("/app-kit/status", {
     intervalMs: 5_000,
   });
+  const routingStatus = createVoiceRoutingStatus("/api/routing/latest", {
+    intervalMs: 4_000,
+  });
   let unsubscribeGuided = () => {};
   let unsubscribeGeneral = () => {};
   let unsubscribeOpsStatus = () => {};
+  let unsubscribeRoutingStatus = () => {};
   let currentVoice = $derived(
     activeMode === "general" ? generalState : guidedState,
   );
@@ -124,7 +124,6 @@
 
   const refreshIntakes = async () => {
     savedIntakes = await fetchSavedIntakes();
-    routingDecision = await fetchLatestRoutingDecision();
   };
 
   const startMic = async () => {
@@ -228,8 +227,13 @@
     unsubscribeOpsStatus = opsStatus.subscribe(() => {
       opsStatusHTML = opsStatus.getHTML();
     });
+    unsubscribeRoutingStatus = routingStatus.subscribe(() => {
+      routingStatusHTML = routingStatus.getHTML();
+    });
     opsStatusHTML = opsStatus.getHTML();
+    routingStatusHTML = routingStatus.getHTML();
     void opsStatus.refresh().catch(() => {});
+    void routingStatus.refresh().catch(() => {});
     void refreshIntakes();
     refreshTimer = setInterval(() => {
       void refreshIntakes();
@@ -244,9 +248,11 @@
     unsubscribeGuided();
     unsubscribeGeneral();
     unsubscribeOpsStatus();
+    unsubscribeRoutingStatus();
     guidedVoice?.close();
     generalVoice?.close();
     opsStatus.close();
+    routingStatus.close();
   });
 </script>
 
@@ -350,49 +356,9 @@
         </p>
       </article>
 
-      <article class="voice-card voice-routing-card">
-        <span class="voice-framework-pill">Routing Trace</span>
-        <h2>Why this STT provider?</h2>
-        <p class="voice-footnote">
-          Latest router event from the self-hosted trace store.
-        </p>
-        {#if routingDecision}
-          <div class="voice-routing-grid">
-            <div>
-              <span>Policy</span>
-              <strong>{getVoiceRoutingLabel(routingDecision.routing)}</strong>
-            </div>
-            <div>
-              <span>Provider</span>
-              <strong>{routingDecision.provider}</strong>
-            </div>
-            <div>
-              <span>Selected</span>
-              <strong>{routingDecision.selectedProvider}</strong>
-            </div>
-            <div>
-              <span>Fallback</span>
-              <strong>{routingDecision.fallbackProvider ?? "None"}</strong>
-            </div>
-            <div>
-              <span>Status</span>
-              <strong>{routingDecision.status}</strong>
-            </div>
-            <div>
-              <span>Latency budget</span>
-              <strong>
-                {routingDecision.latencyBudgetMs
-                  ? `${routingDecision.latencyBudgetMs}ms`
-                  : "None"}
-              </strong>
-            </div>
-          </div>
-        {:else}
-          <p class="empty-copy">
-            Start a voice session to see the selected STT provider.
-          </p>
-        {/if}
-      </article>
+      <div class="voice-card voice-routing-card voice-routing-status-host">
+        {@html routingStatusHTML}
+      </div>
 
       <div class="voice-card voice-workflow-card voice-ops-status-host">
         {@html opsStatusHTML}
