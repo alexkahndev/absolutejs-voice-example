@@ -76,6 +76,7 @@ import {
           <a href="/html">HTML</a>
           <a href="/htmx">HTMX</a>
           <a href="/reviews">Reviews</a>
+          <a href="/carriers">Carriers</a>
         </nav>
       </header>
       <main class="voice-shell">

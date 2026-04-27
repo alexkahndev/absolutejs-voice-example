@@ -216,6 +216,7 @@ onUnmounted(() => {
           {{ framework.label }}
         </a>
         <a href="/reviews">Reviews</a>
+        <a href="/carriers">Carriers</a>
       </nav>
     </header>
     <main class="voice-shell">

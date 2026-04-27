@@ -20,6 +20,7 @@ import {
   createVoiceRoutingDecisionSummary,
   createVoiceSTTProviderRouter,
   createVoiceTaskUpdatedEvent,
+  createVoiceTelephonyCarrierMatrixRoutes,
   createVoiceTelephonyOutcomePolicy,
   createTwilioVoiceRoutes,
   createVoiceToolContractRoutes,
@@ -55,6 +56,10 @@ import {
   type VoiceOpsTaskStore,
   type VoiceOutcomeContractDefinition,
   type VoiceTelephonyOutcomeProviderEvent,
+  type VoiceTelephonyCarrierMatrixInput,
+  type VoiceTelephonyProvider,
+  type VoiceTelephonySetupStatus,
+  type VoiceTelephonySmokeReport,
   type VoiceToolContractDefinition,
   type VoiceOpsWebhookEnvelope,
   type VoiceTurnCorrectionHandler,
@@ -290,6 +295,8 @@ const publicBaseUrl = process.env.VOICE_DEMO_PUBLIC_BASE_URL;
 const handoffWebhookUrl = process.env.VOICE_DEMO_HANDOFF_WEBHOOK_URL;
 const telephonyWebhookSigningSecret =
   process.env.VOICE_DEMO_TELEPHONY_WEBHOOK_SECRET;
+const telnyxPublicKey = process.env.TELNYX_PUBLIC_KEY;
+const plivoAuthToken = process.env.PLIVO_AUTH_TOKEN;
 const webhookSigningSecret = process.env.VOICE_DEMO_WEBHOOK_SECRET;
 const webhookUrl = process.env.VOICE_DEMO_WEBHOOK_URL;
 const requestedModelProvider = process.env.VOICE_MODEL_PROVIDER?.toLowerCase();
@@ -1143,6 +1150,13 @@ const appKitLinks = [
     statusHref: "/api/telephony-outcomes",
   },
   {
+    description:
+      "Twilio, Telnyx, and Plivo setup, signing, stream URL, and contract readiness side-by-side.",
+    href: "/carriers",
+    label: "Carrier Matrix",
+    statusHref: "/api/carriers",
+  },
+  {
     description: "Redacted trace exports for debugging and support.",
     href: "/diagnostics",
     label: "Diagnostics",
@@ -1168,6 +1182,192 @@ const appKitLinks = [
     label: "Integrations",
   },
 ];
+
+const resolveRequestOrigin = (request: Request) => {
+  const url = new URL(request.url);
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const forwardedProto = request.headers.get("x-forwarded-proto");
+  const host = forwardedHost ?? request.headers.get("host") ?? url.host;
+  const protocol = forwardedProto ?? url.protocol.replace(":", "");
+
+  return `${protocol}://${host}`;
+};
+
+const joinUrlPath = (origin: string, path: string) =>
+  `${origin.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+
+const resolveCarrierOrigin = (request: Request) =>
+  publicBaseUrl?.replace(/\/$/, "") ?? resolveRequestOrigin(request);
+
+const resolveCarrierStreamUrl = (request: Request, path: string) => {
+  const origin = resolveCarrierOrigin(request);
+  const wsOrigin = origin.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
+  return joinUrlPath(wsOrigin, path);
+};
+
+const createCarrierSmoke = <TProvider extends VoiceTelephonyProvider>(
+  setup: VoiceTelephonySetupStatus<TProvider>,
+): VoiceTelephonySmokeReport<TProvider> => {
+  const checks: VoiceTelephonySmokeReport<TProvider>["checks"] = [
+    {
+      message: setup.urls.stream
+        ? "Carrier stream URL is configured."
+        : "Carrier stream URL is missing.",
+      name: "stream-url",
+      status: setup.urls.stream ? "pass" : "fail",
+    },
+    {
+      message: setup.urls.stream.startsWith("wss://")
+        ? "Carrier stream URL uses wss://."
+        : "Carrier stream URL should use wss:// for production.",
+      name: "wss-stream",
+      status: setup.urls.stream.startsWith("wss://") ? "pass" : "fail",
+    },
+    {
+      message: setup.urls.webhook
+        ? "Carrier webhook URL is configured."
+        : "Carrier webhook URL is missing.",
+      name: "webhook-url",
+      status: setup.urls.webhook ? "pass" : "fail",
+    },
+    {
+      message: setup.signing.configured
+        ? `Webhook signing is configured with ${setup.signing.mode}.`
+        : "Webhook signing is not configured.",
+      name: "signed-webhook",
+      status: setup.signing.configured ? "pass" : "fail",
+    },
+  ];
+
+  for (const missing of setup.missing) {
+    checks.push({
+      message: `${missing} is missing.`,
+      name: "missing-env",
+      status: "fail",
+    });
+  }
+
+  for (const warning of setup.warnings) {
+    checks.push({
+      message: warning,
+      name: "setup-warning",
+      status: "warn",
+    });
+  }
+
+  return {
+    checks,
+    generatedAt: Date.now(),
+    pass: checks.every((check) => check.status !== "fail"),
+    provider: setup.provider,
+    setup,
+    twiml: {
+      status: setup.ready ? 200 : 428,
+      streamUrl: setup.urls.stream,
+    },
+    webhook: {
+      status: setup.signing.configured ? 200 : 428,
+    },
+  };
+};
+
+const createCarrierSetup = <TProvider extends VoiceTelephonyProvider>(input: {
+  answerPath?: string;
+  missing: string[];
+  provider: TProvider;
+  request: Request;
+  signingConfigured: boolean;
+  signingMode: VoiceTelephonySetupStatus<TProvider>["signing"]["mode"];
+  streamPath: string;
+  webhookPath: string;
+}): VoiceTelephonySetupStatus<TProvider> => {
+  const origin = resolveCarrierOrigin(input.request);
+  const stream = resolveCarrierStreamUrl(input.request, input.streamPath);
+  const webhook = joinUrlPath(origin, input.webhookPath);
+  const warnings = [
+    ...(stream.startsWith("wss://")
+      ? []
+      : ["Carrier streams should use wss:// in production."]),
+    ...(input.signingConfigured
+      ? []
+      : ["Webhook signature verification is not configured."]),
+  ];
+
+  return {
+    generatedAt: Date.now(),
+    missing: input.missing,
+    provider: input.provider,
+    ready:
+      input.missing.length === 0 &&
+      input.signingConfigured &&
+      warnings.length === 0,
+    signing: {
+      configured: input.signingConfigured,
+      mode: input.signingConfigured ? input.signingMode : "none",
+      verificationUrl: webhook,
+    },
+    urls: {
+      stream,
+      twiml: input.answerPath ? joinUrlPath(origin, input.answerPath) : undefined,
+      webhook,
+    },
+    warnings,
+  };
+};
+
+const loadCarrierMatrixInputs = ({
+  request,
+}: {
+  query: Record<string, unknown>;
+  request: Request;
+}): VoiceTelephonyCarrierMatrixInput[] => {
+  const twilio = createCarrierSetup({
+    answerPath: "/api/twilio/voice",
+    missing: [
+      publicBaseUrl ? undefined : "VOICE_DEMO_PUBLIC_BASE_URL",
+      telephonyWebhookSigningSecret
+        ? undefined
+        : "VOICE_DEMO_TELEPHONY_WEBHOOK_SECRET",
+    ].filter(Boolean) as string[],
+    provider: "twilio",
+    request,
+    signingConfigured: Boolean(telephonyWebhookSigningSecret),
+    signingMode: "twilio-signature",
+    streamPath: "/api/twilio/stream",
+    webhookPath: "/api/telephony-webhook",
+  });
+  const telnyx = createCarrierSetup({
+    answerPath: "/api/telnyx/voice",
+    missing: [
+      publicBaseUrl ? undefined : "VOICE_DEMO_PUBLIC_BASE_URL",
+      telnyxPublicKey ? undefined : "TELNYX_PUBLIC_KEY",
+    ].filter(Boolean) as string[],
+    provider: "telnyx",
+    request,
+    signingConfigured: Boolean(telnyxPublicKey),
+    signingMode: "provider-signature",
+    streamPath: "/api/telnyx/stream",
+    webhookPath: "/api/telnyx/webhook",
+  });
+  const plivo = createCarrierSetup({
+    answerPath: "/api/plivo/voice",
+    missing: [
+      publicBaseUrl ? undefined : "VOICE_DEMO_PUBLIC_BASE_URL",
+      plivoAuthToken ? undefined : "PLIVO_AUTH_TOKEN",
+    ].filter(Boolean) as string[],
+    provider: "plivo",
+    request,
+    signingConfigured: Boolean(plivoAuthToken),
+    signingMode: "provider-signature",
+    streamPath: "/api/plivo/stream",
+    webhookPath: "/api/plivo/webhook",
+  });
+
+  return [twilio, telnyx, plivo].map((setup) => ({
+    setup,
+    smoke: createCarrierSmoke(setup),
+  }));
+};
 
 const normalizeTaskFilters = (
   query: Record<string, unknown>,
@@ -1647,6 +1847,13 @@ const server = new Elysia()
     }),
   )
   .use(
+    createVoiceTelephonyCarrierMatrixRoutes({
+      load: loadCarrierMatrixInputs,
+      path: "/api/carriers",
+      title: "AbsoluteJS Voice Demo Carrier Matrix",
+    }),
+  )
+  .use(
     createTwilioVoiceRoutes<unknown, VoiceSessionRecord, SavedIntake>({
       context: {},
       correctTurn: correctDemoTurn,
@@ -1737,6 +1944,7 @@ const server = new Elysia()
     policy: telephonyOutcomePolicy,
     previews: listTelephonyOutcomePreviews(),
   }))
+  .get("/carriers", ({ redirect }) => redirect("/api/carriers?format=html"))
   .get(
     "/telephony-outcomes",
     () =>
