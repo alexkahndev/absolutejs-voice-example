@@ -1093,6 +1093,7 @@ const server = new Elysia()
         { href: "/ops-console", label: "Ops Console" },
         { href: "/quality", label: "Quality" },
         { href: "/evals/baseline", label: "Baseline" },
+        { href: "/evals/scenarios", label: "Scenarios" },
         { href: "/resilience", label: "Resilience" },
         { href: "/diagnostics", label: "Diagnostics" },
         { href: "/sessions", label: "Sessions" },
@@ -1103,6 +1104,40 @@ const server = new Elysia()
       baselineStore: createVoiceFileEvalBaselineStore(
         resolve(runtimeDirectory, "eval-baseline.json"),
       ),
+      scenarios: [
+        {
+          description:
+            "The guided demo should collect the expected test answers and complete without provider errors.",
+          id: "guided-demo-completes",
+          label: "Guided demo completes",
+          maxProviderErrors: 0,
+          minSessions: 1,
+          minTurns: 3,
+          requiredDisposition: "completed",
+          requiredTranscriptIncludes: ["name", "integration", "follow up"],
+          scenarioId: "guided",
+        },
+        {
+          description:
+            "General recording should save at least one freeform turn and end cleanly.",
+          id: "general-recording-completes",
+          label: "General recording completes",
+          maxProviderErrors: 0,
+          minSessions: 1,
+          minTurns: 1,
+          requiredDisposition: "completed",
+          scenarioId: "general",
+        },
+        {
+          description:
+            "Any transfer outcome must create a handoff delivery path for downstream ops.",
+          id: "transfer-handoff-delivered",
+          label: "Transfer handoff delivered",
+          minSessions: 0,
+          requiredDisposition: "transferred",
+          requiredHandoffActions: ["transfer"],
+        },
+      ],
       store: runtimeStorage.traces,
       title: "AbsoluteJS Voice Demo Evals",
     }),
@@ -1129,6 +1164,13 @@ const server = new Elysia()
           href: "/evals/baseline",
           label: "Eval Baseline",
           statusHref: "/evals/baseline/status",
+        },
+        {
+          description:
+            "Business-workflow evals for guided recordings, general captures, and transfer handoffs.",
+          href: "/evals/scenarios",
+          label: "Scenario Evals",
+          statusHref: "/evals/scenarios/status",
         },
         {
           description: "Provider failover, degradation, and simulator controls.",
