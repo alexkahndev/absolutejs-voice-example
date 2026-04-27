@@ -19,6 +19,8 @@ import {
   createVoiceRoutingDecisionSummary,
   createVoiceSTTProviderRouter,
   createVoiceTaskUpdatedEvent,
+  createVoiceToolContractRoutes,
+  createVoiceToolRuntimeContractDefaults,
   createVoiceWorkflowContractHandler,
   createVoiceWorkflowContractPreset,
   createVoiceOpsWebhookReceiverRoutes,
@@ -45,8 +47,10 @@ import {
   type VoiceProviderRouterEvent,
   type VoiceOpsTaskStatus,
   type VoiceOpsTaskStore,
+  type VoiceToolContractDefinition,
   type VoiceOpsWebhookEnvelope,
   type VoiceTurnCorrectionHandler,
+  type VoiceTurnRecord,
   type VoiceSessionRecord,
   voice,
 } from "@absolutejs/voice";
@@ -651,6 +655,111 @@ const reviewTaskRecorderTool = createVoiceAgentTool<
   }),
   name: "review_task_recorder",
 });
+const createContractTurn = (
+  id: string,
+  text: string,
+): VoiceTurnRecord<SavedIntake> => ({
+  committedAt: Date.now(),
+  id,
+  text,
+  transcripts: [],
+});
+const demoToolContracts = [
+  {
+    cases: [
+      {
+        args: {},
+        context: { query: { scenarioId: "general" } },
+        expect: {
+          expectedResult: { mode: "general" },
+          expectIdempotent: true,
+          expectStatus: "ok",
+          expectTimedOut: false,
+        },
+        id: "general-mode",
+        label: "Classifies general intake context",
+      },
+      {
+        args: {},
+        context: { query: { scenarioId: "guided" } },
+        expect: {
+          expectedResult: { mode: "guided" },
+          expectIdempotent: true,
+          expectStatus: "ok",
+          expectTimedOut: false,
+        },
+        id: "guided-mode",
+        label: "Classifies guided intake context",
+      },
+    ],
+    defaultRuntime: createVoiceToolRuntimeContractDefaults(),
+    description:
+      "Keeps the assistant intake classifier deterministic across route contexts.",
+    id: "intake-classifier",
+    label: "Intake classifier",
+    tool: intakeClassifierTool,
+  },
+  {
+    cases: [
+      {
+        args: {},
+        expect: {
+          expectedResult: {
+            text: "Please transfer me to support escalation.",
+          },
+          expectIdempotent: true,
+          expectStatus: "ok",
+          expectTimedOut: false,
+        },
+        id: "transfer-utterance",
+        label: "Preserves lifecycle routing utterance",
+        turn: createContractTurn(
+          "tool-contract-lifecycle-transfer",
+          "Please transfer me to support escalation.",
+        ),
+      },
+    ],
+    defaultRuntime: createVoiceToolRuntimeContractDefaults(),
+    description:
+      "Proves lifecycle routing tools receive the exact committed caller text.",
+    id: "lifecycle-router",
+    label: "Lifecycle router",
+    tool: lifecycleRouterTool,
+  },
+  {
+    cases: [
+      {
+        args: {},
+        expect: {
+          expectedResult: {
+            events: true,
+            reviews: true,
+            tasks: true,
+          },
+          expectIdempotent: true,
+          expectStatus: "ok",
+          expectTimedOut: false,
+        },
+        id: "store-capabilities",
+        label: "Reports review/task/event store capabilities",
+      },
+    ],
+    defaultRuntime: createVoiceToolRuntimeContractDefaults(),
+    description:
+      "Documents the ops stores the assistant can use for post-call artifacts.",
+    id: "review-task-recorder",
+    label: "Review/task recorder",
+    tool: reviewTaskRecorderTool,
+  },
+] satisfies Array<
+  VoiceToolContractDefinition<
+    unknown,
+    VoiceSessionRecord,
+    Record<string, unknown>,
+    unknown,
+    SavedIntake
+  >
+>;
 const correctDemoTurn: VoiceTurnCorrectionHandler<
   unknown,
   VoiceSessionRecord,
@@ -806,6 +915,13 @@ const appKitLinks = [
     description: "Provider failover, degradation, and simulator controls.",
     href: "/resilience",
     label: "Resilience",
+  },
+  {
+    description:
+      "Primitive-mounted assistant tool contracts for deterministic tool behavior.",
+    href: "/tool-contracts",
+    label: "Tool Contracts",
+    statusHref: "/api/tool-contracts",
   },
   {
     description: "Redacted trace exports for debugging and support.",
@@ -1273,6 +1389,14 @@ const server = new Elysia()
       sttProviders: configuredSTTProviders,
       title: "AbsoluteJS Voice Demo Ops Console",
     }).routes,
+  )
+  .use(
+    createVoiceToolContractRoutes({
+      contracts: demoToolContracts,
+      htmlPath: "/tool-contracts",
+      path: "/api/tool-contracts",
+      title: "AbsoluteJS Voice Demo Tool Contracts",
+    }),
   )
   .use(
     createVoiceOpsWebhookReceiverRoutes({
