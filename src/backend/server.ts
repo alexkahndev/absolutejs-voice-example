@@ -17,6 +17,9 @@ import {
   createVoiceSessionListRoutes,
   createVoiceSessionReplayRoutes,
   createVoiceTaskUpdatedEvent,
+  createVoiceOpsWebhookReceiverRoutes,
+  createVoiceOpsWebhookSink,
+  deliverVoiceIntegrationEventToSinks,
   reopenVoiceOpsTask,
   renderVoiceSessionsHTML,
   startVoiceOpsTask,
@@ -30,6 +33,7 @@ import {
   type VoiceProviderRouterEvent,
   type VoiceOpsTaskStatus,
   type VoiceOpsTaskStore,
+  type VoiceOpsWebhookEnvelope,
   type VoiceTurnCorrectionHandler,
   type VoiceSessionRecord,
   voice,
@@ -167,6 +171,8 @@ const deepgramApiKey = getEnv("DEEPGRAM_API_KEY");
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
 const geminiApiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
 const openAIApiKey = process.env.OPENAI_API_KEY;
+const publicBaseUrl = process.env.VOICE_DEMO_PUBLIC_BASE_URL;
+const webhookSigningSecret = process.env.VOICE_DEMO_WEBHOOK_SECRET;
 const webhookUrl = process.env.VOICE_DEMO_WEBHOOK_URL;
 const requestedModelProvider = process.env.VOICE_MODEL_PROVIDER?.toLowerCase();
 const configuredModelProviders: VoiceModelProvider[] = [
@@ -471,33 +477,25 @@ const normalizeTaskFilters = (
 const listReviews = async (): Promise<SavedVoiceReviewArtifact[]> =>
   listVoiceReviews(await runtimeStorage.reviews.list());
 
+const receivedWebhookEnvelopes: VoiceOpsWebhookEnvelope[] = [];
+const webhookSink = webhookUrl
+  ? createVoiceOpsWebhookSink({
+      baseUrl: publicBaseUrl,
+      id: "voice-demo-ops-webhook",
+      signingSecret: webhookSigningSecret,
+      url: webhookUrl,
+    })
+  : undefined;
+
 const deliverIntegrationEvent = async (
   event: SavedVoiceIntegrationEvent,
 ): Promise<SavedVoiceIntegrationEvent> => {
-  const storedEvent: SavedVoiceIntegrationEvent = { ...event };
-
-  if (webhookUrl) {
-    try {
-      const response = await fetch(webhookUrl, {
-        body: JSON.stringify(storedEvent),
-        headers: {
-          "content-type": "application/json",
-        },
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        storedEvent.deliveryError = `HTTP ${response.status}`;
-      } else {
-        storedEvent.deliveredAt = Date.now();
-        storedEvent.deliveredTo = webhookUrl;
-        storedEvent.deliveryError = undefined;
-      }
-    } catch (error) {
-      storedEvent.deliveryError =
-        error instanceof Error ? error.message : String(error);
-    }
-  }
+  const storedEvent: SavedVoiceIntegrationEvent = webhookSink
+    ? ((await deliverVoiceIntegrationEventToSinks({
+        event,
+        sinks: [webhookSink],
+      })) as SavedVoiceIntegrationEvent)
+    : { ...event };
 
   await runtimeStorage.events.set(storedEvent.id, storedEvent);
   return storedEvent;
@@ -765,6 +763,15 @@ const server = new Elysia()
       store: runtimeStorage.traces,
     }),
   )
+  .use(
+    createVoiceOpsWebhookReceiverRoutes({
+      onEnvelope: ({ envelope }) => {
+        receivedWebhookEnvelopes.unshift(envelope);
+        receivedWebhookEnvelopes.splice(12);
+      },
+      signingSecret: webhookSigningSecret,
+    }),
+  )
   .get("/api/intakes", () => listIntakes())
   .get("/api/assistant-config", () => assistantConfig)
   .get("/api/assistant-summary", async () => summarizeAssistantRuns())
@@ -876,7 +883,12 @@ const server = new Elysia()
       new Response(
         renderVoiceIntegrationEventsPage(
           await listIntegrationEvents(),
-          webhookUrl,
+          {
+            receivedWebhookCount: receivedWebhookEnvelopes.length,
+            receiverPath: "/api/voice-ops/webhook",
+            signingEnabled: Boolean(webhookSigningSecret),
+            webhookUrl,
+          },
         ),
         {
           headers: {

@@ -16,7 +16,12 @@ export const listVoiceIntegrationEvents = (
 
 export const renderVoiceIntegrationEventsPage = (
   events: SavedVoiceIntegrationEvent[],
-  webhookUrl?: string,
+  options: {
+    receivedWebhookCount?: number;
+    receiverPath?: string;
+    signingEnabled?: boolean;
+    webhookUrl?: string;
+  } = {},
 ) => {
   const items = listVoiceIntegrationEvents(events)
     .map(
@@ -30,8 +35,14 @@ export const renderVoiceIntegrationEventsPage = (
           <span class="pill">${escapeHtml(event.id)}</span>
           ${event.deliveredTo ? `<span class="pill">delivered to ${escapeHtml(event.deliveredTo)}</span>` : `<span class="pill">stored only</span>`}
           ${event.deliveryError ? `<span class="pill error">delivery failed</span>` : event.deliveredAt ? `<span class="pill success">delivered</span>` : ""}
+          ${event.deliveryStatus ? `<span class="pill">${escapeHtml(event.deliveryStatus)}</span>` : ""}
         </div>
         ${event.deliveryError ? `<p><strong>Delivery error:</strong> ${escapeHtml(event.deliveryError)}</p>` : ""}
+        ${
+          event.sinkDeliveries
+            ? `<pre>${escapeHtml(JSON.stringify(event.sinkDeliveries, null, 2))}</pre>`
+            : ""
+        }
         <pre>${escapeHtml(JSON.stringify(event.payload, null, 2))}</pre>
       </article>
     `,
@@ -64,8 +75,9 @@ export const renderVoiceIntegrationEventsPage = (
     <section>
       <h1>Integration events</h1>
       <p>This stream shows the payloads AbsoluteJS Voice can hand to external systems like CRMs, helpdesks, or automation webhooks.</p>
-      <p>${webhookUrl ? `Webhook delivery is enabled for ${escapeHtml(webhookUrl)}.` : "Webhook delivery is disabled; events are being stored locally only."}</p>
-      <p><a href="/reviews">Back to reviews</a> · <a href="/tasks">Open task queue</a></p>
+      <p>${options.webhookUrl ? `Signed ops webhook delivery is enabled for ${escapeHtml(options.webhookUrl)}.` : "Webhook delivery is disabled; events are being stored locally only."}</p>
+      <p>Receiver: <code>${escapeHtml(options.receiverPath ?? "/api/voice-ops/webhook")}</code> · Signing ${options.signingEnabled ? "enabled" : "optional"} · Received ${options.receivedWebhookCount ?? 0}</p>
+      <p><a href="/reviews">Back to reviews</a> · <a href="/tasks">Open task queue</a> · <a href="/sessions">Sessions</a></p>
     </section>
     <section class="event-list">
       ${items || "<p>No integration events yet. Complete a call or change a task state first.</p>"}
