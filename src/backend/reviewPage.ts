@@ -26,6 +26,7 @@ export type SavedVoiceReviewArtifact = Omit<
   generatedAt: number;
   intakeId: string;
   scenarioId: SavedIntake["scenarioId"];
+  sessionId: string;
 };
 
 export type VoiceReviewFilterInput = {
@@ -82,6 +83,9 @@ const formatReviewStatusLabel = (status: VoiceReviewStatus) =>
       : "Failed";
 
 const getStatusClassName = (status: VoiceReviewStatus) => `status-${status}`;
+
+const getReplayHref = (sessionId: string) =>
+  `/api/voice-sessions/${encodeURIComponent(sessionId)}/replay/htmx`;
 
 const includesText = (value: string | undefined, search: string) =>
   typeof value === "string" && value.toLowerCase().includes(search);
@@ -388,6 +392,7 @@ export const buildSavedVoiceReview = (input: {
       target: input.result.callTarget,
     }),
     scenarioId: input.result.scenarioId,
+    sessionId: input.result.sessionId,
     summary: {
       elapsedMs: lastTimelineEvent?.atMs,
       firstTurnLatencyMs: firstCommit?.atMs,
@@ -540,6 +545,7 @@ export const renderVoiceReviewIndexPage = (
   ${derived.warnings.length > 0 ? `<div class="review-warning-list">${renderWarnings(derived.warnings)}</div>` : ""}
   <p>
     <a href="/reviews/${encodeURIComponent(review.id)}">Open review</a>
+    · <a href="${getReplayHref(review.sessionId)}">Open replay</a>
     ${compareTarget ? ` · <a href="/reviews/compare?left=${encodeURIComponent(review.id)}&right=${encodeURIComponent(compareTarget)}">Compare with latest</a>` : ""}
   </p>
 </article>`;
@@ -729,6 +735,7 @@ export const renderVoiceReviewPage = (
         <a href="/reviews">Back to reviews</a>
         <a href="/tasks">Open task queue</a>
         <a href="/integrations">Integration events</a>
+        <a href="${getReplayHref(artifact.sessionId)}">Open session replay</a>
         <a href="/reviews/compare?left=${encodeURIComponent(artifact.id)}">Compare this review</a>
       </div>
     </section>

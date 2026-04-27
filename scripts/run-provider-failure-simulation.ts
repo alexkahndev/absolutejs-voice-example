@@ -35,6 +35,29 @@ const postFailure = async (provider: ProviderId) => {
 const results = await Promise.all(
   providers.map((provider) => postFailure(provider)),
 );
+const replayHrefs = results
+  .map((result) =>
+    typeof result.body.replayHref === "string"
+      ? {
+          provider: result.provider,
+          replayHref: result.body.replayHref,
+          sessionId:
+            typeof result.body.sessionId === "string"
+              ? result.body.sessionId
+              : undefined,
+        }
+      : undefined,
+  )
+  .filter(
+    (
+      result,
+    ): result is {
+      provider: ProviderId;
+      replayHref: string;
+      sessionId: string | undefined;
+    } =>
+      result !== undefined,
+  );
 const providerStatus = await fetch(`${baseUrl}/api/provider-status`).then(
   async (response) => (await response.json()) as Array<Record<string, unknown>>,
 );
@@ -43,6 +66,7 @@ console.log(
   JSON.stringify(
     {
       providerStatus,
+      replayHrefs,
       results,
     },
     null,

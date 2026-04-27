@@ -122,6 +122,7 @@ const renderFailoverControls = (providers: string[] = []) => {
         )
         .join("")}
     </div>
+    <p id="failover-replay" class="empty" hidden></p>
     <pre id="failover-output" class="failover-output" hidden></pre>
   </div>`;
 };
@@ -225,6 +226,17 @@ export const renderVoiceAssistantPage = (
   </main>
   <script>
     const output = document.getElementById("failover-output");
+    const replay = document.getElementById("failover-replay");
+    const showReplay = (body) => {
+      if (!replay) return;
+      if (body && typeof body.replayHref === "string") {
+        replay.hidden = false;
+        replay.innerHTML = '<a href="' + body.replayHref.replace(/"/g, "&quot;") + '">Open replay for this simulation</a>';
+      } else {
+        replay.hidden = true;
+        replay.textContent = "";
+      }
+    };
     for (const button of document.querySelectorAll("[data-provider]")) {
       button.addEventListener("click", async () => {
         const provider = button.getAttribute("data-provider");
@@ -242,6 +254,7 @@ export const renderVoiceAssistantPage = (
           if (output) {
             output.textContent = JSON.stringify(body, null, 2);
           }
+          showReplay(body);
           window.setTimeout(() => window.location.reload(), 500);
         } catch (error) {
           if (output) {
@@ -269,6 +282,7 @@ export const renderVoiceAssistantPage = (
           if (output) {
             output.textContent = JSON.stringify(body, null, 2);
           }
+          showReplay(body);
           window.setTimeout(() => window.location.reload(), 500);
         } catch (error) {
           if (output) {

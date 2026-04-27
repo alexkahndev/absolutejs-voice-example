@@ -84,6 +84,9 @@ const formatTaskStatus = (status: VoiceOpsTaskStatus) => {
 const getTaskStatusClassName = (status: VoiceOpsTaskStatus) =>
   `status-${status}`;
 
+const getReplayHref = (sessionId: string) =>
+  `/api/voice-sessions/${encodeURIComponent(sessionId)}/replay/htmx`;
+
 const MINUTE_MS = 60 * 1000;
 const URGENT_SLA_MS = 10 * MINUTE_MS;
 const FAST_SLA_MS = 15 * MINUTE_MS;
@@ -379,6 +382,7 @@ export const renderVoiceOpsPage = (
         <div class="toolbar">
           ${renderTaskActions(task)}
           <a href="/reviews/${encodeURIComponent(task.reviewId)}">Open review</a>
+          <a href="${getReplayHref(task.intakeId)}">Open replay</a>
         </div>
       </article>
     `;
