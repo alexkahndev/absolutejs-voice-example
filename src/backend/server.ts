@@ -7,6 +7,7 @@ import {
   createGeminiVoiceAssistantModel,
   createVoiceDiagnosticsRoutes,
   createVoiceEvalRoutes,
+  createVoiceFileEvalBaselineStore,
   createVoiceAssistant,
   createVoiceAgentTool,
   createVoiceExperiment,
@@ -1091,6 +1092,7 @@ const server = new Elysia()
         { href: "/react", label: "Back to demo" },
         { href: "/ops-console", label: "Ops Console" },
         { href: "/quality", label: "Quality" },
+        { href: "/evals/baseline", label: "Baseline" },
         { href: "/resilience", label: "Resilience" },
         { href: "/diagnostics", label: "Diagnostics" },
         { href: "/sessions", label: "Sessions" },
@@ -1098,6 +1100,9 @@ const server = new Elysia()
         { href: "/tasks", label: "Tasks" },
         { href: "/integrations", label: "Integrations" },
       ],
+      baselineStore: createVoiceFileEvalBaselineStore(
+        resolve(runtimeDirectory, "eval-baseline.json"),
+      ),
       store: runtimeStorage.traces,
       title: "AbsoluteJS Voice Demo Evals",
     }),
@@ -1117,6 +1122,13 @@ const server = new Elysia()
           href: "/evals",
           label: "Evals",
           statusHref: "/evals/status",
+        },
+        {
+          description:
+            "Compare current evals against a saved known-good baseline.",
+          href: "/evals/baseline",
+          label: "Eval Baseline",
+          statusHref: "/evals/baseline/status",
         },
         {
           description: "Provider failover, degradation, and simulator controls.",
