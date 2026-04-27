@@ -26,15 +26,17 @@ import {
   VOICE_CALL_CONTROL_ACTIONS,
   VOICE_MODEL_PROVIDERS,
   VOICE_ROUTING_MODES,
+  type SavedIntake,
   type VoiceDemoMode,
   type VoiceModelProvider,
+  type VoiceRoutingDecision,
   type VoiceRoutingMode,
-  type SavedIntake,
 } from "../../../shared/demo";
 import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoMicrophone,
+  fetchLatestRoutingDecision,
   fetchSavedIntakes,
   getAppKitStatusLabel,
   formatErrorMessage,
@@ -157,6 +159,50 @@ import {
             <p class="voice-footnote">
               {{ routingDescription() }}
             </p>
+          </article>
+
+          <article class="voice-card voice-routing-card">
+            <span class="voice-framework-pill">Routing Trace</span>
+            <h2>Why this STT provider?</h2>
+            <p class="voice-footnote">
+              Latest router event from the self-hosted trace store.
+            </p>
+            @if (routingDecision(); as decision) {
+              <div class="voice-routing-grid">
+                <div>
+                  <span>Policy</span>
+                  <strong>{{ getVoiceRoutingLabel(decision.routing) }}</strong>
+                </div>
+                <div>
+                  <span>Provider</span>
+                  <strong>{{ decision.provider }}</strong>
+                </div>
+                <div>
+                  <span>Selected</span>
+                  <strong>{{ decision.selectedProvider }}</strong>
+                </div>
+                <div>
+                  <span>Fallback</span>
+                  <strong>{{ decision.fallbackProvider ?? "None" }}</strong>
+                </div>
+                <div>
+                  <span>Status</span>
+                  <strong>{{ decision.status }}</strong>
+                </div>
+                <div>
+                  <span>Latency budget</span>
+                  <strong>{{
+                    decision.latencyBudgetMs
+                      ? decision.latencyBudgetMs + "ms"
+                      : "None"
+                  }}</strong>
+                </div>
+              </div>
+            } @else {
+              <p class="empty-copy">
+                Start a voice session to see the selected STT provider.
+              </p>
+            }
           </article>
 
           <article
@@ -449,6 +495,7 @@ export class AngularVoiceDemoComponent {
   idleMicCopy = VOICE_DEMO_MIC_IDLE;
   liveMicCopy = VOICE_DEMO_MIC_LIVE;
   micError = signal<string | null>(null);
+  routingDecision = signal<VoiceRoutingDecision | null>(null);
   savedIntakes = signal<SavedIntake[]>([]);
   generalLabel = VOICE_DEMO_GENERAL_LABEL;
   guidedLabel = VOICE_DEMO_GUIDED_LABEL;
@@ -520,6 +567,7 @@ export class AngularVoiceDemoComponent {
 
   async refreshIntakes() {
     this.savedIntakes.set(await fetchSavedIntakes());
+    this.routingDecision.set(await fetchLatestRoutingDecision());
   }
 
   async startMic() {

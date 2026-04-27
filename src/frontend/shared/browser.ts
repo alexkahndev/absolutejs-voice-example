@@ -1,6 +1,6 @@
 import { createMicrophoneCapture } from "@absolutejs/voice/client";
 import type { VoiceAppKitStatusReport } from "@absolutejs/voice";
-import type { SavedIntake } from "../../shared/demo";
+import type { SavedIntake, VoiceRoutingDecision } from "../../shared/demo";
 
 const VOICE_WAVE_POINTS = 48;
 const VOICE_WAVE_WIDTH = 320;
@@ -58,6 +58,16 @@ export const fetchSavedIntakes = async () => {
   }
 
   return (await response.json()) as SavedIntake[];
+};
+
+export const fetchLatestRoutingDecision = async () => {
+  const response = await fetch("/api/routing/latest");
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return (await response.json()) as VoiceRoutingDecision | null;
 };
 
 export const getAppKitStatusLabel = (

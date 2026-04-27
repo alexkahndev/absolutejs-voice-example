@@ -96,6 +96,7 @@ import {
   VOICE_ASSISTANT_CONFIG,
   type SavedIntake,
   type VoiceModelProvider,
+  type VoiceRoutingDecision,
   type VoiceRoutingMode,
 } from "../shared/demo";
 
@@ -507,11 +508,13 @@ const traceSTTProviderEvent = async (
   event: VoiceIOProviderRouterEvent<VoiceSTTProvider>,
   input: { sessionId: string },
 ) => {
+  const routing = sessionRoutingModes.get(input.sessionId) ?? "balanced";
   await runtimeStorage.traces.append({
     at: event.at,
     payload: {
       ...event,
       providerStatus: event.status,
+      routing,
     },
     sessionId: input.sessionId,
     type: "session.error",
@@ -940,6 +943,65 @@ const summarizeProviderHealth = async (): Promise<
     store: runtimeStorage.traces,
   });
 
+const getLatestRoutingDecision = async (): Promise<
+  VoiceRoutingDecision | null
+> => {
+  const events = await runtimeStorage.traces.list({
+    limit: 50,
+    type: "session.error",
+  });
+  const latest = events
+    .toSorted((left, right) => right.at - left.at)
+    .find((event) => {
+      const payload = event.payload as Record<string, unknown>;
+      return payload.kind === "stt" && typeof payload.provider === "string";
+    });
+
+  if (!latest) {
+    return null;
+  }
+
+  const payload = latest.payload as Record<string, unknown>;
+  const routing = isVoiceRoutingMode(payload.routing)
+    ? payload.routing
+    : "balanced";
+  const provider =
+    typeof payload.provider === "string" ? payload.provider : "unknown";
+  const selectedProvider =
+    typeof payload.selectedProvider === "string"
+      ? payload.selectedProvider
+      : provider;
+  const status =
+    payload.status === "error" ||
+    payload.status === "fallback" ||
+    payload.status === "success"
+      ? payload.status
+      : "success";
+
+  return {
+    at: latest.at,
+    attempt: typeof payload.attempt === "number" ? payload.attempt : 1,
+    fallbackProvider:
+      typeof payload.fallbackProvider === "string"
+        ? payload.fallbackProvider
+        : undefined,
+    latencyBudgetMs:
+      typeof payload.latencyBudgetMs === "number"
+        ? payload.latencyBudgetMs
+        : undefined,
+    provider,
+    routing,
+    selectedProvider,
+    sessionId: latest.sessionId ?? "unknown",
+    status,
+    suppressionRemainingMs:
+      typeof payload.suppressionRemainingMs === "number"
+        ? payload.suppressionRemainingMs
+        : undefined,
+    timedOut: payload.timedOut === true,
+  };
+};
+
 const sttProviderSimulationStatus = () =>
   (["deepgram", "assemblyai"] as const).map((provider) => ({
     configured: configuredSTTProviders.includes(provider),
@@ -1275,6 +1337,7 @@ const server = new Elysia()
     }),
   )
   .get("/api/intakes", () => listIntakes())
+  .get("/api/routing/latest", async () => await getLatestRoutingDecision())
   .get("/api/assistant-config", () => assistantConfig)
   .get("/api/assistant-summary", async () => summarizeAssistantRuns())
   .post("/api/voice-handoffs/retry", async () => retryVoiceHandoffDeliveries())

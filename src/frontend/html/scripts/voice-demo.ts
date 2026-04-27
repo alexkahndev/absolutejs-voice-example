@@ -6,6 +6,7 @@ import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoMicrophone,
+  fetchLatestRoutingDecision,
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
@@ -73,6 +74,7 @@ const voiceWaveGlow = document.querySelector("#voice-wave-glow");
 const voiceWavePath = document.querySelector("#voice-wave-path");
 const workflowStatusHost = document.querySelector("#workflow-status-card");
 const routingModeCopy = document.querySelector("#routing-mode-copy");
+const routingDecisionRoot = document.querySelector("#routing-decision");
 const routingModeMetric = document.querySelector("#metric-routing");
 const routingModeSelect = document.querySelector("#routing-mode-select");
 
@@ -99,6 +101,7 @@ if (
   !(voiceWavePath instanceof SVGPathElement) ||
   !(workflowStatusHost instanceof HTMLElement) ||
   !(routingModeCopy instanceof HTMLElement) ||
+  !(routingDecisionRoot instanceof HTMLElement) ||
   !(routingModeMetric instanceof HTMLElement) ||
   !(routingModeSelect instanceof HTMLSelectElement) ||
   !(voiceStatus instanceof HTMLElement)
@@ -191,7 +194,18 @@ const renderChat = () => {
 
 const renderSavedIntakes = async () => {
   const intakes = await fetchSavedIntakes();
+  const routingDecision = await fetchLatestRoutingDecision();
   intakesMetric.textContent = String(intakes.length);
+  routingDecisionRoot.innerHTML = routingDecision
+    ? `<div class="voice-routing-grid">
+  <div><span>Policy</span><strong>${escapeHtml(getVoiceRoutingLabel(routingDecision.routing))}</strong></div>
+  <div><span>Provider</span><strong>${escapeHtml(routingDecision.provider)}</strong></div>
+  <div><span>Selected</span><strong>${escapeHtml(routingDecision.selectedProvider)}</strong></div>
+  <div><span>Fallback</span><strong>${escapeHtml(routingDecision.fallbackProvider ?? "None")}</strong></div>
+  <div><span>Status</span><strong>${escapeHtml(routingDecision.status)}</strong></div>
+  <div><span>Latency budget</span><strong>${routingDecision.latencyBudgetMs ? `${routingDecision.latencyBudgetMs}ms` : "None"}</strong></div>
+</div>`
+    : `<p class="empty-copy">Start a voice session to see the selected STT provider.</p>`;
 
   if (framework === "htmx") {
     const htmxWindow = window as unknown as HtmxWindow;

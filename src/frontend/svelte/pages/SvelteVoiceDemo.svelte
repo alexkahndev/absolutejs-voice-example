@@ -30,15 +30,17 @@
     VOICE_CALL_CONTROL_ACTIONS,
     VOICE_MODEL_PROVIDERS,
     VOICE_ROUTING_MODES,
+    type SavedIntake,
     type VoiceDemoMode,
     type VoiceModelProvider,
+    type VoiceRoutingDecision,
     type VoiceRoutingMode,
-    type SavedIntake,
   } from "../../../shared/demo";
   import {
     createInitialVoiceWaveLevels,
     createVoiceWavePath,
     createDemoMicrophone,
+    fetchLatestRoutingDecision,
     fetchSavedIntakes,
     formatErrorMessage,
     formatDateTime,
@@ -70,6 +72,7 @@
     guided: false,
   });
   let isCapturing = $state(false);
+  let routingDecision = $state<VoiceRoutingDecision | null>(null);
   let savedIntakes = $state<SavedIntake[]>([]);
   let opsStatusHTML = $state("");
   let guidedState = $state(createInitialVoiceState());
@@ -118,6 +121,7 @@
 
   const refreshIntakes = async () => {
     savedIntakes = await fetchSavedIntakes();
+    routingDecision = await fetchLatestRoutingDecision();
   };
 
   const startMic = async () => {
@@ -341,6 +345,50 @@
           {VOICE_ROUTING_MODES.find((item) => item.id === routingMode)
             ?.description ?? ""}
         </p>
+      </article>
+
+      <article class="voice-card voice-routing-card">
+        <span class="voice-framework-pill">Routing Trace</span>
+        <h2>Why this STT provider?</h2>
+        <p class="voice-footnote">
+          Latest router event from the self-hosted trace store.
+        </p>
+        {#if routingDecision}
+          <div class="voice-routing-grid">
+            <div>
+              <span>Policy</span>
+              <strong>{getVoiceRoutingLabel(routingDecision.routing)}</strong>
+            </div>
+            <div>
+              <span>Provider</span>
+              <strong>{routingDecision.provider}</strong>
+            </div>
+            <div>
+              <span>Selected</span>
+              <strong>{routingDecision.selectedProvider}</strong>
+            </div>
+            <div>
+              <span>Fallback</span>
+              <strong>{routingDecision.fallbackProvider ?? "None"}</strong>
+            </div>
+            <div>
+              <span>Status</span>
+              <strong>{routingDecision.status}</strong>
+            </div>
+            <div>
+              <span>Latency budget</span>
+              <strong>
+                {routingDecision.latencyBudgetMs
+                  ? `${routingDecision.latencyBudgetMs}ms`
+                  : "None"}
+              </strong>
+            </div>
+          </div>
+        {:else}
+          <p class="empty-copy">
+            Start a voice session to see the selected STT provider.
+          </p>
+        {/if}
       </article>
 
       <div class="voice-card voice-workflow-card voice-ops-status-host">

@@ -37,6 +37,20 @@ export type VoiceProviderStatusRecord = {
   suppressedUntil?: number;
 };
 
+export type VoiceRoutingDecision = {
+  at: number;
+  attempt: number;
+  fallbackProvider?: string;
+  latencyBudgetMs?: number;
+  provider: string;
+  routing: VoiceRoutingMode;
+  selectedProvider: string;
+  sessionId: string;
+  status: "error" | "fallback" | "success";
+  suppressionRemainingMs?: number;
+  timedOut?: boolean;
+};
+
 export const VOICE_MODEL_PROVIDERS: Array<{
   id: VoiceModelProvider;
   label: string;

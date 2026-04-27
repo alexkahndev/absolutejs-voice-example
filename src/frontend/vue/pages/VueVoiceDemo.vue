@@ -25,15 +25,17 @@ import {
   VOICE_CALL_CONTROL_ACTIONS,
   VOICE_MODEL_PROVIDERS,
   VOICE_ROUTING_MODES,
+  type SavedIntake,
   type VoiceDemoMode,
   type VoiceModelProvider,
+  type VoiceRoutingDecision,
   type VoiceRoutingMode,
-  type SavedIntake,
 } from "../../../shared/demo";
 import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoMicrophone,
+  fetchLatestRoutingDecision,
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
@@ -55,6 +57,7 @@ const hasStartedModes = ref<Record<VoiceDemoMode, boolean>>({
   guided: false,
 });
 const micError = ref<string | null>(null);
+const routingDecision = ref<VoiceRoutingDecision | null>(null);
 const savedIntakes = ref<SavedIntake[]>([]);
 const waveLevels = ref(createInitialVoiceWaveLevels());
 let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
@@ -95,6 +98,7 @@ const callLifecycleLabel = computed(() => {
 
 const refreshIntakes = async () => {
   savedIntakes.value = await fetchSavedIntakes();
+  routingDecision.value = await fetchLatestRoutingDecision();
 };
 
 const startMic = async () => {
@@ -302,6 +306,49 @@ onUnmounted(() => {
               VOICE_ROUTING_MODES.find((item) => item.id === routingMode)
                 ?.description
             }}
+          </p>
+        </article>
+
+        <article class="voice-card voice-routing-card">
+          <span class="voice-framework-pill">Routing Trace</span>
+          <h2>Why this STT provider?</h2>
+          <p class="voice-footnote">
+            Latest router event from the self-hosted trace store.
+          </p>
+          <div v-if="routingDecision" class="voice-routing-grid">
+            <div>
+              <span>Policy</span>
+              <strong>{{ getVoiceRoutingLabel(routingDecision.routing) }}</strong>
+            </div>
+            <div>
+              <span>Provider</span>
+              <strong>{{ routingDecision.provider }}</strong>
+            </div>
+            <div>
+              <span>Selected</span>
+              <strong>{{ routingDecision.selectedProvider }}</strong>
+            </div>
+            <div>
+              <span>Fallback</span>
+              <strong>{{ routingDecision.fallbackProvider ?? "None" }}</strong>
+            </div>
+            <div>
+              <span>Status</span>
+              <strong>{{ routingDecision.status }}</strong>
+            </div>
+            <div>
+              <span>Latency budget</span>
+              <strong>
+                {{
+                  routingDecision.latencyBudgetMs
+                    ? `${routingDecision.latencyBudgetMs}ms`
+                    : "None"
+                }}
+              </strong>
+            </div>
+          </div>
+          <p v-else class="empty-copy">
+            Start a voice session to see the selected STT provider.
           </p>
         </article>
 

@@ -6,6 +6,7 @@ import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoMicrophone,
+  fetchLatestRoutingDecision,
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
@@ -37,6 +38,7 @@ import {
   VOICE_ROUTING_MODES,
   type VoiceDemoMode,
   type VoiceModelProvider,
+  type VoiceRoutingDecision,
   type VoiceRoutingMode,
   type SavedIntake,
 } from "../../../shared/demo";
@@ -102,12 +104,15 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
     guided: false,
   });
   const [micError, setMicError] = useState<string | null>(null);
+  const [routingDecision, setRoutingDecision] =
+    useState<VoiceRoutingDecision | null>(null);
   const [savedIntakes, setSavedIntakes] = useState<SavedIntake[]>([]);
   const [waveLevels, setWaveLevels] = useState(createInitialVoiceWaveLevels);
   const currentVoice = activeMode === "general" ? generalVoice : guidedVoice;
   useEffect(() => {
     const refresh = () => {
       void fetchSavedIntakes().then(setSavedIntakes);
+      void fetchLatestRoutingDecision().then(setRoutingDecision);
     };
 
     refresh();
@@ -340,6 +345,50 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                 {VOICE_ROUTING_MODES.find((item) => item.id === routingMode)
                   ?.description ?? ""}
               </p>
+            </article>
+
+            <article className="voice-card voice-routing-card">
+              <span className="voice-framework-pill">Routing Trace</span>
+              <h2>Why this STT provider?</h2>
+              <p className="voice-footnote">
+                Latest router event from the self-hosted trace store.
+              </p>
+              {routingDecision ? (
+                <div className="voice-routing-grid">
+                  <div>
+                    <span>Policy</span>
+                    <strong>{getVoiceRoutingLabel(routingDecision.routing)}</strong>
+                  </div>
+                  <div>
+                    <span>Provider</span>
+                    <strong>{routingDecision.provider}</strong>
+                  </div>
+                  <div>
+                    <span>Selected</span>
+                    <strong>{routingDecision.selectedProvider}</strong>
+                  </div>
+                  <div>
+                    <span>Fallback</span>
+                    <strong>{routingDecision.fallbackProvider ?? "None"}</strong>
+                  </div>
+                  <div>
+                    <span>Status</span>
+                    <strong>{routingDecision.status}</strong>
+                  </div>
+                  <div>
+                    <span>Latency budget</span>
+                    <strong>
+                      {routingDecision.latencyBudgetMs
+                        ? `${routingDecision.latencyBudgetMs}ms`
+                        : "None"}
+                    </strong>
+                  </div>
+                </div>
+              ) : (
+                <p className="empty-copy">
+                  Start a voice session to see the selected STT provider.
+                </p>
+              )}
             </article>
 
             <VoiceOpsStatus
