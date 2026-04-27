@@ -22,6 +22,8 @@ import {
   createVoiceTaskUpdatedEvent,
   createVoiceTelephonyCarrierMatrixRoutes,
   createVoiceTelephonyOutcomePolicy,
+  createPlivoVoiceRoutes,
+  createTelnyxVoiceRoutes,
   createTwilioVoiceRoutes,
   createVoiceToolContractRoutes,
   createVoiceToolRuntimeContractDefaults,
@@ -1851,6 +1853,92 @@ const server = new Elysia()
       load: loadCarrierMatrixInputs,
       path: "/api/carriers",
       title: "AbsoluteJS Voice Demo Carrier Matrix",
+    }),
+  )
+  .use(
+    createTelnyxVoiceRoutes<unknown, VoiceSessionRecord, SavedIntake>({
+      context: {},
+      outcomePolicy: telephonyOutcomePolicy,
+      setup: {
+        path: "/api/telnyx/setup",
+        requiredEnv: {
+          TELNYX_PUBLIC_KEY: telnyxPublicKey,
+          VOICE_DEMO_PUBLIC_BASE_URL: publicBaseUrl,
+        },
+        title: "AbsoluteJS Voice Demo Telnyx Setup",
+      },
+      smoke: {
+        path: "/api/telnyx/smoke",
+        title: "AbsoluteJS Voice Demo Telnyx Smoke Test",
+      },
+      streamPath: "/api/telnyx/stream",
+      texml: {
+        path: "/api/telnyx/voice",
+        response: {
+          codec: "PCMU",
+          streamName: "absolutejs-voice-demo",
+          track: "inbound_track",
+        },
+      },
+      webhook: {
+        idempotency: {
+          store: telephonyWebhookIdempotencyStore,
+        },
+        onDecision: ({ decision }) => {
+          console.info("telnyx telephony outcome webhook", {
+            action: decision.action,
+            disposition: decision.disposition,
+            source: decision.source,
+          });
+        },
+        path: "/api/telnyx/webhook",
+        publicKey: telnyxPublicKey,
+      },
+    }),
+  )
+  .use(
+    createPlivoVoiceRoutes<unknown, VoiceSessionRecord, SavedIntake>({
+      context: {},
+      outcomePolicy: telephonyOutcomePolicy,
+      setup: {
+        path: "/api/plivo/setup",
+        requiredEnv: {
+          PLIVO_AUTH_TOKEN: plivoAuthToken,
+          VOICE_DEMO_PUBLIC_BASE_URL: publicBaseUrl,
+        },
+        title: "AbsoluteJS Voice Demo Plivo Setup",
+      },
+      smoke: {
+        path: "/api/plivo/smoke",
+        title: "AbsoluteJS Voice Demo Plivo Smoke Test",
+      },
+      streamPath: "/api/plivo/stream",
+      answer: {
+        path: "/api/plivo/voice",
+        response: {
+          audioTrack: "inbound",
+          bidirectional: true,
+          contentType: "audio/x-mulaw;rate=8000",
+          keepCallAlive: true,
+        },
+      },
+      webhook: {
+        authToken: plivoAuthToken,
+        idempotency: {
+          store: telephonyWebhookIdempotencyStore,
+        },
+        onDecision: ({ decision }) => {
+          console.info("plivo telephony outcome webhook", {
+            action: decision.action,
+            disposition: decision.disposition,
+            source: decision.source,
+          });
+        },
+        path: "/api/plivo/webhook",
+        verificationUrl: publicBaseUrl
+          ? `${publicBaseUrl.replace(/\/$/, "")}/api/plivo/webhook`
+          : undefined,
+      },
     }),
   )
   .use(
