@@ -25,7 +25,9 @@
         {
           "at": 1777200002000,
           "id": "fixture-guided-assistant-1",
-          "payload": { "text": "Thanks Riley. Which integration are you testing?" },
+          "payload": {
+            "text": "Thanks Riley. Which integration are you testing?"
+          },
           "scenarioId": "guided",
           "sessionId": "fixture-guided",
           "turnId": "guided-1",
@@ -34,7 +36,9 @@
         {
           "at": 1777200003000,
           "id": "fixture-guided-turn-2",
-          "payload": { "text": "I am testing the absolutejs voice integration" },
+          "payload": {
+            "text": "I am testing the absolutejs voice integration"
+          },
           "scenarioId": "guided",
           "sessionId": "fixture-guided",
           "turnId": "guided-2",

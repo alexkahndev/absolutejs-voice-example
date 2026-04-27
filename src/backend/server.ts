@@ -27,8 +27,8 @@ import {
   createVoiceSessionReplayRoutes,
   createVoiceSTTProviderRouter,
   createVoiceTaskUpdatedEvent,
-  createVoiceWorkflowContract,
   createVoiceWorkflowContractHandler,
+  createVoiceWorkflowContractPreset,
   createVoiceOpsWebhookReceiverRoutes,
   createVoiceOpsWebhookSink,
   createVoiceWebhookHandoffAdapter,
@@ -641,60 +641,69 @@ const persistIntake = (intake: SavedIntake) => {
   savedIntakes.splice(12);
 };
 
-const guidedWorkflowContract = createVoiceWorkflowContract<SavedIntake>({
-  description:
-    "The guided demo should collect the expected test answers and complete without provider errors.",
-  fields: [
-    { path: "transcript" },
-    { path: "assistantSummary" },
-    { match: "non-empty", path: "promptAnswers" },
-    { match: "number", path: "turnCount" },
-  ],
-  id: "guided-demo-completes",
-  label: "Guided demo completes",
-  maxProviderErrors: 0,
-  minSessions: 1,
-  minTurns: 3,
-  outcome: "complete",
-  requiredDisposition: "completed",
-  requiredTranscriptIncludes: ["name", "integration", "follow up"],
-  scenarioId: "guided",
-});
+const guidedWorkflowContract = createVoiceWorkflowContractPreset<SavedIntake>(
+  "support-triage",
+  {
+    description:
+      "The guided demo should collect the expected test answers and complete without provider errors.",
+    fields: [
+      { aliases: ["issue.summary"], path: "transcript" },
+      { aliases: ["resolution.nextStep"], path: "assistantSummary" },
+      { match: "non-empty", path: "promptAnswers" },
+      { match: "number", path: "turnCount" },
+    ],
+    id: "guided-demo-completes",
+    label: "Guided demo completes",
+    maxProviderErrors: 0,
+    minSessions: 1,
+    minTurns: 3,
+    outcome: "complete",
+    requiredDisposition: "completed",
+    requiredTranscriptIncludes: ["name", "integration", "follow up"],
+    scenarioId: "guided",
+  },
+);
 
-const generalWorkflowContract = createVoiceWorkflowContract<SavedIntake>({
-  description:
-    "General recording should save at least one freeform turn and end cleanly.",
-  fields: [
-    { path: "transcript" },
-    { path: "assistantSummary" },
-    { match: "number", path: "turnCount" },
-  ],
-  id: "general-recording-completes",
-  label: "General recording completes",
-  maxProviderErrors: 0,
-  minSessions: 1,
-  minTurns: 1,
-  outcome: "complete",
-  requiredDisposition: "completed",
-  scenarioId: "general",
-});
+const generalWorkflowContract = createVoiceWorkflowContractPreset<SavedIntake>(
+  "support-triage",
+  {
+    description:
+      "General recording should save at least one freeform turn and end cleanly.",
+    fields: [
+      { aliases: ["issue.summary"], path: "transcript" },
+      { aliases: ["resolution.nextStep"], path: "assistantSummary" },
+      { match: "number", path: "turnCount" },
+    ],
+    id: "general-recording-completes",
+    label: "General recording completes",
+    maxProviderErrors: 0,
+    minSessions: 1,
+    minTurns: 1,
+    outcome: "complete",
+    requiredDisposition: "completed",
+    scenarioId: "general",
+  },
+);
 
-const transferWorkflowContract = createVoiceWorkflowContract<SavedIntake>({
-  description:
-    "Any transfer outcome must create a handoff delivery path for downstream ops.",
-  fields: [
-    { path: "transcript" },
-    { path: "assistantSummary" },
-    { path: "callTarget", required: false },
-  ],
-  id: "transfer-handoff-delivered",
-  label: "Transfer handoff delivered",
-  minSessions: 0,
-  outcome: "transfer",
-  requiredDisposition: "transferred",
-  requiredHandoffActions: ["transfer"],
-  scenarioId: "transfer",
-});
+const transferWorkflowContract = createVoiceWorkflowContractPreset<SavedIntake>(
+  "transfer-handoff",
+  {
+    description:
+      "Any transfer outcome must create a handoff delivery path for downstream ops.",
+    fields: [
+      { aliases: ["transfer.summary"], path: "transcript" },
+      { aliases: ["transfer.reason"], path: "assistantSummary" },
+      { aliases: ["transfer.target"], path: "callTarget", required: false },
+    ],
+    id: "transfer-handoff-delivered",
+    label: "Transfer handoff delivered",
+    minSessions: 0,
+    outcome: "transfer",
+    requiredDisposition: "transferred",
+    requiredHandoffActions: ["transfer"],
+    scenarioId: "transfer",
+  },
+);
 
 const workflowScenarios = [
   guidedWorkflowContract.toScenarioEval(),
@@ -817,34 +826,33 @@ const sttProviderSimulationStatus = () =>
     provider,
   }));
 
-const sttProviderFailureSimulator = createVoiceIOProviderFailureSimulator<
-  VoiceSTTProvider
->({
-  failureElapsedMs: 12,
-  failureMessage: ({ provider }) =>
-    `Simulated ${provider} websocket open failure.`,
-  fallback: (provider) =>
-    configuredSTTProviders.filter((candidate) => candidate !== provider),
-  kind: "stt",
-  latencyBudgets: sttLatencyBudgets,
-  onProviderEvent: async (event, input) => {
-    await runtimeStorage.traces.append({
-      at: event.at,
-      payload: {
-        ...event,
-        providerStatus: event.status,
-      },
-      sessionId: input.sessionId,
-      type: "session.error",
-    });
-  },
-  providers: configuredSTTProviders,
-  recoveryElapsedMs: {
-    assemblyai: 28,
-    deepgram: 18,
-  },
-  sessionId: ({ now }) => `stt-sim-${now}`,
-});
+const sttProviderFailureSimulator =
+  createVoiceIOProviderFailureSimulator<VoiceSTTProvider>({
+    failureElapsedMs: 12,
+    failureMessage: ({ provider }) =>
+      `Simulated ${provider} websocket open failure.`,
+    fallback: (provider) =>
+      configuredSTTProviders.filter((candidate) => candidate !== provider),
+    kind: "stt",
+    latencyBudgets: sttLatencyBudgets,
+    onProviderEvent: async (event, input) => {
+      await runtimeStorage.traces.append({
+        at: event.at,
+        payload: {
+          ...event,
+          providerStatus: event.status,
+        },
+        sessionId: input.sessionId,
+        type: "session.error",
+      });
+    },
+    providers: configuredSTTProviders,
+    recoveryElapsedMs: {
+      assemblyai: 28,
+      deepgram: 18,
+    },
+    sessionId: ({ now }) => `stt-sim-${now}`,
+  });
 
 const listAssistantMemory = async (): Promise<VoiceAssistantMemoryRecord[]> =>
   memoryStore.list({
@@ -1232,7 +1240,8 @@ const server = new Elysia()
           statusHref: "/evals/fixtures/status",
         },
         {
-          description: "Provider failover, degradation, and simulator controls.",
+          description:
+            "Provider failover, degradation, and simulator controls.",
           href: "/resilience",
           label: "Resilience",
         },
@@ -1387,15 +1396,12 @@ const server = new Elysia()
     "/integrations",
     async () =>
       new Response(
-        renderVoiceIntegrationEventsPage(
-          await listIntegrationEvents(),
-          {
-            receivedWebhookCount: receivedWebhookEnvelopes.length,
-            receiverPath: "/api/voice-ops/webhook",
-            signingEnabled: Boolean(webhookSigningSecret),
-            webhookUrl,
-          },
-        ),
+        renderVoiceIntegrationEventsPage(await listIntegrationEvents(), {
+          receivedWebhookCount: receivedWebhookEnvelopes.length,
+          receiverPath: "/api/voice-ops/webhook",
+          signingEnabled: Boolean(webhookSigningSecret),
+          webhookUrl,
+        }),
         {
           headers: {
             "Content-Type": "text/html; charset=utf-8",
@@ -1403,19 +1409,17 @@ const server = new Elysia()
         },
       ),
   )
-  .get(
-    "/handoffs",
-    async () => {
-      const handoffDeliveries = await Promise.resolve(
-        handoffDeliveryStore.list(),
-      );
-      const [handoffHealth, handoffQueue] = await Promise.all([
-        summarizeVoiceHandoffHealth({ store: runtimeStorage.traces }),
-        Promise.resolve(summarizeVoiceHandoffDeliveries(handoffDeliveries)),
-      ]);
+  .get("/handoffs", async () => {
+    const handoffDeliveries = await Promise.resolve(
+      handoffDeliveryStore.list(),
+    );
+    const [handoffHealth, handoffQueue] = await Promise.all([
+      summarizeVoiceHandoffHealth({ store: runtimeStorage.traces }),
+      Promise.resolve(summarizeVoiceHandoffDeliveries(handoffDeliveries)),
+    ]);
 
-      return new Response(
-        `<!doctype html>
+    return new Response(
+      `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -1492,14 +1496,13 @@ const server = new Elysia()
   </main>
 </body>
 </html>`,
-        {
-          headers: {
-            "Content-Type": "text/html; charset=utf-8",
-          },
+      {
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
         },
-      );
-    },
-  )
+      },
+    );
+  })
   .get(
     "/sessions",
     async () =>
