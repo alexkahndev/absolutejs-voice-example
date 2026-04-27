@@ -19,6 +19,7 @@ import {
   createVoiceTaskUpdatedEvent,
   createVoiceOpsWebhookReceiverRoutes,
   createVoiceOpsWebhookSink,
+  createVoiceWebhookHandoffAdapter,
   deliverVoiceIntegrationEventToSinks,
   reopenVoiceOpsTask,
   renderVoiceSessionsHTML,
@@ -172,6 +173,7 @@ const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
 const geminiApiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
 const openAIApiKey = process.env.OPENAI_API_KEY;
 const publicBaseUrl = process.env.VOICE_DEMO_PUBLIC_BASE_URL;
+const handoffWebhookUrl = process.env.VOICE_DEMO_HANDOFF_WEBHOOK_URL;
 const webhookSigningSecret = process.env.VOICE_DEMO_WEBHOOK_SECRET;
 const webhookUrl = process.env.VOICE_DEMO_WEBHOOK_URL;
 const requestedModelProvider = process.env.VOICE_MODEL_PROVIDER?.toLowerCase();
@@ -478,6 +480,22 @@ const listReviews = async (): Promise<SavedVoiceReviewArtifact[]> =>
   listVoiceReviews(await runtimeStorage.reviews.list());
 
 const receivedWebhookEnvelopes: VoiceOpsWebhookEnvelope[] = [];
+const handoffAdapters = handoffWebhookUrl
+  ? [
+      createVoiceWebhookHandoffAdapter({
+        actions: ["transfer", "escalate", "voicemail", "no-answer"],
+        id: "voice-demo-handoff-webhook",
+        signingSecret: webhookSigningSecret,
+        url: handoffWebhookUrl,
+      }) as ReturnType<
+        typeof createVoiceWebhookHandoffAdapter<
+          unknown,
+          VoiceSessionRecord,
+          SavedIntake
+        >
+      >,
+    ]
+  : [];
 const webhookSink = webhookUrl
   ? createVoiceOpsWebhookSink({
       baseUrl: publicBaseUrl,
@@ -724,6 +742,12 @@ const server = new Elysia()
         const savedIntake = result ?? buildSavedIntake(session);
         persistIntake(savedIntake);
       },
+      handoff:
+        handoffAdapters.length > 0
+          ? {
+              adapters: handoffAdapters,
+            }
+          : undefined,
       ops: assistant.ops,
       correctTurn: correctDemoTurn,
       phraseHints: VOICE_DEMO_PHRASE_HINTS,
