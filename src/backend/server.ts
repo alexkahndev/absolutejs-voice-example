@@ -754,6 +754,132 @@ const summarizeSTTProviderHealth = async (): Promise<
   });
 };
 
+const sttProviderSimulationStatus = () =>
+  (["deepgram", "assemblyai"] as const).map((provider) => ({
+    configured: configuredSTTProviders.includes(provider),
+    provider,
+  }));
+
+const isVoiceSTTProvider = (value: unknown): value is VoiceSTTProvider =>
+  value === "deepgram" || value === "assemblyai";
+
+const simulateSTTProviderFailure = async (provider: VoiceSTTProvider) => {
+  if (!configuredSTTProviders.includes(provider)) {
+    return {
+      error: `${provider} is not configured in this environment.`,
+    };
+  }
+  if (provider !== "deepgram") {
+    return {
+      error:
+        "This demo currently simulates Deepgram failure because Deepgram is the primary STT provider.",
+    };
+  }
+  if (!configuredSTTProviders.includes("assemblyai")) {
+    return {
+      error:
+        "ASSEMBLYAI_API_KEY is required before simulating a real STT fallback path.",
+    };
+  }
+
+  const now = Date.now();
+  const sessionId = `stt-sim-${now}`;
+  const suppressedUntil = now + 30_000;
+  await runtimeStorage.traces.append({
+    at: now,
+    payload: {
+      attempt: 0,
+      elapsedMs: 12,
+      error: "Simulated Deepgram websocket open failure.",
+      fallbackProvider: "assemblyai",
+      kind: "stt",
+      latencyBudgetMs: sttLatencyBudgets.deepgram,
+      operation: "open",
+      provider,
+      providerHealth: {
+        consecutiveFailures: 1,
+        lastFailureAt: now,
+        provider,
+        status: "suppressed",
+        suppressedUntil,
+      },
+      providerStatus: "error",
+      selectedProvider: "deepgram",
+      suppressedUntil,
+    },
+    sessionId,
+    type: "session.error",
+  });
+  await runtimeStorage.traces.append({
+    at: now + 1,
+    payload: {
+      attempt: 1,
+      elapsedMs: 28,
+      fallbackProvider: "assemblyai",
+      kind: "stt",
+      latencyBudgetMs: sttLatencyBudgets.assemblyai,
+      operation: "open",
+      provider: "assemblyai",
+      providerHealth: {
+        consecutiveFailures: 0,
+        provider: "assemblyai",
+        status: "healthy",
+      },
+      providerStatus: "fallback",
+      selectedProvider: "deepgram",
+    },
+    sessionId,
+    type: "session.error",
+  });
+
+  return {
+    fallbackProvider: "assemblyai",
+    mode: "failure",
+    provider,
+    sessionId,
+    status: "simulated",
+    suppressedUntil,
+  };
+};
+
+const simulateSTTProviderRecovery = async (provider: VoiceSTTProvider) => {
+  if (!configuredSTTProviders.includes(provider)) {
+    return {
+      error: `${provider} is not configured in this environment.`,
+    };
+  }
+
+  const now = Date.now();
+  const sessionId = `stt-sim-${now}`;
+  await runtimeStorage.traces.append({
+    at: now,
+    payload: {
+      attempt: 0,
+      elapsedMs: provider === "deepgram" ? 18 : 32,
+      kind: "stt",
+      latencyBudgetMs: sttLatencyBudgets[provider],
+      operation: "open",
+      provider,
+      providerHealth: {
+        consecutiveFailures: 0,
+        provider,
+        status: "healthy",
+      },
+      providerStatus: "success",
+      selectedProvider: provider,
+    },
+    sessionId,
+    type: "session.error",
+  });
+
+  return {
+    mode: "recovery",
+    provider,
+    sessionId,
+    status: "simulated",
+  };
+};
+
 const listAssistantMemory = async (): Promise<VoiceAssistantMemoryRecord[]> =>
   memoryStore.list({
     assistantId: VOICE_ASSISTANT_CONFIG.id,
@@ -1057,6 +1183,42 @@ const server = new Elysia()
 
     return providerFailureSimulator.run(provider, "recovery");
   })
+  .post("/api/stt-simulate/failure", async ({ query, set }) => {
+    const provider = isVoiceSTTProvider(query.provider)
+      ? query.provider
+      : undefined;
+
+    if (!provider) {
+      set.status = 400;
+      return {
+        error: "Set ?provider=deepgram.",
+      };
+    }
+
+    const result = await simulateSTTProviderFailure(provider);
+    if ("error" in result) {
+      set.status = 400;
+    }
+    return result;
+  })
+  .post("/api/stt-simulate/recovery", async ({ query, set }) => {
+    const provider = isVoiceSTTProvider(query.provider)
+      ? query.provider
+      : undefined;
+
+    if (!provider) {
+      set.status = 400;
+      return {
+        error: "Set ?provider=deepgram or ?provider=assemblyai.",
+      };
+    }
+
+    const result = await simulateSTTProviderRecovery(provider);
+    if ("error" in result) {
+      set.status = 400;
+    }
+    return result;
+  })
   .get("/api/assistant-memory", async () => listAssistantMemory())
   .get("/api/reviews", async ({ query }) => {
     const reviews = await listReviews();
@@ -1147,6 +1309,7 @@ const server = new Elysia()
           llmProviderHealth: await summarizeProviderHealth(),
           routingEvents: listVoiceRoutingEvents(await runtimeStorage.traces.list()),
           sttProviderHealth: await summarizeSTTProviderHealth(),
+          sttProviders: sttProviderSimulationStatus(),
         }),
         {
           headers: {

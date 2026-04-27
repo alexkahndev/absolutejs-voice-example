@@ -17,6 +17,11 @@ type RoutingEvent = {
   turnId?: string;
 };
 
+type STTSimulationProvider = {
+  configured: boolean;
+  provider: string;
+};
+
 const escapeHtml = (value: string) =>
   value
     .replaceAll("&", "&amp;")
@@ -43,29 +48,29 @@ export const listVoiceRoutingEvents = (
       continue;
     }
 
-      const kind = getString(event.payload.kind);
-      const provider = getString(event.payload.provider);
-      const providerStatus = getString(event.payload.providerStatus);
-      if (!provider || !providerStatus) {
-        continue;
-      }
+    const kind = getString(event.payload.kind);
+    const provider = getString(event.payload.provider);
+    const providerStatus = getString(event.payload.providerStatus);
+    if (!provider || !providerStatus) {
+      continue;
+    }
 
-      routingEvents.push({
-        at: event.at,
-        attempt: getNumber(event.payload.attempt),
-        elapsedMs: getNumber(event.payload.elapsedMs),
-        error: getString(event.payload.error),
-        fallbackProvider: getString(event.payload.fallbackProvider),
-        kind: kind === "stt" || kind === "tts" ? kind : "llm",
-        latencyBudgetMs: getNumber(event.payload.latencyBudgetMs),
-        operation: getString(event.payload.operation),
-        provider,
-        selectedProvider: getString(event.payload.selectedProvider),
-        sessionId: event.sessionId,
-        status: providerStatus,
-        timedOut: getBoolean(event.payload.timedOut),
-        turnId: event.turnId,
-      });
+    routingEvents.push({
+      at: event.at,
+      attempt: getNumber(event.payload.attempt),
+      elapsedMs: getNumber(event.payload.elapsedMs),
+      error: getString(event.payload.error),
+      fallbackProvider: getString(event.payload.fallbackProvider),
+      kind: kind === "stt" || kind === "tts" ? kind : "llm",
+      latencyBudgetMs: getNumber(event.payload.latencyBudgetMs),
+      operation: getString(event.payload.operation),
+      provider,
+      selectedProvider: getString(event.payload.selectedProvider),
+      sessionId: event.sessionId,
+      status: providerStatus,
+      timedOut: getBoolean(event.payload.timedOut),
+      turnId: event.turnId,
+    });
   }
 
   return routingEvents.sort((left, right) => right.at - left.at);
@@ -170,10 +175,44 @@ const renderTimeline = (events: RoutingEvent[]) => {
     .join("")}</div>`;
 };
 
+const renderSTTSimulationControls = (providers: STTSimulationProvider[]) => {
+  const configuredProviders = providers.filter((provider) => provider.configured);
+  const deepgramConfigured = configuredProviders.some(
+    (provider) => provider.provider === "deepgram",
+  );
+  const assemblyConfigured = configuredProviders.some(
+    (provider) => provider.provider === "assemblyai",
+  );
+
+  if (configuredProviders.length === 0) {
+    return `<p class="muted">No STT providers are configured for simulation.</p>`;
+  }
+
+  return `<div class="simulate-panel">
+    <p class="muted">Simulate Deepgram failure to prove the realtime route falls back to AssemblyAI without changing provider credentials.</p>
+    <div class="simulate-actions">
+      <button type="button" data-stt-fail="deepgram"${deepgramConfigured && assemblyConfigured ? "" : " disabled"}>Simulate Deepgram STT failure</button>
+      ${configuredProviders
+        .map(
+          (provider) =>
+            `<button type="button" data-stt-recover="${escapeHtml(provider.provider)}">Mark ${escapeHtml(provider.provider)} recovered</button>`,
+        )
+        .join("")}
+    </div>
+    ${
+      assemblyConfigured
+        ? ""
+        : `<p class="muted">Add <code>ASSEMBLYAI_API_KEY</code> to enable the real fallback provider.</p>`
+    }
+    <pre id="stt-sim-output" class="simulate-output" hidden></pre>
+  </div>`;
+};
+
 export const renderVoiceResiliencePage = (input: {
   llmProviderHealth: VoiceProviderHealthSummary<string>[];
   routingEvents: RoutingEvent[];
   sttProviderHealth: VoiceProviderHealthSummary<string>[];
+  sttProviders: STTSimulationProvider[];
 }) => {
   const summary = summarizeRoutingEvents(input.routingEvents);
   const kindCounts = [...summary.byKind.entries()]
@@ -208,6 +247,11 @@ export const renderVoiceResiliencePage = (input: {
     .event.success, .provider.healthy { border-color: rgba(34, 197, 94, 0.5); }
     .provider.suppressed, .provider.degraded, .provider.rate-limited { border-color: rgba(239, 68, 68, 0.7); }
     .provider.recoverable { border-color: rgba(59, 130, 246, 0.7); }
+    button { background: #f59e0b; border: 0; border-radius: 999px; color: #111827; cursor: pointer; font-weight: 800; padding: 10px 14px; }
+    button:disabled { cursor: not-allowed; opacity: 0.45; }
+    code { color: #fef3c7; }
+    .simulate-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    .simulate-output { background: #050505; border: 1px solid #27272a; border-radius: 14px; color: #d4d4d8; overflow: auto; padding: 12px; white-space: pre-wrap; }
     a { color: #f59e0b; }
     @media (max-width: 850px) { .grid, .provider-grid, dl { grid-template-columns: 1fr; } }
   </style>
@@ -232,6 +276,7 @@ export const renderVoiceResiliencePage = (input: {
     </section>
     <section>
       <h2>STT provider health</h2>
+      ${renderSTTSimulationControls(input.sttProviders)}
       ${renderProviderCards("STT", input.sttProviderHealth)}
     </section>
     <section>
@@ -239,6 +284,30 @@ export const renderVoiceResiliencePage = (input: {
       ${renderTimeline(input.routingEvents)}
     </section>
   </main>
+  <script>
+    const output = document.getElementById("stt-sim-output");
+    const showResult = (result) => {
+      if (!output) return;
+      output.hidden = false;
+      output.textContent = JSON.stringify(result, null, 2);
+    };
+    document.querySelectorAll("[data-stt-fail]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const provider = button.getAttribute("data-stt-fail");
+        const response = await fetch("/api/stt-simulate/failure?provider=" + encodeURIComponent(provider || ""), { method: "POST" });
+        showResult(await response.json());
+        if (response.ok) window.setTimeout(() => window.location.reload(), 450);
+      });
+    });
+    document.querySelectorAll("[data-stt-recover]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const provider = button.getAttribute("data-stt-recover");
+        const response = await fetch("/api/stt-simulate/recovery?provider=" + encodeURIComponent(provider || ""), { method: "POST" });
+        showResult(await response.json());
+        if (response.ok) window.setTimeout(() => window.location.reload(), 450);
+      });
+    });
+  </script>
 </body>
 </html>`;
 };
