@@ -1295,6 +1295,13 @@ const appKitLinks = [
     statusHref: "/api/voice-traces",
   },
   {
+    description:
+      "Interruption latency proof for barge-in, playback stop, and resumed capture.",
+    href: "/barge-in",
+    label: "Barge-In",
+    statusHref: "/api/voice-barge-in",
+  },
+  {
     description: "Recent calls with replay links.",
     href: "/sessions",
     label: "Sessions",

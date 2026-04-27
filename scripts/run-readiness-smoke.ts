@@ -2,6 +2,7 @@ export {};
 
 type EndpointName =
   | "appKit"
+  | "bargeIn"
   | "carriers"
   | "handoffs"
   | "productionReadiness"
@@ -114,6 +115,24 @@ const endpoints: Array<{
         failed: report.failed,
         total: report.total,
         warnings: report.warnings,
+      };
+    },
+  },
+  {
+    name: "bargeIn",
+    path: "/api/voice-barge-in",
+    summarize: (body) => {
+      const report = body as {
+        averageLatencyMs?: unknown;
+        failed?: unknown;
+        status?: unknown;
+        total?: unknown;
+      };
+      return {
+        averageLatencyMs: report.averageLatencyMs,
+        failed: report.failed,
+        status: report.status,
+        total: report.total,
       };
     },
   },

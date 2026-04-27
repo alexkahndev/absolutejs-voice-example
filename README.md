@@ -71,6 +71,7 @@ Then open:
 - `http://localhost:3000/tasks`
 - `http://localhost:3000/integrations`
 - `http://localhost:3000/traces`
+- `http://localhost:3000/barge-in`
 
 ## Recommended Pattern
 
@@ -185,9 +186,10 @@ A good end-to-end demo flow is:
    - `no answer`
 4. Open `/reviews` to inspect the call artifact.
 5. Open `/traces` to inspect the per-call provider timeline.
-6. Open `/assistant` to inspect assistant variants, outcomes, guardrails, and tools.
-7. Open `/tasks` to see the generated follow-up work.
-8. Open `/integrations` to inspect the portable outbound event payloads.
+6. Open `/barge-in` to inspect interruption latency evidence.
+7. Open `/assistant` to inspect assistant variants, outcomes, guardrails, and tools.
+8. Open `/tasks` to see the generated follow-up work.
+9. Open `/integrations` to inspect the portable outbound event payloads.
 
 The demo uses the support-triage recipe, so completed calls create triage review tasks, escalations route to `support-escalations`, transfers create handoff checks, and voicemail/no-answer outcomes create callback work.
 
