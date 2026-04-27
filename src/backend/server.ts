@@ -267,6 +267,16 @@ const handoffWebhookUrl = process.env.VOICE_DEMO_HANDOFF_WEBHOOK_URL;
 const webhookSigningSecret = process.env.VOICE_DEMO_WEBHOOK_SECRET;
 const webhookUrl = process.env.VOICE_DEMO_WEBHOOK_URL;
 const requestedModelProvider = process.env.VOICE_MODEL_PROVIDER?.toLowerCase();
+const readPositiveNumberEnv = (name: string, fallback: number) => {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+};
+const providerLatencyBudgets = {
+  anthropic: readPositiveNumberEnv("VOICE_ANTHROPIC_TIMEOUT_MS", 6_000),
+  deterministic: readPositiveNumberEnv("VOICE_DETERMINISTIC_TIMEOUT_MS", 500),
+  gemini: readPositiveNumberEnv("VOICE_GEMINI_TIMEOUT_MS", 6_000),
+  openai: readPositiveNumberEnv("VOICE_OPENAI_TIMEOUT_MS", 6_000),
+} satisfies Record<VoiceModelProvider, number>;
 const configuredModelProviders: VoiceModelProvider[] = [
   "deterministic",
   openAIApiKey ? "openai" : undefined,
@@ -426,10 +436,30 @@ const assistantModel = createVoiceProviderRouter<
     rateLimitCooldownMs: 120_000,
   },
   providerProfiles: {
-    deterministic: { cost: 0, latencyMs: 5, priority: 4 },
-    openai: { cost: 2, latencyMs: 500, priority: 1 },
-    anthropic: { cost: 3, latencyMs: 700, priority: 2 },
-    gemini: { cost: 1, latencyMs: 650, priority: 3 },
+    deterministic: {
+      cost: 0,
+      latencyMs: 5,
+      priority: 4,
+      timeoutMs: providerLatencyBudgets.deterministic,
+    },
+    openai: {
+      cost: 2,
+      latencyMs: 500,
+      priority: 1,
+      timeoutMs: providerLatencyBudgets.openai,
+    },
+    anthropic: {
+      cost: 3,
+      latencyMs: 700,
+      priority: 2,
+      timeoutMs: providerLatencyBudgets.anthropic,
+    },
+    gemini: {
+      cost: 1,
+      latencyMs: 650,
+      priority: 3,
+      timeoutMs: providerLatencyBudgets.gemini,
+    },
   },
   providers: providerModels,
   selectProvider: ({ context }) => resolveRequestedProvider(context),
