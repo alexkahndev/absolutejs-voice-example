@@ -15,6 +15,7 @@ import {
   createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
   createOpenAIVoiceAssistantModel,
+  createOpenAIVoiceTTS,
   createVoiceHandoffDeliveryWorker,
   createVoiceProviderRouter,
   createVoiceRoutingDecisionSummary,
@@ -337,6 +338,15 @@ const voiceProviderModels = {
   gemini: process.env.GEMINI_VOICE_MODEL ?? "gemini-2.5-flash",
   openai: process.env.OPENAI_VOICE_MODEL ?? "gpt-4.1-mini",
 } satisfies Record<VoiceModelProvider | VoiceSTTProvider, string>;
+const telephonyTTS = openAIApiKey
+  ? createOpenAIVoiceTTS({
+      apiKey: openAIApiKey,
+      instructions:
+        "Speak like a concise phone support agent. Keep the tone natural, clear, and calm. Avoid long pauses.",
+      model: process.env.OPENAI_TTS_MODEL ?? "gpt-4o-mini-tts",
+      voice: process.env.OPENAI_TTS_VOICE ?? "marin",
+    })
+  : undefined;
 const voiceProviderFeatures = {
   anthropic: ["tool calling", "JSON result shaping", "fallback routing"],
   assemblyai: ["realtime STT", "turn formatting", "fallback STT"],
@@ -1728,6 +1738,7 @@ const createTelephonyBridgeConfig = () => ({
   preset: "reliability" as const,
   session: runtimeStorage.session,
   stt: sttAdapter,
+  tts: telephonyTTS,
 });
 
 const server = new Elysia()
