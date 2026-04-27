@@ -8,6 +8,7 @@ type EndpointName =
   | "liveLatency"
   | "productionReadiness"
   | "providerCapabilities"
+  | "simulationSuite"
   | "turnLatency"
   | "voiceTraces";
 
@@ -139,6 +140,24 @@ const endpoints: Array<{
         status: report.status,
         total: report.total,
         warnings: report.warnings,
+      };
+    },
+  },
+  {
+    name: "simulationSuite",
+    path: "/api/voice/simulations",
+    summarize: (body) => {
+      const report = body as {
+        failed?: unknown;
+        status?: unknown;
+        summary?: unknown;
+        total?: unknown;
+      };
+      return {
+        failed: report.failed,
+        status: report.status,
+        summary: report.summary,
+        total: report.total,
       };
     },
   },

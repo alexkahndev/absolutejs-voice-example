@@ -6,9 +6,9 @@
       "name": "absolutejs-voice-example",
       "dependencies": {
         "@absolutejs/absolute": "0.19.0-beta.648",
-        "@absolutejs/voice": "0.0.22-beta.105",
-        "@absolutejs/voice-assemblyai": "0.0.19-beta.70",
-        "@absolutejs/voice-deepgram": "0.0.20-beta.40",
+        "@absolutejs/voice": "0.0.22-beta.106",
+        "@absolutejs/voice-assemblyai": "0.0.19-beta.71",
+        "@absolutejs/voice-deepgram": "0.0.20-beta.41",
         "@angular/common": "^21.0.0",
         "@angular/compiler": "^21.0.0",
         "@angular/compiler-cli": "^21.0.0",
@@ -62,11 +62,11 @@
 
     "@absolutejs/native-windows-x64": ["@absolutejs/native-windows-x64@0.19.0-beta.648", "", { "os": "win32", "cpu": "x64" }, "sha512-cYVJhSSTWavwlfor0DSUd2Xz/dW5BReom8MmdxN4QA6PncU/9yTMWcCtLZehlQld8kpDncryWtOURwJZ+g4Y+A=="],
 
-    "@absolutejs/voice": ["@absolutejs/voice@0.0.22-beta.105", "", { "peerDependencies": { "@absolutejs/absolute": ">=0.19.0-beta.646", "@angular/core": ">=21.0.0", "elysia": ">=1.4.18", "react": ">=19.0.0", "vue": ">=3.5.0" }, "optionalPeers": ["@angular/core", "react", "vue"] }, "sha512-UJloLdi/GUdMvGGHy0UzxSAg+P313Xu6djxXEBAiTHlFP4PRd24GQxasfrLpPdt/8mQTvh4yxg6OscWcEvexjQ=="],
+    "@absolutejs/voice": ["@absolutejs/voice@0.0.22-beta.106", "", { "peerDependencies": { "@absolutejs/absolute": ">=0.19.0-beta.646", "@angular/core": ">=21.0.0", "elysia": ">=1.4.18", "react": ">=19.0.0", "vue": ">=3.5.0" }, "optionalPeers": ["@angular/core", "react", "vue"] }, "sha512-NBCqT8lo6yEWx7KekiVSgjOys9RnPL+/wxfGgTGK3MrVinBN4pwrwRXvJSEQXf1Qfo6C4j+rAQyprrAD9m7ygA=="],
 
-    "@absolutejs/voice-assemblyai": ["@absolutejs/voice-assemblyai@0.0.19-beta.70", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.105" } }, "sha512-YJAoTx3t+k0CDUhkC7UG1YZi11RFFfUvu2FRbr/PIuMYrxJA/nwKXBdZ+q4zameN//4ZQ4dX05z3HReTdJfFaQ=="],
+    "@absolutejs/voice-assemblyai": ["@absolutejs/voice-assemblyai@0.0.19-beta.71", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.106" } }, "sha512-alPIoSFE5lc6sCX0cOOs0uYGqsvwINTANqT+iuow4GrQXjYVwylZR7zIqPzMNPPWLQiBnXYFyh2nM52JgYLz9w=="],
 
-    "@absolutejs/voice-deepgram": ["@absolutejs/voice-deepgram@0.0.20-beta.40", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.105" } }, "sha512-7ZCI7rSrWwed8Oare/AhHwB+xBhhpbEQzE61uFa3rSv45Dyi49hVWwFlUgVrOk0XQBZCw7uDpvsxRWROffpaJQ=="],
+    "@absolutejs/voice-deepgram": ["@absolutejs/voice-deepgram@0.0.20-beta.41", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.106" } }, "sha512-/4Baou7nKSy7vMhdu7R0FZwsFJAZ3b1UeF4nzwqgkIcf+TunsJ3/1uelcNM/zGosIY5Kse/mE22FlwryJD2lEA=="],
 
     "@angular/common": ["@angular/common@21.2.9", "", { "dependencies": { "tslib": "^2.3.0" }, "peerDependencies": { "@angular/core": "21.2.9", "rxjs": "^6.5.3 || ^7.4.0" } }, "sha512-7spQcF3hPN/fjTx6Pwa32KRRdO0NcixnRuPV4lo50ejtXesjiLVR+fkaX38sawAyGoq89IuuYvUDrbLwCMypmQ=="],
 

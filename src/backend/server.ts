@@ -20,6 +20,7 @@ import {
   createVoiceProviderRouter,
   createVoiceRoutingDecisionSummary,
   createVoiceSTTProviderRouter,
+  createVoiceSimulationSuiteRoutes,
   createVoiceTTSProviderRouter,
   createVoiceTaskUpdatedEvent,
   createVoiceTelephonyOutcomePolicy,
@@ -1223,6 +1224,13 @@ const appKitLinks = [
   },
   {
     description:
+      "One pre-production proof report for sessions, scenarios, fixtures, tools, and outcomes.",
+    href: "/voice/simulations",
+    label: "Simulation Suite",
+    statusHref: "/api/voice/simulations",
+  },
+  {
+    description:
       "Seeded certification fixtures that prove workflows pass before live traffic.",
     href: "/evals/fixtures",
     label: "Fixture Evals",
@@ -2134,6 +2142,27 @@ const server = new Elysia()
       htmlPath: "/tool-contracts",
       path: "/api/tool-contracts",
       title: "AbsoluteJS Voice Demo Tool Contracts",
+    }),
+  )
+  .use(
+    createVoiceSimulationSuiteRoutes({
+      htmlPath: "/voice/simulations",
+      path: "/api/voice/simulations",
+      store: runtimeStorage.traces,
+      scenarios: workflowScenarios,
+      fixtureStore: createVoiceFileScenarioFixtureStore(
+        resolve(import.meta.dir, "fixtures", "voice-scenario-fixtures.json"),
+      ),
+      tools: demoToolContracts,
+      outcomes: {
+        contracts: demoOutcomeContracts,
+        events: runtimeStorage.events,
+        handoffs: handoffDeliveryStore as unknown as VoiceHandoffDeliveryStore,
+        reviews: runtimeStorage.reviews,
+        sessions: runtimeStorage.session,
+        tasks: runtimeStorage.tasks,
+      },
+      title: "AbsoluteJS Voice Demo Simulation Suite",
     }),
   )
   .post("/api/turn-latency/proof", () => seedTurnLatencyProof())
