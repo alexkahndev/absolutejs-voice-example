@@ -2,8 +2,8 @@
   import { onDestroy, onMount } from "svelte";
   import Head from "@absolutejs/absolute/svelte/components/Head.js";
   import {
+    createVoiceAppKitStatus,
     createVoiceStream,
-    createVoiceWorkflowStatus,
   } from "@absolutejs/voice/svelte";
   import type { VoiceStream, VoiceStreamState } from "@absolutejs/voice";
   import {
@@ -35,11 +35,11 @@
     createVoiceWavePath,
     createDemoMicrophone,
     fetchSavedIntakes,
-    getWorkflowStatusLabel,
+    getAppKitStatusLabel,
     formatErrorMessage,
     formatDateTime,
     pushVoiceWaveLevel,
-    type VoiceWorkflowStatusReport,
+    type VoiceAppKitStatusReport,
   } from "../../shared/browser";
 
   const createInitialVoiceState = (): VoiceStreamState<SavedIntake> => ({
@@ -67,7 +67,7 @@
   });
   let isCapturing = $state(false);
   let savedIntakes = $state<SavedIntake[]>([]);
-  let workflowReport = $state<VoiceWorkflowStatusReport | null>(null);
+  let appKitReport = $state<VoiceAppKitStatusReport | null>(null);
   let guidedState = $state(createInitialVoiceState());
   let generalState = $state(createInitialVoiceState());
   let waveLevels = $state(createInitialVoiceWaveLevels());
@@ -75,12 +75,12 @@
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
   let guidedVoice: VoiceStream<SavedIntake> | null = null;
   let generalVoice: VoiceStream<SavedIntake> | null = null;
-  const workflowStatus = createVoiceWorkflowStatus("/evals/scenarios/json", {
+  const appKitStatus = createVoiceAppKitStatus("/app-kit/status", {
     intervalMs: 5_000,
   });
   let unsubscribeGuided = () => {};
   let unsubscribeGeneral = () => {};
-  let unsubscribeWorkflow = () => {};
+  let unsubscribeAppKitStatus = () => {};
   let currentVoice = $derived(
     activeMode === "general" ? generalState : guidedState,
   );
@@ -199,10 +199,10 @@
 
   onMount(() => {
     connectVoices();
-    unsubscribeWorkflow = workflowStatus.subscribe(() => {
-      workflowReport = workflowStatus.getSnapshot().report ?? null;
+    unsubscribeAppKitStatus = appKitStatus.subscribe(() => {
+      appKitReport = appKitStatus.getSnapshot().report ?? null;
     });
-    void workflowStatus.refresh().catch(() => {});
+    void appKitStatus.refresh().catch(() => {});
     void refreshIntakes();
     refreshTimer = setInterval(() => {
       void refreshIntakes();
@@ -216,10 +216,10 @@
     stopMic();
     unsubscribeGuided();
     unsubscribeGeneral();
-    unsubscribeWorkflow();
+    unsubscribeAppKitStatus();
     guidedVoice?.close();
     generalVoice?.close();
-    workflowStatus.close();
+    appKitStatus.close();
   });
 </script>
 
@@ -306,21 +306,21 @@
       </article>
 
       <article
-        class={`voice-card voice-workflow-card ${workflowReport?.status === "fail" ? "is-failing" : ""}`}
+        class={`voice-card voice-workflow-card ${appKitReport?.status === "fail" ? "is-failing" : ""}`}
       >
-        <span class="voice-framework-pill">Workflow Contracts</span>
-        <h2>{getWorkflowStatusLabel(workflowReport)}</h2>
+        <span class="voice-framework-pill">Voice App Kit</span>
+        <h2>{getAppKitStatusLabel(appKitReport)}</h2>
         <p class="voice-footnote">
-          Live trace gates generated from the same contracts that validate route
-          results before completion, transfer, and handoff.
+          One embedded status check for quality, workflow contracts, providers,
+          sessions, and handoffs.
         </p>
         <div class="voice-workflow-summary">
-          <span class="pill">{workflowReport?.passed ?? 0} passing</span>
-          <span class="pill">{workflowReport?.failed ?? 0} failing</span>
-          <span class="pill">{workflowReport?.total ?? 0} contracts</span>
+          <span class="pill">{appKitReport?.passed ?? 0} passing</span>
+          <span class="pill">{appKitReport?.failed ?? 0} failing</span>
+          <span class="pill">{appKitReport?.total ?? 0} checks</span>
         </div>
         <p class="voice-footnote">
-          <a href="/evals/scenarios">Open live gates</a> ·
+          <a href="/app-kit/status">Open app-kit status</a> ·
           <a href="/evals/fixtures">Open certified fixtures</a>
         </p>
       </article>

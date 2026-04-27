@@ -1,16 +1,13 @@
 import { Head } from "@absolutejs/absolute/react/components";
 import { useEffect, useRef, useState } from "react";
 import type { VoiceTurnRecord } from "@absolutejs/voice";
-import {
-  useVoiceStream,
-  useVoiceWorkflowStatus,
-} from "@absolutejs/voice/react";
+import { useVoiceStream, useVoiceAppKitStatus } from "@absolutejs/voice/react";
 import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoMicrophone,
   fetchSavedIntakes,
-  getWorkflowStatusLabel,
+  getAppKitStatusLabel,
   formatErrorMessage,
   formatDateTime,
   pushVoiceWaveLevel,
@@ -97,7 +94,7 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
   const [savedIntakes, setSavedIntakes] = useState<SavedIntake[]>([]);
   const [waveLevels, setWaveLevels] = useState(createInitialVoiceWaveLevels);
   const currentVoice = activeMode === "general" ? generalVoice : guidedVoice;
-  const workflowStatus = useVoiceWorkflowStatus("/evals/scenarios/json", {
+  const appKitStatus = useVoiceAppKitStatus("/app-kit/status", {
     intervalMs: 5_000,
   });
 
@@ -305,28 +302,28 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
 
             <article
               className={`voice-card voice-workflow-card ${
-                workflowStatus.report?.status === "fail" ? "is-failing" : ""
+                appKitStatus.report?.status === "fail" ? "is-failing" : ""
               }`}
             >
-              <span className="voice-framework-pill">Workflow Contracts</span>
-              <h2>{getWorkflowStatusLabel(workflowStatus.report)}</h2>
+              <span className="voice-framework-pill">Voice App Kit</span>
+              <h2>{getAppKitStatusLabel(appKitStatus.report)}</h2>
               <p className="voice-footnote">
-                Live trace gates generated from the same contracts that validate
-                route results before completion, transfer, and handoff.
+                One embedded readiness check for certified workflows, provider
+                health, and handoffs.
               </p>
               <div className="voice-workflow-summary">
                 <span className="pill">
-                  {workflowStatus.report?.passed ?? 0} passing
+                  {appKitStatus.report?.passed ?? 0} passing
                 </span>
                 <span className="pill">
-                  {workflowStatus.report?.failed ?? 0} failing
+                  {appKitStatus.report?.failed ?? 0} failing
                 </span>
                 <span className="pill">
-                  {workflowStatus.report?.total ?? 0} contracts
+                  {appKitStatus.report?.total ?? 0} checks
                 </span>
               </div>
               <p className="voice-footnote">
-                <a href="/evals/scenarios">Open live gates</a> ·{" "}
+                <a href="/app-kit/status">Open app-kit status</a> ·{" "}
                 <a href="/evals/fixtures">Open certified fixtures</a>
               </p>
             </article>

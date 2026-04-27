@@ -1,13 +1,13 @@
 import {
+  createVoiceAppKitStatusStore,
   createVoiceStream,
-  createVoiceWorkflowStatusStore,
 } from "@absolutejs/voice/client";
 import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoMicrophone,
   fetchSavedIntakes,
-  getWorkflowStatusLabel,
+  getAppKitStatusLabel,
   formatErrorMessage,
   formatDateTime,
   pushVoiceWaveLevel,
@@ -110,7 +110,7 @@ const guidedVoice = createVoiceStream<SavedIntake>(
 const generalVoice = createVoiceStream<SavedIntake>(
   getVoiceRoutePath("general", modelProvider),
 );
-const workflowStatus = createVoiceWorkflowStatusStore("/evals/scenarios/json", {
+const appKitStatus = createVoiceAppKitStatusStore("/app-kit/status", {
   intervalMs: 5_000,
 });
 let activeMode: VoiceDemoMode | null = null;
@@ -143,12 +143,12 @@ const renderWave = () => {
 };
 
 const renderWorkflowStatus = () => {
-  const report = workflowStatus.getSnapshot().report;
+  const report = appKitStatus.getSnapshot().report;
   workflowStatusCard.classList.toggle("is-failing", report?.status === "fail");
-  workflowStatusLabel.textContent = getWorkflowStatusLabel(report);
+  workflowStatusLabel.textContent = getAppKitStatusLabel(report);
   workflowStatusSummary.innerHTML = `<span class="pill">${report?.passed ?? 0} passing</span>
 <span class="pill">${report?.failed ?? 0} failing</span>
-<span class="pill">${report?.total ?? 0} contracts</span>`;
+<span class="pill">${report?.total ?? 0} checks</span>`;
 };
 
 const renderChat = () => {
@@ -367,10 +367,9 @@ window.addEventListener("beforeunload", () => {
 render();
 void renderSavedIntakes();
 renderWorkflowStatus();
-const unsubscribeWorkflowStatus =
-  workflowStatus.subscribe(renderWorkflowStatus);
-void workflowStatus.refresh().catch(() => {});
+const unsubscribeWorkflowStatus = appKitStatus.subscribe(renderWorkflowStatus);
+void appKitStatus.refresh().catch(() => {});
 window.addEventListener("beforeunload", () => {
   unsubscribeWorkflowStatus();
-  workflowStatus.close();
+  appKitStatus.close();
 });

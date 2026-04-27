@@ -1159,6 +1159,13 @@ const server = new Elysia()
   )
   .use(
     createVoiceAppKitRoutes({
+      appStatus: {
+        include: {
+          quality: false,
+          sessions: false,
+        },
+        preferFixtureWorkflows: true,
+      },
       assistantHealth: {},
       diagnostics: {
         title: "AbsoluteJS Voice Demo Diagnostics",

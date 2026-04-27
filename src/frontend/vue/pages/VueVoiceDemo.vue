@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { useVoiceStream, useVoiceWorkflowStatus } from "@absolutejs/voice/vue";
+import { useVoiceAppKitStatus, useVoiceStream } from "@absolutejs/voice/vue";
 import {
   FRAMEWORKS,
   FRAMEWORK_DESCRIPTIONS,
@@ -30,7 +30,7 @@ import {
   createVoiceWavePath,
   createDemoMicrophone,
   fetchSavedIntakes,
-  getWorkflowStatusLabel,
+  getAppKitStatusLabel,
   formatErrorMessage,
   formatDateTime,
   pushVoiceWaveLevel,
@@ -43,7 +43,7 @@ const guidedVoice = useVoiceStream<SavedIntake>(
 const generalVoice = useVoiceStream<SavedIntake>(
   getVoiceRoutePath("general", modelProvider.value),
 );
-const workflowStatus = useVoiceWorkflowStatus("/evals/scenarios/json", {
+const appKitStatus = useVoiceAppKitStatus("/app-kit/status", {
   intervalMs: 5_000,
 });
 const activeMode = ref<VoiceDemoMode | null>(null);
@@ -268,28 +268,28 @@ onUnmounted(() => {
           :class="[
             'voice-card',
             'voice-workflow-card',
-            workflowStatus.report.value?.status === 'fail' ? 'is-failing' : '',
+            appKitStatus.report.value?.status === 'fail' ? 'is-failing' : '',
           ]"
         >
-          <span class="voice-framework-pill">Workflow Contracts</span>
-          <h2>{{ getWorkflowStatusLabel(workflowStatus.report.value) }}</h2>
+          <span class="voice-framework-pill">Voice App Kit</span>
+          <h2>{{ getAppKitStatusLabel(appKitStatus.report.value) }}</h2>
           <p class="voice-footnote">
-            Live trace gates generated from the same contracts that validate
-            route results before completion, transfer, and handoff.
+            One embedded readiness check for certified workflows, provider
+            health, and handoffs.
           </p>
           <div class="voice-workflow-summary">
             <span class="pill"
-              >{{ workflowStatus.report.value?.passed ?? 0 }} passing</span
+              >{{ appKitStatus.report.value?.passed ?? 0 }} passing</span
             >
             <span class="pill"
-              >{{ workflowStatus.report.value?.failed ?? 0 }} failing</span
+              >{{ appKitStatus.report.value?.failed ?? 0 }} failing</span
             >
             <span class="pill"
-              >{{ workflowStatus.report.value?.total ?? 0 }} contracts</span
+              >{{ appKitStatus.report.value?.total ?? 0 }} checks</span
             >
           </div>
           <p class="voice-footnote">
-            <a href="/evals/scenarios">Open live gates</a> ·
+            <a href="/app-kit/status">Open app-kit status</a> ·
             <a href="/evals/fixtures">Open certified fixtures</a>
           </p>
         </article>

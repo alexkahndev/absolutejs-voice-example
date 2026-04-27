@@ -1,12 +1,8 @@
 import { createMicrophoneCapture } from "@absolutejs/voice/client";
+import type { VoiceAppKitStatusReport } from "@absolutejs/voice";
 import type { SavedIntake } from "../../shared/demo";
 
-export type VoiceWorkflowStatusReport = {
-  failed: number;
-  passed: number;
-  status: "pass" | "fail";
-  total: number;
-};
+export type { VoiceAppKitStatusReport };
 
 const VOICE_WAVE_POINTS = 48;
 const VOICE_WAVE_WIDTH = 320;
@@ -66,24 +62,24 @@ export const fetchSavedIntakes = async () => {
   return (await response.json()) as SavedIntake[];
 };
 
-export const fetchWorkflowStatus = async () => {
-  const response = await fetch("/evals/scenarios/json");
+export const fetchAppKitStatus = async () => {
+  const response = await fetch("/app-kit/status");
 
   if (!response.ok) {
     return null;
   }
 
-  return (await response.json()) as VoiceWorkflowStatusReport;
+  return (await response.json()) as VoiceAppKitStatusReport;
 };
 
-export const getWorkflowStatusLabel = (
-  report?: VoiceWorkflowStatusReport | null,
+export const getAppKitStatusLabel = (
+  report?: VoiceAppKitStatusReport | null,
 ) => {
   if (!report) {
     return "Checking";
   }
 
-  return report.status === "pass" ? "Passing" : "Needs live run";
+  return report.status === "pass" ? "Passing" : "Needs attention";
 };
 
 export const formatDateTime = (value: number) =>
