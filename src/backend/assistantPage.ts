@@ -177,7 +177,7 @@ export const renderVoiceAssistantPage = (
     <section>
       <h1>Assistant control plane</h1>
       <p>This page summarizes assistant trace events from <code>createVoiceAssistant(...)</code>: variants, outcomes, guardrails, tools, memory, and artifact plans.</p>
-      <p><a href="/react">Back to demo</a> · <a href="/sessions">Sessions</a> · <a href="/reviews">Reviews</a> · <a href="/tasks">Tasks</a> · <a href="/integrations">Integrations</a></p>
+      <p><a href="/react">Back to demo</a> · <a href="/sessions">Sessions</a> · <a href="/handoffs">Handoffs</a> · <a href="/reviews">Reviews</a> · <a href="/tasks">Tasks</a> · <a href="/integrations">Integrations</a></p>
     </section>
     <section>
       <h2>${escapeHtml(config.id)}</h2>

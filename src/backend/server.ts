@@ -12,6 +12,7 @@ import {
   createVoiceFileRuntimeStorage,
   createOpenAIVoiceAssistantModel,
   createVoiceAssistantHealthRoutes,
+  createVoiceHandoffHealthRoutes,
   createVoiceProviderHealthRoutes,
   createVoiceProviderRouter,
   createVoiceSessionListRoutes,
@@ -22,9 +23,11 @@ import {
   createVoiceWebhookHandoffAdapter,
   deliverVoiceIntegrationEventToSinks,
   reopenVoiceOpsTask,
+  renderVoiceHandoffHealthHTML,
   renderVoiceSessionsHTML,
   startVoiceOpsTask,
   summarizeVoiceAssistantRuns,
+  summarizeVoiceHandoffHealth,
   summarizeVoiceProviderHealth,
   summarizeVoiceSessions,
   type VoiceCallReviewStore,
@@ -788,6 +791,11 @@ const server = new Elysia()
     }),
   )
   .use(
+    createVoiceHandoffHealthRoutes({
+      store: runtimeStorage.traces,
+    }),
+  )
+  .use(
     createVoiceOpsWebhookReceiverRoutes({
       onEnvelope: ({ envelope }) => {
         receivedWebhookEnvelopes.unshift(envelope);
@@ -922,6 +930,51 @@ const server = new Elysia()
       ),
   )
   .get(
+    "/handoffs",
+    async () =>
+      new Response(
+        `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AbsoluteJS Voice Handoffs</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { background: #0b0d10; color: #f4f4f5; font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 24px; }
+    main { max-width: 1080px; margin: 0 auto; display: grid; gap: 16px; }
+    section, article { background: #13161b; border: 1px solid #232833; border-radius: 18px; padding: 20px; }
+    .voice-handoff-health-grid, .voice-handoff-health-columns { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+    .voice-handoff-health-grid article, .voice-handoff-health-columns article, .voice-handoff-health-events article { background: #0f1217; border: 1px solid #232833; border-radius: 16px; padding: 16px; }
+    .voice-handoff-health-events { display: grid; gap: 14px; }
+    .voice-handoff-health-events article.failed { border-color: rgba(239, 68, 68, 0.7); }
+    .voice-handoff-health-events article.delivered { border-color: rgba(34, 197, 94, 0.5); }
+    .voice-handoff-health-event-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    span, small { color: #a1a1aa; }
+    a { color: #f59e0b; }
+  </style>
+</head>
+<body>
+  <main>
+    <section>
+      <h1>Voice handoffs</h1>
+      <p>Trace-backed transfer and escalation delivery health with replay links.</p>
+      <p><a href="/assistant">Assistant control plane</a> · <a href="/sessions">Sessions</a> · <a href="/tasks">Tasks</a> · <a href="/integrations">Integrations</a></p>
+    </section>
+    <section>
+      ${renderVoiceHandoffHealthHTML(await summarizeVoiceHandoffHealth({ store: runtimeStorage.traces }))}
+    </section>
+  </main>
+</body>
+</html>`,
+        {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+          },
+        },
+      ),
+  )
+  .get(
     "/sessions",
     async () =>
       new Response(
@@ -953,7 +1006,7 @@ const server = new Elysia()
     <section>
       <h1>Voice sessions</h1>
       <p>Searchable trace-backed sessions with direct replay links.</p>
-      <p><a href="/assistant">Assistant control plane</a> · <a href="/reviews">Reviews</a> · <a href="/tasks">Tasks</a></p>
+      <p><a href="/assistant">Assistant control plane</a> · <a href="/reviews">Reviews</a> · <a href="/tasks">Tasks</a> · <a href="/handoffs">Handoffs</a></p>
     </section>
     <section>
       ${renderVoiceSessionsHTML(await summarizeVoiceSessions({ store: runtimeStorage.traces }))}
