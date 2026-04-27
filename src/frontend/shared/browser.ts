@@ -1,8 +1,10 @@
 import {
   createMicrophoneCapture,
+  createVoiceAudioPlayer,
   createVoiceBargeInMonitor,
 } from "@absolutejs/voice/client";
 import type {
+  VoiceAudioPlayer,
   VoiceBargeInMonitor,
   VoiceAppKitStatusReport,
   VoiceRoutingDecisionSummary,
@@ -259,9 +261,37 @@ export const createDemoBargeInEvidence = <TResult = unknown>(
     path: "/api/voice-barge-in",
     thresholdMs: options.thresholdMs ?? 250,
   });
+  const subscribers = new Set<() => void>();
+  let player: VoiceAudioPlayer | null = null;
   let lastAssistantAt = 0;
   let lastAssistantAudioCount = 0;
   let lastAssistantTextCount = 0;
+
+  const getPlayer = () => {
+    if (player) {
+      return player;
+    }
+
+    player = createVoiceAudioPlayer({
+      get assistantAudio() {
+        return getVoice().assistantAudio;
+      },
+      subscribe: (subscriber) => {
+        subscribers.add(subscriber);
+        return () => {
+          subscribers.delete(subscriber);
+        };
+      },
+    });
+
+    return player;
+  };
+
+  const notifyAssistantOutput = () => {
+    for (const subscriber of subscribers) {
+      subscriber();
+    }
+  };
 
   const syncAssistantOutput = () => {
     const voice = getVoice();
@@ -277,6 +307,11 @@ export const createDemoBargeInEvidence = <TResult = unknown>(
 
     lastAssistantAudioCount = audioCount;
     lastAssistantTextCount = textCount;
+
+    if (audioCount > 0) {
+      notifyAssistantOutput();
+      void getPlayer().start().catch(() => {});
+    }
   };
 
   const sendAudio = (audio: Uint8Array | ArrayBuffer) => {
@@ -288,14 +323,21 @@ export const createDemoBargeInEvidence = <TResult = unknown>(
       (options.recentAssistantWindowMs ?? 4_000);
     const isSpeechLike = getPcmLevel(audio) >= (options.speechThreshold ?? 0.04);
 
-    if (isRecentAssistantOutput && isSpeechLike) {
+    if (isSpeechLike && player?.isPlaying) {
       monitor.recordRequested({
         reason: "manual-audio",
         sessionId: voice.sessionId,
       });
-      monitor.recordStopped({
-        latencyMs: 0,
-        playbackStopLatencyMs: 0,
+      void player.interrupt().then(() => {
+        monitor.recordStopped({
+          latencyMs: player?.lastInterruptLatencyMs,
+          playbackStopLatencyMs: player?.lastPlaybackStopLatencyMs,
+          reason: "manual-audio",
+          sessionId: voice.sessionId,
+        });
+      });
+    } else if (isRecentAssistantOutput && isSpeechLike) {
+      monitor.recordSkipped({
         reason: "manual-audio",
         sessionId: voice.sessionId,
       });
@@ -305,6 +347,11 @@ export const createDemoBargeInEvidence = <TResult = unknown>(
   };
 
   return {
+    close: () => {
+      void player?.close();
+      player = null;
+      subscribers.clear();
+    },
     getSnapshot: monitor.getSnapshot,
     sendAudio,
     subscribe: monitor.subscribe,
