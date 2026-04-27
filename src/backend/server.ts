@@ -1,5 +1,6 @@
 import { getEnv, networking, prepare } from "@absolutejs/absolute";
 import {
+  applyVoiceCampaignTelephonyOutcome,
   applyPhraseHintCorrections,
   assignVoiceOpsTask,
   completeVoiceOpsTask,
@@ -1097,6 +1098,23 @@ const telephonyWebhookIdempotencyStore =
 const campaignStore = createVoiceSQLiteCampaignStore({
   path: resolve(runtimeDirectory, "campaigns.sqlite"),
 });
+const recordCampaignTelephonyOutcome = (input: {
+  decision: Parameters<typeof applyVoiceCampaignTelephonyOutcome>[0]["decision"];
+  event: Parameters<typeof applyVoiceCampaignTelephonyOutcome>[0]["event"];
+  routeResult?: unknown;
+  sessionId?: string;
+}) =>
+  applyVoiceCampaignTelephonyOutcome(
+    {
+      decision: input.decision,
+      event: input.event,
+      routeResult: input.routeResult,
+      sessionId: input.sessionId,
+    },
+    {
+      store: campaignStore,
+    },
+  );
 
 const telephonyOutcomeSamples = [
   {
@@ -2263,9 +2281,13 @@ const server = new Elysia()
               idempotency: {
                 store: telephonyWebhookIdempotencyStore,
               },
-              onDecision: ({ decision }) => {
+              onDecision: async (input) => {
+                const { decision } = input;
+                const campaignOutcome =
+                  await recordCampaignTelephonyOutcome(input);
                 console.info("telnyx telephony outcome webhook", {
                   action: decision.action,
+                  campaignOutcome,
                   disposition: decision.disposition,
                   source: decision.source,
                 });
@@ -2308,9 +2330,13 @@ const server = new Elysia()
               idempotency: {
                 store: telephonyWebhookIdempotencyStore,
               },
-              onDecision: ({ decision }) => {
+              onDecision: async (input) => {
+                const { decision } = input;
+                const campaignOutcome =
+                  await recordCampaignTelephonyOutcome(input);
                 console.info("plivo telephony outcome webhook", {
                   action: decision.action,
+                  campaignOutcome,
                   disposition: decision.disposition,
                   source: decision.source,
                 });
@@ -2360,9 +2386,13 @@ const server = new Elysia()
               idempotency: {
                 store: telephonyWebhookIdempotencyStore,
               },
-              onDecision: ({ decision }) => {
+              onDecision: async (input) => {
+                const { decision } = input;
+                const campaignOutcome =
+                  await recordCampaignTelephonyOutcome(input);
                 console.info("telephony outcome webhook", {
                   action: decision.action,
+                  campaignOutcome,
                   disposition: decision.disposition,
                   source: decision.source,
                 });
