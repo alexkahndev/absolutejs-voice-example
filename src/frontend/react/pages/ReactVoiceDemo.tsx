@@ -1,12 +1,16 @@
 import { Head } from "@absolutejs/absolute/react/components";
 import { useEffect, useRef, useState } from "react";
 import type { VoiceTurnRecord } from "@absolutejs/voice";
-import { useVoiceStream } from "@absolutejs/voice/react";
+import {
+  useVoiceStream,
+  useVoiceWorkflowStatus,
+} from "@absolutejs/voice/react";
 import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoMicrophone,
   fetchSavedIntakes,
+  getWorkflowStatusLabel,
   formatErrorMessage,
   formatDateTime,
   pushVoiceWaveLevel,
@@ -93,6 +97,9 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
   const [savedIntakes, setSavedIntakes] = useState<SavedIntake[]>([]);
   const [waveLevels, setWaveLevels] = useState(createInitialVoiceWaveLevels);
   const currentVoice = activeMode === "general" ? generalVoice : guidedVoice;
+  const workflowStatus = useVoiceWorkflowStatus("/evals/scenarios/json", {
+    intervalMs: 5_000,
+  });
 
   useEffect(() => {
     const refresh = () => {
@@ -294,6 +301,34 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                   ))}
                 </select>
               </label>
+            </article>
+
+            <article
+              className={`voice-card voice-workflow-card ${
+                workflowStatus.report?.status === "fail" ? "is-failing" : ""
+              }`}
+            >
+              <span className="voice-framework-pill">Workflow Contracts</span>
+              <h2>{getWorkflowStatusLabel(workflowStatus.report)}</h2>
+              <p className="voice-footnote">
+                Live trace gates generated from the same contracts that validate
+                route results before completion, transfer, and handoff.
+              </p>
+              <div className="voice-workflow-summary">
+                <span className="pill">
+                  {workflowStatus.report?.passed ?? 0} passing
+                </span>
+                <span className="pill">
+                  {workflowStatus.report?.failed ?? 0} failing
+                </span>
+                <span className="pill">
+                  {workflowStatus.report?.total ?? 0} contracts
+                </span>
+              </div>
+              <p className="voice-footnote">
+                <a href="/evals/scenarios">Open live gates</a> ·{" "}
+                <a href="/evals/fixtures">Open certified fixtures</a>
+              </p>
             </article>
 
             <article className="voice-card voice-card-side">

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { useVoiceStream } from "@absolutejs/voice/vue";
+import { useVoiceStream, useVoiceWorkflowStatus } from "@absolutejs/voice/vue";
 import {
   FRAMEWORKS,
   FRAMEWORK_DESCRIPTIONS,
@@ -30,6 +30,7 @@ import {
   createVoiceWavePath,
   createDemoMicrophone,
   fetchSavedIntakes,
+  getWorkflowStatusLabel,
   formatErrorMessage,
   formatDateTime,
   pushVoiceWaveLevel,
@@ -42,6 +43,9 @@ const guidedVoice = useVoiceStream<SavedIntake>(
 const generalVoice = useVoiceStream<SavedIntake>(
   getVoiceRoutePath("general", modelProvider.value),
 );
+const workflowStatus = useVoiceWorkflowStatus("/evals/scenarios/json", {
+  intervalMs: 5_000,
+});
 const activeMode = ref<VoiceDemoMode | null>(null);
 const isCapturing = ref(false);
 const hasStartedModes = ref<Record<VoiceDemoMode, boolean>>({
@@ -144,7 +148,9 @@ const startMode = async (mode: VoiceDemoMode) => {
   await startMic();
 };
 
-const runCallControl = (action: (typeof VOICE_CALL_CONTROL_ACTIONS)[number]) => {
+const runCallControl = (
+  action: (typeof VOICE_CALL_CONTROL_ACTIONS)[number],
+) => {
   currentVoice.value.callControl(action);
   stopMic();
 };
@@ -256,6 +262,36 @@ onUnmounted(() => {
               </option>
             </select>
           </label>
+        </article>
+
+        <article
+          :class="[
+            'voice-card',
+            'voice-workflow-card',
+            workflowStatus.report.value?.status === 'fail' ? 'is-failing' : '',
+          ]"
+        >
+          <span class="voice-framework-pill">Workflow Contracts</span>
+          <h2>{{ getWorkflowStatusLabel(workflowStatus.report.value) }}</h2>
+          <p class="voice-footnote">
+            Live trace gates generated from the same contracts that validate
+            route results before completion, transfer, and handoff.
+          </p>
+          <div class="voice-workflow-summary">
+            <span class="pill"
+              >{{ workflowStatus.report.value?.passed ?? 0 }} passing</span
+            >
+            <span class="pill"
+              >{{ workflowStatus.report.value?.failed ?? 0 }} failing</span
+            >
+            <span class="pill"
+              >{{ workflowStatus.report.value?.total ?? 0 }} contracts</span
+            >
+          </div>
+          <p class="voice-footnote">
+            <a href="/evals/scenarios">Open live gates</a> ·
+            <a href="/evals/fixtures">Open certified fixtures</a>
+          </p>
         </article>
 
         <article class="voice-card voice-card-side">

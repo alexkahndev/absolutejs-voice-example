@@ -112,6 +112,26 @@
           </label>
         </article>
 
+        <article
+          class="voice-card voice-workflow-card"
+          id="workflow-status-card"
+        >
+          <span class="voice-framework-pill">Workflow Contracts</span>
+          <h2 id="workflow-status-label">Checking</h2>
+          <p class="voice-footnote">
+            Live trace gates generated from the same contracts that validate
+            route results before completion, transfer, and handoff.
+          </p>
+          <div
+            class="voice-workflow-summary"
+            id="workflow-status-summary"
+          ></div>
+          <p class="voice-footnote">
+            <a href="/evals/scenarios">Open live gates</a> ·
+            <a href="/evals/fixtures">Open certified fixtures</a>
+          </p>
+        </article>
+
         <article class="voice-card voice-card-side">
           <h2>Run the guided voice demo</h2>
           <ol class="voice-guide-list">
@@ -290,6 +310,32 @@
         const shell = document.querySelector("[data-voice-htmx]");
         const select = document.querySelector("#model-provider-select");
         const metric = document.querySelector("#metric-provider");
+        const workflowCard = document.querySelector("#workflow-status-card");
+        const workflowLabel = document.querySelector("#workflow-status-label");
+        const workflowSummary = document.querySelector(
+          "#workflow-status-summary",
+        );
+        const renderWorkflowStatus = async () => {
+          if (!workflowCard || !workflowLabel || !workflowSummary) return;
+          try {
+            const response = await fetch("/evals/scenarios/json");
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const report = await response.json();
+            workflowCard.classList.toggle(
+              "is-failing",
+              report.status === "fail",
+            );
+            workflowLabel.textContent =
+              report.status === "pass" ? "Passing" : "Needs live run";
+            workflowSummary.innerHTML = `<span class="pill">${report.passed ?? 0} passing</span>
+<span class="pill">${report.failed ?? 0} failing</span>
+<span class="pill">${report.total ?? 0} contracts</span>`;
+          } catch {
+            workflowCard.classList.add("is-failing");
+            workflowLabel.textContent = "Unavailable";
+            workflowSummary.innerHTML = `<span class="pill">Check /evals/scenarios</span>`;
+          }
+        };
         if (shell) {
           shell.dataset.voiceGuidedPath = `/voice/intake?scenarioId=guided&provider=${provider}`;
           shell.dataset.voiceGeneralPath = `/voice/intake?scenarioId=general&provider=${provider}`;
@@ -306,6 +352,8 @@
         if (metric) {
           metric.textContent = labels[provider] ?? provider;
         }
+        void renderWorkflowStatus();
+        window.setInterval(renderWorkflowStatus, 5000);
       })();
     </script>
     <script

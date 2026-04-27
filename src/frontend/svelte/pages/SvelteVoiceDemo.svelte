@@ -1,7 +1,10 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
   import Head from "@absolutejs/absolute/svelte/components/Head.js";
-  import { createVoiceStream } from "@absolutejs/voice/svelte";
+  import {
+    createVoiceStream,
+    createVoiceWorkflowStatus,
+  } from "@absolutejs/voice/svelte";
   import type { VoiceStream, VoiceStreamState } from "@absolutejs/voice";
   import {
     FRAMEWORKS,
@@ -32,9 +35,11 @@
     createVoiceWavePath,
     createDemoMicrophone,
     fetchSavedIntakes,
+    getWorkflowStatusLabel,
     formatErrorMessage,
     formatDateTime,
     pushVoiceWaveLevel,
+    type VoiceWorkflowStatusReport,
   } from "../../shared/browser";
 
   const createInitialVoiceState = (): VoiceStreamState<SavedIntake> => ({
@@ -62,6 +67,7 @@
   });
   let isCapturing = $state(false);
   let savedIntakes = $state<SavedIntake[]>([]);
+  let workflowReport = $state<VoiceWorkflowStatusReport | null>(null);
   let guidedState = $state(createInitialVoiceState());
   let generalState = $state(createInitialVoiceState());
   let waveLevels = $state(createInitialVoiceWaveLevels());
@@ -69,8 +75,12 @@
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
   let guidedVoice: VoiceStream<SavedIntake> | null = null;
   let generalVoice: VoiceStream<SavedIntake> | null = null;
+  const workflowStatus = createVoiceWorkflowStatus("/evals/scenarios/json", {
+    intervalMs: 5_000,
+  });
   let unsubscribeGuided = () => {};
   let unsubscribeGeneral = () => {};
+  let unsubscribeWorkflow = () => {};
   let currentVoice = $derived(
     activeMode === "general" ? generalState : guidedState,
   );
@@ -143,7 +153,9 @@
     await startMic();
   };
 
-  const runCallControl = (action: (typeof VOICE_CALL_CONTROL_ACTIONS)[number]) => {
+  const runCallControl = (
+    action: (typeof VOICE_CALL_CONTROL_ACTIONS)[number],
+  ) => {
     const activeVoice = activeMode === "general" ? generalVoice : guidedVoice;
     activeVoice?.callControl(action);
     stopMic();
@@ -187,6 +199,10 @@
 
   onMount(() => {
     connectVoices();
+    unsubscribeWorkflow = workflowStatus.subscribe(() => {
+      workflowReport = workflowStatus.getSnapshot().report ?? null;
+    });
+    void workflowStatus.refresh().catch(() => {});
     void refreshIntakes();
     refreshTimer = setInterval(() => {
       void refreshIntakes();
@@ -200,8 +216,10 @@
     stopMic();
     unsubscribeGuided();
     unsubscribeGeneral();
+    unsubscribeWorkflow();
     guidedVoice?.close();
     generalVoice?.close();
+    workflowStatus.close();
   });
 </script>
 
@@ -285,6 +303,26 @@
             {/each}
           </select>
         </label>
+      </article>
+
+      <article
+        class={`voice-card voice-workflow-card ${workflowReport?.status === "fail" ? "is-failing" : ""}`}
+      >
+        <span class="voice-framework-pill">Workflow Contracts</span>
+        <h2>{getWorkflowStatusLabel(workflowReport)}</h2>
+        <p class="voice-footnote">
+          Live trace gates generated from the same contracts that validate route
+          results before completion, transfer, and handoff.
+        </p>
+        <div class="voice-workflow-summary">
+          <span class="pill">{workflowReport?.passed ?? 0} passing</span>
+          <span class="pill">{workflowReport?.failed ?? 0} failing</span>
+          <span class="pill">{workflowReport?.total ?? 0} contracts</span>
+        </div>
+        <p class="voice-footnote">
+          <a href="/evals/scenarios">Open live gates</a> ·
+          <a href="/evals/fixtures">Open certified fixtures</a>
+        </p>
       </article>
 
       <article class="voice-card voice-card-side">

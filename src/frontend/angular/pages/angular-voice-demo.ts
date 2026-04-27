@@ -1,5 +1,8 @@
 import { Component, computed, inject, signal } from "@angular/core";
-import { VoiceStreamService } from "@absolutejs/voice/angular";
+import {
+  VoiceStreamService,
+  VoiceWorkflowStatusService,
+} from "@absolutejs/voice/angular";
 import {
   FRAMEWORK_DESCRIPTIONS,
   getInitialVoiceModelProvider,
@@ -28,6 +31,7 @@ import {
   createVoiceWavePath,
   createDemoMicrophone,
   fetchSavedIntakes,
+  getWorkflowStatusLabel,
   formatErrorMessage,
   formatDateTime,
   pushVoiceWaveLevel,
@@ -119,6 +123,33 @@ import {
                 }
               </select>
             </label>
+          </article>
+
+          <article
+            class="voice-card voice-workflow-card"
+            [class.is-failing]="workflowStatus.report()?.status === 'fail'"
+          >
+            <span class="voice-framework-pill">Workflow Contracts</span>
+            <h2>{{ getWorkflowStatusLabel(workflowStatus.report()) }}</h2>
+            <p class="voice-footnote">
+              Live trace gates generated from the same contracts that validate
+              route results before completion, transfer, and handoff.
+            </p>
+            <div class="voice-workflow-summary">
+              <span class="pill"
+                >{{ workflowStatus.report()?.passed ?? 0 }} passing</span
+              >
+              <span class="pill"
+                >{{ workflowStatus.report()?.failed ?? 0 }} failing</span
+              >
+              <span class="pill"
+                >{{ workflowStatus.report()?.total ?? 0 }} contracts</span
+              >
+            </div>
+            <p class="voice-footnote">
+              <a href="/evals/scenarios">Open live gates</a> ·
+              <a href="/evals/fixtures">Open certified fixtures</a>
+            </p>
           </article>
 
           <article class="voice-card voice-card-side">
@@ -372,6 +403,7 @@ export class AngularVoiceDemoComponent {
   modelProviders = VOICE_MODEL_PROVIDERS;
   callControlActions = VOICE_CALL_CONTROL_ACTIONS;
   getVoiceProviderLabel = getVoiceProviderLabel;
+  getWorkflowStatusLabel = getWorkflowStatusLabel;
   hasStartedModes = signal<Record<VoiceDemoMode, boolean>>({
     general: false,
     guided: false,
@@ -390,6 +422,12 @@ export class AngularVoiceDemoComponent {
   );
   generalVoice = inject(VoiceStreamService).connect<SavedIntake>(
     getVoiceRoutePath("general", this.modelProvider()),
+  );
+  workflowStatus = inject(VoiceWorkflowStatusService).connect(
+    "/evals/scenarios/json",
+    {
+      intervalMs: 5_000,
+    },
   );
   currentVoice = computed(() =>
     this.activeMode() === "general" ? this.generalVoice : this.guidedVoice,
@@ -506,6 +544,7 @@ export class AngularVoiceDemoComponent {
     this.stopMic();
     this.guidedVoice.close();
     this.generalVoice.close();
+    this.workflowStatus.close();
   }
 }
 

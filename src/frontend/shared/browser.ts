@@ -1,6 +1,13 @@
 import { createMicrophoneCapture } from "@absolutejs/voice/client";
 import type { SavedIntake } from "../../shared/demo";
 
+export type VoiceWorkflowStatusReport = {
+  failed: number;
+  passed: number;
+  status: "pass" | "fail";
+  total: number;
+};
+
 const VOICE_WAVE_POINTS = 48;
 const VOICE_WAVE_WIDTH = 320;
 const VOICE_WAVE_HEIGHT = 88;
@@ -57,6 +64,26 @@ export const fetchSavedIntakes = async () => {
   }
 
   return (await response.json()) as SavedIntake[];
+};
+
+export const fetchWorkflowStatus = async () => {
+  const response = await fetch("/evals/scenarios/json");
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return (await response.json()) as VoiceWorkflowStatusReport;
+};
+
+export const getWorkflowStatusLabel = (
+  report?: VoiceWorkflowStatusReport | null,
+) => {
+  if (!report) {
+    return "Checking";
+  }
+
+  return report.status === "pass" ? "Passing" : "Needs live run";
 };
 
 export const formatDateTime = (value: number) =>
