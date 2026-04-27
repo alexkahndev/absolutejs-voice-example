@@ -5,6 +5,7 @@ type EndpointName =
   | "bargeIn"
   | "carriers"
   | "handoffs"
+  | "liveLatency"
   | "productionReadiness"
   | "providerCapabilities"
   | "turnLatency"
@@ -135,6 +136,30 @@ const endpoints: Array<{
       return {
         averageTotalMs: report.averageTotalMs,
         failed: report.failed,
+        status: report.status,
+        total: report.total,
+        warnings: report.warnings,
+      };
+    },
+  },
+  {
+    name: "liveLatency",
+    path: "/api/live-latency",
+    summarize: (body) => {
+      const report = body as {
+        averageLatencyMs?: unknown;
+        failed?: unknown;
+        p50LatencyMs?: unknown;
+        p95LatencyMs?: unknown;
+        status?: unknown;
+        total?: unknown;
+        warnings?: unknown;
+      };
+      return {
+        averageLatencyMs: report.averageLatencyMs,
+        failed: report.failed,
+        p50LatencyMs: report.p50LatencyMs,
+        p95LatencyMs: report.p95LatencyMs,
         status: report.status,
         total: report.total,
         warnings: report.warnings,

@@ -29,6 +29,7 @@ import {
   createTwilioVoiceRoutes,
   createVoiceToolContractRoutes,
   createVoiceToolRuntimeContractDefaults,
+  createVoiceLiveLatencyRoutes,
   createVoiceTurnLatencyRoutes,
   createVoiceTurnQualityRoutes,
   createVoiceWorkflowContractHandler,
@@ -1265,6 +1266,13 @@ const appKitLinks = [
   },
   {
     description:
+      "Browser-measured speech-to-assistant response p50/p95 over recent live calls.",
+    href: "/live-latency",
+    label: "Live Latency",
+    statusHref: "/api/live-latency",
+  },
+  {
+    description:
       "Per-turn STT confidence, fallback, correction, and transcript diagnostics.",
     href: "/turn-quality",
     label: "Turn Quality",
@@ -2133,6 +2141,14 @@ const server = new Elysia()
   )
   .post("/api/turn-latency/proof", () => seedTurnLatencyProof())
   .post("/api/live-turn-latency", ({ body }) => storeLiveTurnLatencyTrace(body))
+  .use(
+    createVoiceLiveLatencyRoutes({
+      htmlPath: "/live-latency",
+      path: "/api/live-latency",
+      store: runtimeStorage.traces,
+      title: "AbsoluteJS Voice Demo Live Latency",
+    }),
+  )
   .use(
     createVoiceTurnLatencyRoutes({
       htmlPath: "/turn-latency",
