@@ -5,6 +5,7 @@ import {
   completeVoiceOpsTask,
   createAnthropicVoiceAssistantModel,
   createGeminiVoiceAssistantModel,
+  createVoiceDiagnosticsRoutes,
   createVoiceAssistant,
   createVoiceAgentTool,
   createVoiceExperiment,
@@ -1052,6 +1053,12 @@ const server = new Elysia()
           sttProviderFailureSimulator.run(provider as VoiceSTTProvider, mode),
       },
       store: runtimeStorage.traces,
+    }),
+  )
+  .use(
+    createVoiceDiagnosticsRoutes({
+      store: runtimeStorage.traces,
+      title: "AbsoluteJS Voice Demo Diagnostics",
     }),
   )
   .use(
