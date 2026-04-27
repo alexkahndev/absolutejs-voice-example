@@ -428,7 +428,7 @@ export const renderVoiceOpsPage = (
         <div class="pill status-done">Done ${summary.done}</div>
         <div class="pill status-open">SLA breached ${summary.breached}</div>
       </div>
-      <p><a href="/reviews">Back to reviews</a></p>
+      <p><a href="/sessions">Sessions</a> · <a href="/reviews">Back to reviews</a></p>
     </section>
     <section>
       <h2>Dashboard</h2>

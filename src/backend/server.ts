@@ -14,12 +14,15 @@ import {
   createVoiceAssistantHealthRoutes,
   createVoiceProviderHealthRoutes,
   createVoiceProviderRouter,
+  createVoiceSessionListRoutes,
   createVoiceSessionReplayRoutes,
   createVoiceTaskUpdatedEvent,
   reopenVoiceOpsTask,
+  renderVoiceSessionsHTML,
   startVoiceOpsTask,
   summarizeVoiceAssistantRuns,
   summarizeVoiceProviderHealth,
+  summarizeVoiceSessions,
   type VoiceCallReviewStore,
   type VoiceAssistantMemoryRecord,
   type VoiceAgentModel,
@@ -757,6 +760,11 @@ const server = new Elysia()
       store: runtimeStorage.traces,
     }),
   )
+  .use(
+    createVoiceSessionListRoutes({
+      store: runtimeStorage.traces,
+    }),
+  )
   .get("/api/intakes", () => listIntakes())
   .get("/api/assistant-config", () => assistantConfig)
   .get("/api/assistant-summary", async () => summarizeAssistantRuns())
@@ -870,6 +878,53 @@ const server = new Elysia()
           await listIntegrationEvents(),
           webhookUrl,
         ),
+        {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+          },
+        },
+      ),
+  )
+  .get(
+    "/sessions",
+    async () =>
+      new Response(
+        `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AbsoluteJS Voice Sessions</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { background: #0b0d10; color: #f4f4f5; font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 24px; }
+    main { max-width: 1080px; margin: 0 auto; display: grid; gap: 16px; }
+    section, article { background: #13161b; border: 1px solid #232833; border-radius: 18px; padding: 20px; }
+    .voice-sessions-list { display: grid; gap: 14px; }
+    .voice-session-card { background: #0f1217; border: 1px solid #232833; border-radius: 16px; padding: 16px; }
+    .voice-session-card.failed { border-color: rgba(239, 68, 68, 0.7); }
+    .voice-session-card.healthy { border-color: rgba(34, 197, 94, 0.5); }
+    .voice-session-card-header { align-items: center; display: flex; gap: 8px; justify-content: space-between; margin-bottom: 12px; }
+    dl { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin: 0; }
+    dl div { background: #13161b; border: 1px solid #232833; border-radius: 12px; padding: 10px; }
+    dt { color: #a1a1aa; }
+    dd { margin: 4px 0 0; font-weight: 700; }
+    a { color: #f59e0b; }
+  </style>
+</head>
+<body>
+  <main>
+    <section>
+      <h1>Voice sessions</h1>
+      <p>Searchable trace-backed sessions with direct replay links.</p>
+      <p><a href="/assistant">Assistant control plane</a> · <a href="/reviews">Reviews</a> · <a href="/tasks">Tasks</a></p>
+    </section>
+    <section>
+      ${renderVoiceSessionsHTML(await summarizeVoiceSessions({ store: runtimeStorage.traces }))}
+    </section>
+  </main>
+</body>
+</html>`,
         {
           headers: {
             "Content-Type": "text/html; charset=utf-8",
