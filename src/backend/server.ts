@@ -308,6 +308,23 @@ const configuredSTTProviders: VoiceSTTProvider[] = [
   "deepgram",
   assemblyAIApiKey ? "assemblyai" : undefined,
 ].filter(Boolean) as VoiceSTTProvider[];
+const selectedSTTProvider: VoiceSTTProvider = "deepgram";
+const voiceProviderModels = {
+  anthropic: process.env.ANTHROPIC_VOICE_MODEL ?? "claude-sonnet-4-5",
+  assemblyai: process.env.ASSEMBLYAI_SPEECH_MODEL ?? "u3-rt-pro",
+  deepgram: "flux-general-en",
+  deterministic: "local deterministic support model",
+  gemini: process.env.GEMINI_VOICE_MODEL ?? "gemini-2.5-flash",
+  openai: process.env.OPENAI_VOICE_MODEL ?? "gpt-4.1-mini",
+} satisfies Record<VoiceModelProvider | VoiceSTTProvider, string>;
+const voiceProviderFeatures = {
+  anthropic: ["tool calling", "JSON result shaping", "fallback routing"],
+  assemblyai: ["realtime STT", "turn formatting", "fallback STT"],
+  deepgram: ["Flux realtime STT", "VAD events", "smart formatting"],
+  deterministic: ["offline demo mode", "zero external dependency"],
+  gemini: ["tool calling", "JSON result shaping", "fallback routing"],
+  openai: ["tool calling", "JSON result shaping", "fallback routing"],
+} satisfies Record<VoiceModelProvider | VoiceSTTProvider, string[]>;
 const resolveModelProvider = () => {
   if (
     requestedModelProvider === "openai" ||
@@ -918,6 +935,13 @@ const appKitLinks = [
   },
   {
     description:
+      "Configured, selected, and healthy LLM/STT providers for this deployment.",
+    href: "/provider-capabilities",
+    label: "Provider Capabilities",
+    statusHref: "/api/provider-capabilities",
+  },
+  {
+    description:
       "Primitive-mounted assistant tool contracts for deterministic tool behavior.",
     href: "/tool-contracts",
     label: "Tool Contracts",
@@ -1368,6 +1392,14 @@ const server = new Elysia()
       handoffs: {},
       links: appKitLinks,
       llmProviders: configuredModelProviders,
+      providerCapabilities: {
+        features: voiceProviderFeatures,
+        models: voiceProviderModels,
+        selected: {
+          llm: modelProvider,
+          stt: selectedSTTProvider,
+        },
+      },
       providerHealth: {},
       resilience: {
         sttSimulation: {
