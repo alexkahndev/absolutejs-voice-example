@@ -20,6 +20,7 @@ import {
   createVoiceProviderRouter,
   createVoiceRoutingDecisionSummary,
   createVoiceSTTProviderRouter,
+  createVoiceTTSProviderRouter,
   createVoiceTaskUpdatedEvent,
   createVoiceTelephonyCarrierMatrixRoutes,
   createVoiceTelephonyOutcomePolicy,
@@ -48,6 +49,8 @@ import {
   summarizeVoiceSessions,
   type STTAdapter,
   type StoredVoiceHandoffDelivery,
+  type TTSAdapter,
+  type TTSAdapterSession,
   type VoiceCallReviewStore,
   type VoiceAssistantMemoryRecord,
   type VoiceAgentModel,
@@ -338,7 +341,71 @@ const voiceProviderModels = {
   gemini: process.env.GEMINI_VOICE_MODEL ?? "gemini-2.5-flash",
   openai: process.env.OPENAI_VOICE_MODEL ?? "gpt-4.1-mini",
 } satisfies Record<VoiceModelProvider | VoiceSTTProvider, string>;
-const telephonyTTS = openAIApiKey
+type VoiceTTSProvider = "openai" | "emergency";
+const createEmergencyTelephonyTTS = (): TTSAdapter => ({
+  kind: "tts",
+  open: (): TTSAdapterSession => {
+    const listeners = {
+      audio: new Set<
+        (payload: {
+          chunk: Uint8Array;
+          format: {
+            channels: 1;
+            container: "raw";
+            encoding: "pcm_s16le";
+            sampleRateHz: number;
+          };
+          receivedAt: number;
+          type: "audio";
+        }) => void
+      >(),
+      close: new Set<(payload: { reason?: string; type: "close" }) => void>(),
+      error: new Set<
+        (payload: { error: Error; recoverable: boolean; type: "error" }) => void
+      >(),
+    };
+
+    return {
+      close: async (reason?: string) => {
+        for (const handler of listeners.close) {
+          handler({ reason, type: "close" });
+        }
+      },
+      on: (event, handler) => {
+        (listeners[event] as Set<typeof handler>).add(handler as never);
+        return () => {
+          (listeners[event] as Set<typeof handler>).delete(handler as never);
+        };
+      },
+      send: async () => {
+        const sampleRateHz = 16_000;
+        const durationMs = 500;
+        const samples = Math.floor((sampleRateHz * durationMs) / 1_000);
+        const chunk = new Uint8Array(samples * 2);
+        const view = new DataView(chunk.buffer);
+        for (let index = 0; index < samples; index += 1) {
+          const envelope = Math.sin((Math.PI * index) / samples);
+          const tone = Math.sin((2 * Math.PI * 660 * index) / sampleRateHz);
+          view.setInt16(index * 2, Math.round(tone * envelope * 5_000), true);
+        }
+        for (const handler of listeners.audio) {
+          handler({
+            chunk,
+            format: {
+              channels: 1,
+              container: "raw",
+              encoding: "pcm_s16le",
+              sampleRateHz,
+            },
+            receivedAt: Date.now(),
+            type: "audio",
+          });
+        }
+      },
+    };
+  },
+});
+const openAITelephonyTTS = openAIApiKey
   ? createOpenAIVoiceTTS({
       apiKey: openAIApiKey,
       instructions:
@@ -347,6 +414,46 @@ const telephonyTTS = openAIApiKey
       voice: process.env.OPENAI_TTS_VOICE ?? "marin",
     })
   : undefined;
+const telephonyTTS = createVoiceTTSProviderRouter<VoiceTTSProvider>({
+  adapters: {
+    ...(openAITelephonyTTS ? { openai: openAITelephonyTTS } : {}),
+    emergency: createEmergencyTelephonyTTS(),
+  },
+  fallback: openAITelephonyTTS ? ["openai", "emergency"] : ["emergency"],
+  onProviderEvent: async (event, input) => {
+    await runtimeStorage.traces.append({
+      at: event.at,
+      payload: {
+        ...event,
+        providerStatus: event.status,
+      },
+      sessionId: input.sessionId,
+      type: "session.error",
+    });
+  },
+  policy: "ordered",
+  providerHealth: {
+    cooldownMs: 30_000,
+    failureThreshold: 1,
+  },
+  providerProfiles: {
+    emergency: {
+      cost: 0,
+      latencyMs: 5,
+      priority: 2,
+      quality: 0.2,
+      timeoutMs: 500,
+    },
+    openai: {
+      cost: 2,
+      latencyMs: 500,
+      priority: 1,
+      quality: 0.9,
+      timeoutMs: readPositiveNumberEnv("VOICE_OPENAI_TTS_TIMEOUT_MS", 6_000),
+    },
+  },
+  selectProvider: () => (openAITelephonyTTS ? "openai" : "emergency"),
+});
 const voiceProviderFeatures = {
   anthropic: ["tool calling", "JSON result shaping", "fallback routing"],
   assemblyai: ["realtime STT", "turn formatting", "fallback STT"],

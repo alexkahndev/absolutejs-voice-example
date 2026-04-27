@@ -4,11 +4,14 @@ import {
   createTelnyxMediaStreamBridge,
   createTwilioMediaStreamBridge,
   createVoiceMemoryStore,
+  createVoiceTTSProviderRouter,
   encodeTwilioMulawBase64,
   type AudioChunk,
   type STTAdapter,
   type STTAdapterOpenOptions,
   type STTAdapterSession,
+  type TTSAdapter,
+  type TTSAdapterSession,
   type Transcript,
 } from "@absolutejs/voice";
 
@@ -32,6 +35,8 @@ type BridgeOptions = Parameters<typeof createTwilioMediaStreamBridge>[1];
 const timeoutMs = Number(process.env.TELEPHONY_TTS_SMOKE_TIMEOUT_MS ?? 20_000);
 const shouldSkipWithoutOpenAI =
   process.env.TELEPHONY_TTS_SMOKE_REQUIRE_OPENAI !== "false";
+const forceFallback = process.env.TELEPHONY_TTS_SMOKE_FORCE_FALLBACK === "true";
+const ttsEvents: Array<{ provider?: string; status?: string }> = [];
 
 if (shouldSkipWithoutOpenAI && !process.env.OPENAI_API_KEY) {
   console.log(
@@ -131,18 +136,79 @@ const createSmokeSTTAdapter = (): STTAdapter => ({
   },
 });
 
-const createBridgeOptions = (): BridgeOptions => ({
-  context: {},
-  onComplete: async () => {},
-  onTurn: async () => ({
-    assistantText: "Confirmed. Phone audio is working.",
-  }),
-  session: createVoiceMemoryStore(),
-  stt: createSmokeSTTAdapter(),
-  tts: createOpenAIVoiceTTS({
+const createEmergencyTTS = (): TTSAdapter => ({
+  kind: "tts",
+  open: (): TTSAdapterSession => {
+    const listeners = {
+      audio: new Set<
+        (payload: {
+          chunk: Uint8Array;
+          format: {
+            channels: 1;
+            container: "raw";
+            encoding: "pcm_s16le";
+            sampleRateHz: number;
+          };
+          receivedAt: number;
+          type: "audio";
+        }) => void
+      >(),
+      close: new Set<(payload: { reason?: string; type: "close" }) => void>(),
+      error: new Set<
+        (payload: { error: Error; recoverable: boolean; type: "error" }) => void
+      >(),
+    };
+
+    return {
+      close: async (reason?: string) => {
+        for (const handler of listeners.close) {
+          handler({ reason, type: "close" });
+        }
+      },
+      on: (event, handler) => {
+        (listeners[event] as Set<typeof handler>).add(handler as never);
+        return () => {
+          (listeners[event] as Set<typeof handler>).delete(handler as never);
+        };
+      },
+      send: async () => {
+        const sampleRateHz = 16_000;
+        const samples = 4_000;
+        const chunk = new Uint8Array(samples * 2);
+        const view = new DataView(chunk.buffer);
+        for (let index = 0; index < samples; index += 1) {
+          const envelope = Math.sin((Math.PI * index) / samples);
+          const tone = Math.sin((2 * Math.PI * 660 * index) / sampleRateHz);
+          view.setInt16(index * 2, Math.round(tone * envelope * 5_000), true);
+        }
+        for (const handler of listeners.audio) {
+          handler({
+            chunk,
+            format: {
+              channels: 1,
+              container: "raw",
+              encoding: "pcm_s16le",
+              sampleRateHz,
+            },
+            receivedAt: Date.now(),
+            type: "audio",
+          });
+        }
+      },
+    };
+  },
+});
+
+const createOpenAITTSForSmoke = () =>
+  createOpenAIVoiceTTS({
     apiKey: process.env.OPENAI_API_KEY ?? "test-key",
-    fetch:
-      process.env.OPENAI_API_KEY || process.env.TELEPHONY_TTS_SMOKE_REQUIRE_OPENAI !== "false"
+    fetch: forceFallback
+      ? (((async () =>
+          new Response(JSON.stringify({ error: "forced fallback" }), {
+            status: 503,
+          })) as unknown) as typeof fetch)
+      : process.env.OPENAI_API_KEY ||
+          process.env.TELEPHONY_TTS_SMOKE_REQUIRE_OPENAI !== "false"
         ? undefined
         : (((async () =>
             new Response(new Uint8Array([0, 0, 32, 0, 224, 255, 0, 0]), {
@@ -155,6 +221,34 @@ const createBridgeOptions = (): BridgeOptions => ({
       "Speak like a concise phone support agent. Keep the response clear.",
     model: process.env.OPENAI_TTS_MODEL ?? "gpt-4o-mini-tts",
     voice: process.env.OPENAI_TTS_VOICE ?? "marin",
+  });
+
+const createBridgeOptions = (): BridgeOptions => ({
+  context: {},
+  onComplete: async () => {},
+  onTurn: async () => ({
+    assistantText: "Confirmed. Phone audio is working.",
+  }),
+  session: createVoiceMemoryStore(),
+  stt: createSmokeSTTAdapter(),
+  tts: createVoiceTTSProviderRouter<"openai" | "emergency">({
+    adapters: {
+      emergency: createEmergencyTTS(),
+      openai: createOpenAITTSForSmoke(),
+    },
+    fallback: ["openai", "emergency"],
+    onProviderEvent: (event) => {
+      ttsEvents.push({
+        provider: event.provider,
+        status: event.status,
+      });
+    },
+    policy: "ordered",
+    providerHealth: {
+      cooldownMs: 100,
+      failureThreshold: 1,
+    },
+    selectProvider: () => "openai",
   }),
   turnDetection: {
     transcriptStabilityMs: 0,
@@ -297,13 +391,20 @@ const results = settled.map((result, index) =>
       },
 );
 const ok = results.every((result) => result.ok);
+const ttsSummary = ttsEvents.reduce<Record<string, number>>((summary, event) => {
+  const key = [event.provider ?? "unknown", event.status ?? "unknown"].join(":");
+  summary[key] = (summary[key] ?? 0) + 1;
+  return summary;
+}, {});
 
 console.log(
   JSON.stringify(
     {
       mode: process.env.OPENAI_API_KEY ? "live-openai" : "mock-openai",
+      forcedFallback: forceFallback,
       ok,
       results,
+      ttsSummary,
     },
     null,
     2,
