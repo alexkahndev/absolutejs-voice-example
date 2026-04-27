@@ -458,6 +458,136 @@ nav a.active {
   margin: 12px 0 0;
 }
 
+.voice-provider-health-card {
+  border-color: rgba(59, 130, 246, 0.3);
+  grid-column: span 4;
+}
+
+.voice-provider-health-card.absolute-voice-provider-status,
+.voice-provider-health-card .absolute-voice-provider-status {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: inherit;
+  font-family: inherit;
+  padding: 0;
+}
+
+.absolute-voice-provider-status__header,
+.absolute-voice-provider-status__provider header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.absolute-voice-provider-status__eyebrow {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: #93c5fd;
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 6px 10px;
+  text-transform: uppercase;
+}
+
+.absolute-voice-provider-status__label {
+  color: var(--text);
+  font-family: var(--display-font);
+  font-size: clamp(2rem, 5vw, 4rem);
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+}
+
+.absolute-voice-provider-status__description,
+.absolute-voice-provider-status__provider p,
+.absolute-voice-provider-status__provider dt,
+.absolute-voice-provider-status__empty {
+  color: var(--muted);
+}
+
+.absolute-voice-provider-status__description,
+.absolute-voice-provider-status__empty {
+  margin: 14px 0 0;
+}
+
+.absolute-voice-provider-status__providers,
+.voice-provider-health-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.absolute-voice-provider-status__provider,
+.voice-provider-health-item {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 12px;
+}
+
+.absolute-voice-provider-status__provider--degraded,
+.absolute-voice-provider-status__provider--rate-limited,
+.absolute-voice-provider-status__provider--suppressed {
+  border-color: rgba(248, 113, 113, 0.48);
+}
+
+.absolute-voice-provider-status__provider--recoverable {
+  border-color: rgba(245, 158, 11, 0.48);
+}
+
+.absolute-voice-provider-status__provider p {
+  margin: 10px 0;
+}
+
+.absolute-voice-provider-status__provider dl {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.absolute-voice-provider-status__provider dl div {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.absolute-voice-provider-status__provider dt {
+  font-size: 0.78rem;
+}
+
+.absolute-voice-provider-status__provider dd {
+  color: var(--ink);
+  font-weight: 800;
+  margin: 4px 0 0;
+}
+
+.voice-provider-health-item {
+  display: grid;
+  gap: 6px;
+}
+
+.voice-provider-health-item strong {
+  color: var(--ink);
+}
+
+.voice-provider-health-item span,
+.voice-provider-health-item small {
+  color: var(--muted);
+}
+
+.absolute-voice-provider-status__error {
+  color: #fca5a5;
+  font-weight: 800;
+  margin: 12px 0 0;
+}
+
 .voice-assistant-config {
   background:
     radial-gradient(

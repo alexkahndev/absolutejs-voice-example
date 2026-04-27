@@ -3,6 +3,7 @@
   import Head from "@absolutejs/absolute/svelte/components/Head.js";
   import {
     createVoiceOpsStatus,
+    createVoiceProviderStatus,
     createVoiceRoutingStatus,
     createVoiceStream,
   } from "@absolutejs/voice/svelte";
@@ -73,6 +74,7 @@
   let isCapturing = $state(false);
   let savedIntakes = $state<SavedIntake[]>([]);
   let opsStatusHTML = $state("");
+  let providerStatusHTML = $state("");
   let routingStatusHTML = $state("");
   let guidedState = $state(createInitialVoiceState());
   let generalState = $state(createInitialVoiceState());
@@ -84,12 +86,16 @@
   const opsStatus = createVoiceOpsStatus("/app-kit/status", {
     intervalMs: 5_000,
   });
+  const providerStatus = createVoiceProviderStatus("/api/provider-status", {
+    intervalMs: 5_000,
+  });
   const routingStatus = createVoiceRoutingStatus("/api/routing/latest", {
     intervalMs: 4_000,
   });
   let unsubscribeGuided = () => {};
   let unsubscribeGeneral = () => {};
   let unsubscribeOpsStatus = () => {};
+  let unsubscribeProviderStatus = () => {};
   let unsubscribeRoutingStatus = () => {};
   let currentVoice = $derived(
     activeMode === "general" ? generalState : guidedState,
@@ -227,12 +233,17 @@
     unsubscribeOpsStatus = opsStatus.subscribe(() => {
       opsStatusHTML = opsStatus.getHTML();
     });
+    unsubscribeProviderStatus = providerStatus.subscribe(() => {
+      providerStatusHTML = providerStatus.getHTML();
+    });
     unsubscribeRoutingStatus = routingStatus.subscribe(() => {
       routingStatusHTML = routingStatus.getHTML();
     });
     opsStatusHTML = opsStatus.getHTML();
+    providerStatusHTML = providerStatus.getHTML();
     routingStatusHTML = routingStatus.getHTML();
     void opsStatus.refresh().catch(() => {});
+    void providerStatus.refresh().catch(() => {});
     void routingStatus.refresh().catch(() => {});
     void refreshIntakes();
     refreshTimer = setInterval(() => {
@@ -248,10 +259,12 @@
     unsubscribeGuided();
     unsubscribeGeneral();
     unsubscribeOpsStatus();
+    unsubscribeProviderStatus();
     unsubscribeRoutingStatus();
     guidedVoice?.close();
     generalVoice?.close();
     opsStatus.close();
+    providerStatus.close();
     routingStatus.close();
   });
 </script>
@@ -358,6 +371,10 @@
 
       <div class="voice-card voice-routing-card voice-routing-status-host">
         {@html routingStatusHTML}
+      </div>
+
+      <div class="voice-card voice-provider-health-card voice-provider-status-host">
+        {@html providerStatusHTML}
       </div>
 
       <div class="voice-card voice-workflow-card voice-ops-status-host">

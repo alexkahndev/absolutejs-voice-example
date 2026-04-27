@@ -1,6 +1,7 @@
 import { Component, computed, inject, signal } from "@angular/core";
 import {
   VoiceAppKitStatusService,
+  VoiceProviderStatusService,
   VoiceRoutingStatusService,
   VoiceStreamService,
 } from "@absolutejs/voice/angular";
@@ -201,6 +202,36 @@ import {
               <p class="empty-copy">
                 Start a voice session to see the selected STT provider.
               </p>
+            }
+          </article>
+
+          <article class="voice-card voice-provider-health-card">
+            <span class="voice-framework-pill">Provider Health</span>
+            <h2>
+              {{
+                providerStatus.providers().length
+                  ? providerStatus.providers().length + " tracked"
+                  : "Checking providers"
+              }}
+            </h2>
+            <p class="voice-footnote">
+              Live model provider health, fallback counts, and cooldown state.
+            </p>
+            @if (providerStatus.providers().length) {
+              <div class="voice-provider-health-list">
+                @for (provider of providerStatus.providers(); track provider.provider) {
+                  <div class="voice-provider-health-item">
+                    <strong>{{ provider.provider }}</strong>
+                    <span>{{ provider.status }}</span>
+                    <small>
+                      {{ provider.runCount }} runs · {{ provider.errorCount }}
+                      errors · {{ provider.fallbackCount }} fallbacks
+                    </small>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="empty-copy">Run assistant traffic to see provider health.</p>
             }
           </article>
 
@@ -508,6 +539,12 @@ export class AngularVoiceDemoComponent {
   appKitStatus = inject(VoiceAppKitStatusService).connect("/app-kit/status", {
     intervalMs: 5_000,
   });
+  providerStatus = inject(VoiceProviderStatusService).connect(
+    "/api/provider-status",
+    {
+      intervalMs: 5_000,
+    },
+  );
   routingStatus = inject(VoiceRoutingStatusService).connect(
     "/api/routing/latest",
     {
@@ -643,6 +680,7 @@ export class AngularVoiceDemoComponent {
     this.guidedVoice.close();
     this.generalVoice.close();
     this.appKitStatus.close();
+    this.providerStatus.close();
     this.routingStatus.close();
   }
 }

@@ -1,6 +1,7 @@
 import {
   createVoiceStream,
   mountVoiceOpsStatus,
+  mountVoiceProviderStatus,
   mountVoiceRoutingStatus,
 } from "@absolutejs/voice/client";
 import {
@@ -73,6 +74,7 @@ const voiceMonitorCopy = document.querySelector("#voice-monitor-copy");
 const voiceWaveGlow = document.querySelector("#voice-wave-glow");
 const voiceWavePath = document.querySelector("#voice-wave-path");
 const workflowStatusHost = document.querySelector("#workflow-status-card");
+const providerStatusHost = document.querySelector("#provider-status-card");
 const routingModeCopy = document.querySelector("#routing-mode-copy");
 const routingDecisionRoot = document.querySelector("#routing-decision");
 const routingModeMetric = document.querySelector("#metric-routing");
@@ -100,6 +102,7 @@ if (
   !(voiceWaveGlow instanceof SVGPathElement) ||
   !(voiceWavePath instanceof SVGPathElement) ||
   !(workflowStatusHost instanceof HTMLElement) ||
+  !(providerStatusHost instanceof HTMLElement) ||
   !(routingModeCopy instanceof HTMLElement) ||
   !(routingDecisionRoot instanceof HTMLElement) ||
   !(routingModeMetric instanceof HTMLElement) ||
@@ -122,6 +125,13 @@ const generalVoice = createVoiceStream<SavedIntake>(
 const opsStatus = mountVoiceOpsStatus(workflowStatusHost, "/app-kit/status", {
   intervalMs: 5_000,
 });
+const providerStatus = mountVoiceProviderStatus(
+  providerStatusHost,
+  "/api/provider-status",
+  {
+    intervalMs: 5_000,
+  },
+);
 const routingStatus = mountVoiceRoutingStatus(
   routingDecisionRoot,
   "/api/routing/latest",
@@ -387,5 +397,6 @@ render();
 void renderSavedIntakes();
 window.addEventListener("beforeunload", () => {
   opsStatus.close();
+  providerStatus.close();
   routingStatus.close();
 });

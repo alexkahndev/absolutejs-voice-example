@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import {
   useVoiceStream,
   VoiceOpsStatus,
+  VoiceProviderStatus,
   VoiceRoutingStatus,
 } from "@absolutejs/voice/vue";
 import {
@@ -312,6 +313,11 @@ onUnmounted(() => {
         <VoiceRoutingStatus
           class="voice-card voice-routing-card"
           :interval-ms="4000"
+        />
+
+        <VoiceProviderStatus
+          class="voice-card voice-provider-health-card"
+          :interval-ms="5000"
         />
 
         <VoiceOpsStatus
