@@ -19,6 +19,7 @@ import {
   VOICE_DEMO_MIC_IDLE,
   VOICE_DEMO_MIC_LIVE,
   VOICE_DEMO_STOP_LABEL,
+  VOICE_CALL_CONTROL_ACTIONS,
   VOICE_MODEL_PROVIDERS,
   type VoiceDemoMode,
   type VoiceModelProvider,
@@ -79,6 +80,12 @@ const leadMessage = computed(() =>
     turnCount: currentVoice.value.turns.value.length,
   }),
 );
+const callLifecycleLabel = computed(() => {
+  const call = currentVoice.value.call.value;
+  return call?.disposition
+    ? `${call.disposition} after ${call.events.length} lifecycle event${call.events.length === 1 ? "" : "s"}`
+    : (call?.events.at(-1)?.type ?? "Not started");
+});
 
 const refreshIntakes = async () => {
   savedIntakes.value = await fetchSavedIntakes();
@@ -135,6 +142,11 @@ const startMode = async (mode: VoiceDemoMode) => {
     [mode]: true,
   };
   await startMic();
+};
+
+const runCallControl = (action: (typeof VOICE_CALL_CONTROL_ACTIONS)[number]) => {
+  currentVoice.value.callControl(action);
+  stopMic();
 };
 
 onMounted(() => {
@@ -339,6 +351,10 @@ onUnmounted(() => {
               <span class="label">Errors</span>
               <span class="value">{{ errorMessage }}</span>
             </div>
+            <div class="status-row">
+              <span class="label">Call lifecycle</span>
+              <span class="value">{{ callLifecycleLabel }}</span>
+            </div>
           </div>
           <div class="voice-chat-list">
             <article class="voice-chat-message assistant">
@@ -406,6 +422,16 @@ onUnmounted(() => {
                 {{ VOICE_DEMO_GENERAL_LABEL }}
               </button>
             </template>
+          </div>
+          <div class="voice-actions">
+            <button
+              v-for="action in VOICE_CALL_CONTROL_ACTIONS"
+              :key="action.action"
+              type="button"
+              @click="runCallControl(action)"
+            >
+              {{ action.label }}
+            </button>
           </div>
           <p class="voice-footnote">
             This demo uses the dev-only in-memory voice session store. Real

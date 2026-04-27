@@ -20,6 +20,27 @@ export const VOICE_DEMO_GUIDE_STEPS = [
 export const VOICE_DEMO_GUIDED_LABEL = "Start guided test";
 export const VOICE_DEMO_GENERAL_LABEL = "Start general recording";
 export const VOICE_DEMO_STOP_LABEL = "Stop microphone";
+export const VOICE_CALL_CONTROL_ACTIONS = [
+  {
+    action: "transfer",
+    label: "Transfer to billing",
+    reason: "demo-button-transfer",
+    target: "billing"
+  },
+  {
+    action: "escalate",
+    label: "Escalate",
+    reason: "demo-button-escalation"
+  },
+  {
+    action: "voicemail",
+    label: "Send voicemail"
+  },
+  {
+    action: "no-answer",
+    label: "No answer"
+  }
+];
 export const VOICE_DEMO_MIC_IDLE = "Ready. Start guided test or general recording to begin.";
 export const VOICE_DEMO_MIC_LIVE = "Live. Answer the prompt, then click Stop microphone when finished.";
 export const VOICE_ASSISTANT_CONFIG = {
@@ -145,6 +166,7 @@ voice.sendAudio(audioChunk);`,
   html: `import { createVoiceStream } from "@absolutejs/voice/client";
 
 const voice = createVoiceStream("${VOICE_ROUTE_PATH}");
+voice.callControl({ action: "transfer", target: "billing" });
 voice.endTurn();
 voice.sendAudio(audioChunk);`,
   htmx: `import { bindVoiceHTMX, createVoiceStream } from "@absolutejs/voice/client";
@@ -157,6 +179,7 @@ voice({
   react: `import { useVoiceStream } from "@absolutejs/voice/react";
 
 const voice = useVoiceStream("${VOICE_ROUTE_PATH}");
+voice.callControl({ action: "escalate", reason: "caller asked for a human" });
 voice.endTurn();
 voice.sendAudio(audioChunk);`,
   svelte: `import { createVoiceStream } from "@absolutejs/voice/svelte";
@@ -167,6 +190,7 @@ voice.sendAudio(audioChunk);`,
   vue: `import { useVoiceStream } from "@absolutejs/voice/vue";
 
 const voice = useVoiceStream("${VOICE_ROUTE_PATH}");
+voice.callControl({ action: "voicemail" });
 voice.endTurn();
 voice.sendAudio(audioChunk);`
 };

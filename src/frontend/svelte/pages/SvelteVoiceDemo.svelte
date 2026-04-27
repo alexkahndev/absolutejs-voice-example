@@ -21,6 +21,7 @@
     VOICE_DEMO_MIC_IDLE,
     VOICE_DEMO_MIC_LIVE,
     VOICE_DEMO_STOP_LABEL,
+    VOICE_CALL_CONTROL_ACTIONS,
     VOICE_MODEL_PROVIDERS,
     type VoiceDemoMode,
     type VoiceModelProvider,
@@ -39,6 +40,7 @@
   const createInitialVoiceState = (): VoiceStreamState<SavedIntake> => ({
     assistantTexts: [],
     assistantAudio: [],
+    call: null,
     error: null,
     isConnected: false,
     partial: "",
@@ -94,6 +96,11 @@
       turnCount: currentVoice.turns.length,
     }),
   );
+  let callLifecycleLabel = $derived(
+    currentVoice.call?.disposition
+      ? `${currentVoice.call.disposition} after ${currentVoice.call.events.length} lifecycle event${currentVoice.call.events.length === 1 ? "" : "s"}`
+      : (currentVoice.call?.events.at(-1)?.type ?? "Not started"),
+  );
 
   const refreshIntakes = async () => {
     savedIntakes = await fetchSavedIntakes();
@@ -134,6 +141,12 @@
     activeMode = mode;
     hasStartedModes = { ...hasStartedModes, [mode]: true };
     await startMic();
+  };
+
+  const runCallControl = (action: (typeof VOICE_CALL_CONTROL_ACTIONS)[number]) => {
+    const activeVoice = activeMode === "general" ? generalVoice : guidedVoice;
+    activeVoice?.callControl(action);
+    stopMic();
   };
 
   const connectVoices = () => {
@@ -358,6 +371,10 @@
             <span class="label">Errors</span>
             <span class="value">{errorMessage}</span>
           </div>
+          <div class="status-row">
+            <span class="label">Call lifecycle</span>
+            <span class="value">{callLifecycleLabel}</span>
+          </div>
         </div>
         <div class="voice-chat-list">
           <article class="voice-chat-message assistant">
@@ -420,6 +437,13 @@
               {VOICE_DEMO_GENERAL_LABEL}
             </button>
           {/if}
+        </div>
+        <div class="voice-actions">
+          {#each VOICE_CALL_CONTROL_ACTIONS as action}
+            <button type="button" on:click={() => runCallControl(action)}>
+              {action.label}
+            </button>
+          {/each}
         </div>
         <p class="voice-footnote">
           This demo uses the dev-only in-memory voice session store. Real

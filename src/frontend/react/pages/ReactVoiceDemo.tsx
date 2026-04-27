@@ -29,6 +29,7 @@ import {
   VOICE_DEMO_MIC_IDLE,
   VOICE_DEMO_MIC_LIVE,
   VOICE_DEMO_STOP_LABEL,
+  VOICE_CALL_CONTROL_ACTIONS,
   VOICE_MODEL_PROVIDERS,
   type VoiceDemoMode,
   type VoiceModelProvider,
@@ -52,6 +53,8 @@ const EMPTY_VOICE = {
     receivedAt: number;
     turnId?: string;
   }>,
+  call: null,
+  callControl: () => {},
   close: () => {},
   endTurn: () => {},
   error: null as string | null,
@@ -142,6 +145,13 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
     microphoneRef.current?.stop();
     setIsCapturing(false);
     setWaveLevels(createInitialVoiceWaveLevels());
+  };
+
+  const runCallControl = (
+    action: (typeof VOICE_CALL_CONTROL_ACTIONS)[number],
+  ) => {
+    currentVoice.callControl(action);
+    stopMic();
   };
 
   const changeModelProvider = (provider: VoiceModelProvider) => {
@@ -370,6 +380,15 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                   <span className="label">Errors</span>
                   <span className="value">{errorMessage}</span>
                 </div>
+                <div className="status-row">
+                  <span className="label">Call lifecycle</span>
+                  <span className="value">
+                    {currentVoice.call?.disposition
+                      ? `${currentVoice.call.disposition} after ${currentVoice.call.events.length} lifecycle event${currentVoice.call.events.length === 1 ? "" : "s"}`
+                      : (currentVoice.call?.events.at(-1)?.type ??
+                        "Not started")}
+                  </span>
+                </div>
               </div>
               <div className="voice-chat-list">
                 <article className="voice-chat-message assistant">
@@ -439,6 +458,17 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                     </button>
                   </>
                 )}
+              </div>
+              <div className="voice-actions">
+                {VOICE_CALL_CONTROL_ACTIONS.map((action) => (
+                  <button
+                    key={action.action}
+                    type="button"
+                    onClick={() => runCallControl(action)}
+                  >
+                    {action.label}
+                  </button>
+                ))}
               </div>
               <p className="voice-footnote">
                 This demo uses the dev-only in-memory voice session store. Real

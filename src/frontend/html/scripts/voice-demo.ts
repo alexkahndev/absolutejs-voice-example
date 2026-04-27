@@ -21,6 +21,7 @@ import {
   VOICE_DEMO_MIC_IDLE,
   VOICE_DEMO_MIC_LIVE,
   VOICE_DEMO_STOP_LABEL,
+  VOICE_CALL_CONTROL_ACTIONS,
   type VoiceModelProvider,
   type SavedIntake,
   type VoiceDemoMode,
@@ -55,6 +56,8 @@ const sessionMetric = document.querySelector("#metric-session");
 const startGuidedButton = document.querySelector("#start-guided");
 const startGeneralButton = document.querySelector("#start-general");
 const stopButton = document.querySelector("#stop-mic");
+const callControlRoot = document.querySelector("#call-control-actions");
+const callLifecycleStatus = document.querySelector("#status-call-lifecycle");
 const voiceStatus = document.querySelector("#status-voice");
 const voiceMonitor = document.querySelector("#voice-monitor");
 const voiceMonitorCopy = document.querySelector("#voice-monitor-copy");
@@ -76,6 +79,8 @@ if (
   !(startGuidedButton instanceof HTMLButtonElement) ||
   !(startGeneralButton instanceof HTMLButtonElement) ||
   !(stopButton instanceof HTMLButtonElement) ||
+  !(callControlRoot instanceof HTMLElement) ||
+  !(callLifecycleStatus instanceof HTMLElement) ||
   !(voiceMonitor instanceof HTMLElement) ||
   !(voiceMonitorCopy instanceof HTMLElement) ||
   !(voiceWaveGlow instanceof SVGPathElement) ||
@@ -233,6 +238,9 @@ const render = () => {
   startGeneralButton.textContent = VOICE_DEMO_GENERAL_LABEL;
   stopButton.textContent = VOICE_DEMO_STOP_LABEL;
   partialStatus.textContent = voice.partial || "No speech captured yet";
+  callLifecycleStatus.textContent = voice.call?.disposition
+    ? `${voice.call.disposition} after ${voice.call.events.length} lifecycle event${voice.call.events.length === 1 ? "" : "s"}`
+    : (voice.call?.events.at(-1)?.type ?? "Not started");
   modelProviderMetric.textContent = getVoiceProviderLabel(modelProvider);
   sessionMetric.textContent = activeMode
     ? getVoiceModeLabel(activeMode)
@@ -241,6 +249,28 @@ const render = () => {
   renderWave();
   renderChat();
 };
+
+callControlRoot.innerHTML = VOICE_CALL_CONTROL_ACTIONS.map(
+  (action) =>
+    `<button data-call-action="${escapeHtml(action.action)}" type="button">${escapeHtml(action.label)}</button>`,
+).join("");
+
+callControlRoot.addEventListener("click", (event) => {
+  const button = event.target;
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+
+  const action = VOICE_CALL_CONTROL_ACTIONS.find(
+    (item) => item.action === button.dataset.callAction,
+  );
+  if (!action) {
+    return;
+  }
+
+  currentVoice().callControl(action);
+  stopMic();
+});
 
 modelProviderSelect.addEventListener("change", () => {
   stopMic();

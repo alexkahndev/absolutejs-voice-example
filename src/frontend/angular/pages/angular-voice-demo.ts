@@ -17,6 +17,7 @@ import {
   VOICE_DEMO_MIC_IDLE,
   VOICE_DEMO_MIC_LIVE,
   VOICE_DEMO_STOP_LABEL,
+  VOICE_CALL_CONTROL_ACTIONS,
   VOICE_MODEL_PROVIDERS,
   type VoiceDemoMode,
   type VoiceModelProvider,
@@ -204,6 +205,10 @@ import {
                 <span class="label">Errors</span>
                 <span class="value">{{ errorMessage() }}</span>
               </div>
+              <div class="status-row">
+                <span class="label">Call lifecycle</span>
+                <span class="value">{{ callLifecycleLabel() }}</span>
+              </div>
             </div>
             <div class="voice-chat-list">
               <article class="voice-chat-message assistant">
@@ -276,6 +281,13 @@ import {
                 </button>
                 <button type="button" (click)="startMode('general')">
                   {{ generalLabel }}
+                </button>
+              }
+            </div>
+            <div class="voice-actions">
+              @for (action of callControlActions; track action.action) {
+                <button type="button" (click)="runCallControl(action)">
+                  {{ action.label }}
                 </button>
               }
             </div>
@@ -358,6 +370,7 @@ export class AngularVoiceDemoComponent {
   activeMode = signal<VoiceDemoMode | null>(null);
   modelProvider = signal<VoiceModelProvider>(getInitialVoiceModelProvider());
   modelProviders = VOICE_MODEL_PROVIDERS;
+  callControlActions = VOICE_CALL_CONTROL_ACTIONS;
   getVoiceProviderLabel = getVoiceProviderLabel;
   hasStartedModes = signal<Record<VoiceDemoMode, boolean>>({
     general: false,
@@ -407,6 +420,12 @@ export class AngularVoiceDemoComponent {
   errorMessage = computed(
     () => this.micError() ?? this.currentVoice().error() ?? "None",
   );
+  callLifecycleLabel = computed(() => {
+    const call = this.currentVoice().call();
+    return call?.disposition
+      ? `${call.disposition} after ${call.events.length} lifecycle event${call.events.length === 1 ? "" : "s"}`
+      : (call?.events.at(-1)?.type ?? "Not started");
+  });
   wavePath = computed(() => createVoiceWavePath(this.waveLevels()));
   private microphone: ReturnType<typeof createDemoMicrophone> | null = null;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
@@ -473,6 +492,11 @@ export class AngularVoiceDemoComponent {
       [mode]: true,
     }));
     await this.startMic();
+  }
+
+  runCallControl(action: (typeof VOICE_CALL_CONTROL_ACTIONS)[number]) {
+    this.currentVoice().callControl(action);
+    this.stopMic();
   }
 
   ngOnDestroy() {

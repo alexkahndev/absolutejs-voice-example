@@ -185,6 +185,10 @@
               <span class="label">Errors</span>
               <span class="value" id="status-error">None</span>
             </div>
+            <div class="status-row">
+              <span class="label">Call lifecycle</span>
+              <span class="value" id="status-call-lifecycle">Not started</span>
+            </div>
           </div>
           <div class="voice-chat-list" id="chat-list">
             <article class="voice-chat-message assistant">
@@ -218,6 +222,7 @@
             </button>
             <button hidden id="stop-mic" type="button">Stop microphone</button>
           </div>
+          <div class="voice-actions" id="call-control-actions"></div>
           <p class="voice-footnote">
             This demo uses the dev-only in-memory voice session store. Real
             deployments should replace it with Redis or Postgres.
