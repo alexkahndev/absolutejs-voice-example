@@ -46,7 +46,7 @@ import {
   type SavedVoiceIntegrationEvent,
 } from "./integrationsPage";
 import { renderVoiceAssistantPage } from "./assistantPage";
-import { createProviderFailureSimulator } from "./providerSimulator";
+import { createVoiceProviderFailureSimulator } from "@absolutejs/voice/testing";
 import { pagesPlugin } from "./plugins/pagesPlugin";
 import {
   buildSavedVoiceReview,
@@ -331,12 +331,21 @@ const assistantModel = createVoiceProviderRouter<
   providers: providerModels,
   selectProvider: ({ context }) => resolveRequestedProvider(context),
 });
-const providerFailureSimulator = createProviderFailureSimulator({
+const providerFailureSimulator = createVoiceProviderFailureSimulator({
   allowProviders: () => configuredModelProviders,
   fallback: providerFallbackOrder,
   isProviderError: (error, provider) =>
     provider !== "deterministic" && isAssistantProviderError(error),
   onProviderEvent: traceProviderEvent,
+  providerLabel: (provider) =>
+    provider === "openai"
+      ? "OpenAI"
+      : provider === "anthropic"
+        ? "Anthropic"
+        : provider === "gemini"
+          ? "Gemini"
+          : "Deterministic",
+  providers: configuredModelProviders,
 });
 const intakeClassifierTool = createVoiceAgentTool<
   unknown,
