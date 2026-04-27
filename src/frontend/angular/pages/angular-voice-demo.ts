@@ -8,6 +8,7 @@ import {
 import { defineVoiceProviderSimulationControlsElement } from "@absolutejs/voice/client";
 import {
   VoiceAppKitStatusService,
+  VoiceProviderCapabilitiesService,
   VoiceProviderStatusService,
   VoiceRoutingStatusService,
   VoiceStreamService,
@@ -240,6 +241,39 @@ import {
               </div>
             } @else {
               <p class="empty-copy">Run assistant traffic to see provider health.</p>
+            }
+          </article>
+
+          <article class="voice-card voice-provider-health-card">
+            <span class="voice-framework-pill">Provider Capabilities</span>
+            <h2>
+              {{
+                providerCapabilities.report()
+                  ? providerCapabilities.report()!.selected + " selected"
+                  : "Checking capabilities"
+              }}
+            </h2>
+            <p class="voice-footnote">
+              Configured LLM/STT providers, selected defaults, models, and feature coverage.
+            </p>
+            @if (providerCapabilities.report()?.capabilities?.length) {
+              <div class="voice-provider-health-list">
+                @for (
+                  capability of providerCapabilities.report()!.capabilities;
+                  track capability.kind + ":" + capability.provider
+                ) {
+                  <div class="voice-provider-health-item">
+                    <strong>{{ capability.provider }} {{ capability.kind }}</strong>
+                    <span>{{ capability.status }}</span>
+                    <small>
+                      {{ capability.model || "default" }} ·
+                      {{ capability.features?.join(", ") || "features not specified" }}
+                    </small>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="empty-copy">Configure provider capabilities to see coverage.</p>
             }
           </article>
 
@@ -563,6 +597,12 @@ export class AngularVoiceDemoComponent {
       intervalMs: 5_000,
     },
   );
+  providerCapabilities = inject(VoiceProviderCapabilitiesService).connect(
+    "/api/provider-capabilities",
+    {
+      intervalMs: 5_000,
+    },
+  );
   routingStatus = inject(VoiceRoutingStatusService).connect(
     "/api/routing/latest",
     {
@@ -699,6 +739,7 @@ export class AngularVoiceDemoComponent {
     this.guidedVoice.close();
     this.generalVoice.close();
     this.appKitStatus.close();
+    this.providerCapabilities.close();
     this.providerStatus.close();
     this.routingStatus.close();
   }

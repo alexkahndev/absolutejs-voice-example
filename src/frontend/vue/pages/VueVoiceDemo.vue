@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import {
   useVoiceStream,
   VoiceOpsStatus,
+  VoiceProviderCapabilities,
   VoiceProviderSimulationControls,
   VoiceProviderStatus,
   VoiceRoutingStatus,
@@ -317,6 +318,11 @@ onUnmounted(() => {
         />
 
         <VoiceProviderStatus
+          class="voice-card voice-provider-health-card"
+          :interval-ms="5000"
+        />
+
+        <VoiceProviderCapabilities
           class="voice-card voice-provider-health-card"
           :interval-ms="5000"
         />

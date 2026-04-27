@@ -3,6 +3,7 @@
   import Head from "@absolutejs/absolute/svelte/components/Head.js";
   import {
     createVoiceOpsStatus,
+    createVoiceProviderCapabilities,
     createVoiceProviderSimulationControls,
     createVoiceProviderStatus,
     createVoiceRoutingStatus,
@@ -75,6 +76,7 @@
   let isCapturing = $state(false);
   let savedIntakes = $state<SavedIntake[]>([]);
   let opsStatusHTML = $state("");
+  let providerCapabilitiesHTML = $state("");
   let providerSimulationHTML = $state("");
   let providerStatusHTML = $state("");
   let routingStatusHTML = $state("");
@@ -92,6 +94,12 @@
   const providerStatus = createVoiceProviderStatus("/api/provider-status", {
     intervalMs: 5_000,
   });
+  const providerCapabilities = createVoiceProviderCapabilities(
+    "/api/provider-capabilities",
+    {
+      intervalMs: 5_000,
+    },
+  );
   const providerSimulation = createVoiceProviderSimulationControls({
     failureMessage:
       "Prove Deepgram STT failover to AssemblyAI without changing credentials.",
@@ -110,6 +118,7 @@
   let unsubscribeOpsStatus = () => {};
   let unsubscribeProviderSimulation = () => {};
   let unbindProviderSimulation = () => {};
+  let unsubscribeProviderCapabilities = () => {};
   let unsubscribeProviderStatus = () => {};
   let unsubscribeRoutingStatus = () => {};
   let currentVoice = $derived(
@@ -251,6 +260,9 @@
     unsubscribeProviderStatus = providerStatus.subscribe(() => {
       providerStatusHTML = providerStatus.getHTML();
     });
+    unsubscribeProviderCapabilities = providerCapabilities.subscribe(() => {
+      providerCapabilitiesHTML = providerCapabilities.getHTML();
+    });
     unsubscribeProviderSimulation = providerSimulation.subscribe(() => {
       providerSimulationHTML = providerSimulation.getHTML();
     });
@@ -258,10 +270,12 @@
       routingStatusHTML = routingStatus.getHTML();
     });
     opsStatusHTML = opsStatus.getHTML();
+    providerCapabilitiesHTML = providerCapabilities.getHTML();
     providerSimulationHTML = providerSimulation.getHTML();
     providerStatusHTML = providerStatus.getHTML();
     routingStatusHTML = routingStatus.getHTML();
     void opsStatus.refresh().catch(() => {});
+    void providerCapabilities.refresh().catch(() => {});
     void providerStatus.refresh().catch(() => {});
     void routingStatus.refresh().catch(() => {});
     if (providerSimulationElement) {
@@ -285,11 +299,13 @@
     unsubscribeOpsStatus();
     unsubscribeProviderSimulation();
     unbindProviderSimulation();
+    unsubscribeProviderCapabilities();
     unsubscribeProviderStatus();
     unsubscribeRoutingStatus();
     guidedVoice?.close();
     generalVoice?.close();
     opsStatus.close();
+    providerCapabilities.close();
     providerSimulation.close();
     providerStatus.close();
     routingStatus.close();
@@ -402,6 +418,10 @@
 
       <div class="voice-card voice-provider-health-card voice-provider-status-host">
         {@html providerStatusHTML}
+      </div>
+
+      <div class="voice-card voice-provider-health-card voice-provider-capabilities-host">
+        {@html providerCapabilitiesHTML}
       </div>
 
       <div

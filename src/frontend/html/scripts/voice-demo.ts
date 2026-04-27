@@ -1,6 +1,7 @@
 import {
   createVoiceStream,
   mountVoiceOpsStatus,
+  mountVoiceProviderCapabilities,
   mountVoiceProviderSimulationControls,
   mountVoiceProviderStatus,
   mountVoiceRoutingStatus,
@@ -75,6 +76,9 @@ const voiceMonitorCopy = document.querySelector("#voice-monitor-copy");
 const voiceWaveGlow = document.querySelector("#voice-wave-glow");
 const voiceWavePath = document.querySelector("#voice-wave-path");
 const workflowStatusHost = document.querySelector("#workflow-status-card");
+const providerCapabilitiesHost = document.querySelector(
+  "#provider-capabilities-card",
+);
 const providerStatusHost = document.querySelector("#provider-status-card");
 const providerSimulationHost = document.querySelector(
   "#provider-simulation-card",
@@ -106,6 +110,7 @@ if (
   !(voiceWaveGlow instanceof SVGPathElement) ||
   !(voiceWavePath instanceof SVGPathElement) ||
   !(workflowStatusHost instanceof HTMLElement) ||
+  !(providerCapabilitiesHost instanceof HTMLElement) ||
   !(providerStatusHost instanceof HTMLElement) ||
   !(providerSimulationHost instanceof HTMLElement) ||
   !(routingModeCopy instanceof HTMLElement) ||
@@ -133,6 +138,13 @@ const opsStatus = mountVoiceOpsStatus(workflowStatusHost, "/app-kit/status", {
 const providerStatus = mountVoiceProviderStatus(
   providerStatusHost,
   "/api/provider-status",
+  {
+    intervalMs: 5_000,
+  },
+);
+const providerCapabilities = mountVoiceProviderCapabilities(
+  providerCapabilitiesHost,
+  "/api/provider-capabilities",
   {
     intervalMs: 5_000,
   },
@@ -415,6 +427,7 @@ render();
 void renderSavedIntakes();
 window.addEventListener("beforeunload", () => {
   opsStatus.close();
+  providerCapabilities.close();
   providerSimulation.close();
   providerStatus.close();
   routingStatus.close();

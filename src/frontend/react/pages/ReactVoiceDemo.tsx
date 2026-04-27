@@ -4,6 +4,7 @@ import type { VoiceTurnRecord } from "@absolutejs/voice";
 import {
   useVoiceStream,
   VoiceOpsStatus,
+  VoiceProviderCapabilities,
   VoiceProviderSimulationControls,
   VoiceProviderStatus,
   VoiceRoutingStatus,
@@ -354,6 +355,11 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
             />
 
             <VoiceProviderStatus
+              className="voice-card voice-provider-health-card"
+              intervalMs={5_000}
+            />
+
+            <VoiceProviderCapabilities
               className="voice-card voice-provider-health-card"
               intervalMs={5_000}
             />
