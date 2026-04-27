@@ -12,6 +12,7 @@ import {
   createVoiceFileRuntimeStorage,
   createOpenAIVoiceAssistantModel,
   createVoiceAssistantHealthRoutes,
+  createVoiceHandoffDeliveryWorker,
   createVoiceHandoffHealthRoutes,
   createVoiceProviderHealthRoutes,
   createVoiceProviderRouter,
@@ -133,6 +134,48 @@ const createJsonHandoffDeliveryStore = <
       deliveries.push(delivery);
       await write(deliveries);
     },
+  };
+};
+
+const createDemoLeaseCoordinator = () => {
+  const leases = new Map<string, string>();
+
+  return {
+    claim: async (input: {
+      leaseMs: number;
+      taskId: string;
+      workerId: string;
+    }) => {
+      if (leases.has(input.taskId)) {
+        return false;
+      }
+
+      leases.set(input.taskId, input.workerId);
+      return true;
+    },
+    get: async (taskId: string) => {
+      const workerId = leases.get(taskId);
+      return workerId
+        ? {
+            expiresAt: Date.now() + 30_000,
+            taskId,
+            workerId,
+          }
+        : null;
+    },
+    release: async (input: { taskId: string; workerId: string }) => {
+      if (leases.get(input.taskId) !== input.workerId) {
+        return false;
+      }
+
+      leases.delete(input.taskId);
+      return true;
+    },
+    renew: async (input: {
+      leaseMs: number;
+      taskId: string;
+      workerId: string;
+    }) => leases.get(input.taskId) === input.workerId,
   };
 };
 
@@ -543,6 +586,24 @@ const handoffAdapters = handoffWebhookUrl
       >,
     ]
   : [];
+const retryVoiceHandoffDeliveries = async () => {
+  if (handoffAdapters.length === 0) {
+    return {
+      error: "VOICE_DEMO_HANDOFF_WEBHOOK_URL is not configured.",
+    };
+  }
+
+  const worker = createVoiceHandoffDeliveryWorker({
+    adapters: handoffAdapters,
+    api: {} as never,
+    deliveries: handoffDeliveryStore,
+    leases: createDemoLeaseCoordinator(),
+    maxFailures: 3,
+    workerId: "voice-demo-handoff-retry",
+  });
+
+  return worker.drain();
+};
 const webhookSink = webhookUrl
   ? createVoiceOpsWebhookSink({
       baseUrl: publicBaseUrl,
@@ -852,6 +913,7 @@ const server = new Elysia()
   .get("/api/intakes", () => listIntakes())
   .get("/api/assistant-config", () => assistantConfig)
   .get("/api/assistant-summary", async () => summarizeAssistantRuns())
+  .post("/api/voice-handoffs/retry", async () => retryVoiceHandoffDeliveries())
   .post("/api/provider-simulate/failure", async ({ query }) => {
     const provider =
       typeof query.provider === "string" && isVoiceModelProvider(query.provider)
@@ -1006,9 +1068,34 @@ const server = new Elysia()
     .handoff-queue-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
     .handoff-queue-grid article { background: #0f1217; }
     .handoff-metric { font-size: 2rem; font-weight: 800; margin: 0; }
+    .handoff-actions { align-items: center; display: flex; flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+    button { background: #f59e0b; border: 0; border-radius: 999px; color: #111827; cursor: pointer; font-weight: 800; padding: 10px 16px; }
+    button:disabled { cursor: wait; opacity: 0.55; }
+    #handoff-retry-result { color: #d4d4d8; }
     span, small { color: #a1a1aa; }
     a { color: #f59e0b; }
   </style>
+  <script>
+    async function retryHandoffs(button) {
+      button.disabled = true;
+      const result = document.getElementById("handoff-retry-result");
+      result.textContent = "Retrying queued handoffs...";
+      try {
+        const response = await fetch("/api/voice-handoffs/retry", { method: "POST" });
+        const payload = await response.json();
+        if (payload.error) {
+          result.textContent = payload.error;
+          button.disabled = false;
+          return;
+        }
+        result.textContent = "Retried " + payload.attempted + " queued handoff(s). Reloading...";
+        window.location.reload();
+      } catch (error) {
+        result.textContent = error instanceof Error ? error.message : String(error);
+        button.disabled = false;
+      }
+    }
+  </script>
 </head>
 <body>
   <main>
@@ -1025,6 +1112,10 @@ const server = new Elysia()
         <article><span>Retry eligible</span><p class="handoff-metric">${handoffQueue.retryEligible}</p></article>
         <article><span>Failed</span><p class="handoff-metric">${handoffQueue.failed}</p></article>
         <article><span>Delivered</span><p class="handoff-metric">${handoffQueue.delivered}</p></article>
+      </div>
+      <div class="handoff-actions">
+        <button type="button" onclick="retryHandoffs(this)">Retry queued handoffs</button>
+        <span id="handoff-retry-result">${handoffAdapters.length > 0 ? "Ready to drain pending and failed deliveries." : "Set VOICE_DEMO_HANDOFF_WEBHOOK_URL to enable delivery retries."}</span>
       </div>
       <p><small>Queue file: ${escapeHtml(resolve(runtimeDirectory, "handoff-deliveries.json"))}</small></p>
     </section>
