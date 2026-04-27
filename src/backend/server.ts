@@ -18,6 +18,7 @@ import {
   createVoiceProviderRouter,
   createVoiceSessionListRoutes,
   createVoiceSessionReplayRoutes,
+  createVoiceSTTProviderRouter,
   createVoiceTaskUpdatedEvent,
   createVoiceOpsWebhookReceiverRoutes,
   createVoiceOpsWebhookSink,
@@ -277,6 +278,9 @@ const providerLatencyBudgets = {
   gemini: readPositiveNumberEnv("VOICE_GEMINI_TIMEOUT_MS", 6_000),
   openai: readPositiveNumberEnv("VOICE_OPENAI_TIMEOUT_MS", 6_000),
 } satisfies Record<VoiceModelProvider, number>;
+const sttLatencyBudgets = {
+  deepgram: readPositiveNumberEnv("VOICE_DEEPGRAM_STT_TIMEOUT_MS", 5_000),
+};
 const configuredModelProviders: VoiceModelProvider[] = [
   "deterministic",
   openAIApiKey ? "openai" : undefined,
@@ -463,6 +467,38 @@ const assistantModel = createVoiceProviderRouter<
   },
   providers: providerModels,
   selectProvider: ({ context }) => resolveRequestedProvider(context),
+});
+const sttAdapter = createVoiceSTTProviderRouter({
+  adapters: {
+    deepgram: deepgram({
+      apiKey: deepgramApiKey,
+      interimResults: true,
+      model: "flux-general-en",
+      punctuate: true,
+      smartFormat: true,
+      vadEvents: true,
+    }),
+  },
+  fallback: ["deepgram"],
+  onProviderEvent: async (event, input) => {
+    await runtimeStorage.traces.append({
+      at: event.at,
+      payload: {
+        ...event,
+        providerStatus: event.status,
+      },
+      sessionId: input.sessionId,
+      type: "session.error",
+    });
+  },
+  providerProfiles: {
+    deepgram: {
+      latencyMs: 250,
+      priority: 1,
+      timeoutMs: sttLatencyBudgets.deepgram,
+    },
+  },
+  selectProvider: () => "deepgram",
 });
 const providerFailureSimulator = createVoiceProviderFailureSimulator({
   allowProviders: () => configuredModelProviders,
@@ -894,14 +930,7 @@ const server = new Elysia()
       path: "/voice/intake",
       preset: "reliability",
       session: runtimeStorage.session,
-      stt: deepgram({
-        apiKey: deepgramApiKey,
-        interimResults: true,
-        model: "flux-general-en",
-        punctuate: true,
-        smartFormat: true,
-        vadEvents: true,
-      }),
+      stt: sttAdapter,
     }),
   )
   .use(
