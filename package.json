@@ -17,9 +17,9 @@
   },
   "dependencies": {
     "@absolutejs/absolute": "0.19.0-beta.648",
-    "@absolutejs/voice": "0.0.22-beta.114",
-    "@absolutejs/voice-assemblyai": "0.0.19-beta.79",
-    "@absolutejs/voice-deepgram": "0.0.20-beta.49",
+    "@absolutejs/voice": "0.0.22-beta.115",
+    "@absolutejs/voice-assemblyai": "0.0.19-beta.80",
+    "@absolutejs/voice-deepgram": "0.0.20-beta.50",
     "@angular/common": "^21.0.0",
     "@angular/compiler": "^21.0.0",
     "@angular/compiler-cli": "^21.0.0",
