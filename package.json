@@ -8,6 +8,7 @@
     "dev": "absolute dev",
     "format": "absolute prettier --write",
     "lint": "absolute eslint",
+    "smoke:telephony:tts": "bun run ./scripts/run-telephony-tts-smoke.ts",
     "simulate:provider-failure": "bun run ./scripts/run-provider-failure-simulation.ts",
     "start": "absolute start",
     "typecheck": "absolute typecheck"
