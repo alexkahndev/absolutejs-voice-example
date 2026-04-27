@@ -10,6 +10,7 @@ import {
 import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
+  createDemoBargeInEvidence,
   createDemoMicrophone,
   fetchSavedIntakes,
   formatErrorMessage,
@@ -182,8 +183,9 @@ let hasStartedModes: Record<VoiceDemoMode, boolean> = {
 };
 const currentVoice = () =>
   activeMode === "general" ? generalVoice : guidedVoice;
+const bargeInEvidence = createDemoBargeInEvidence(() => currentVoice());
 const microphone = createDemoMicrophone(
-  (audio) => currentVoice().sendAudio(audio),
+  (audio) => bargeInEvidence.sendAudio(audio),
   (level) => {
     waveLevels = pushVoiceWaveLevel(waveLevels, level);
     renderWave();
@@ -398,6 +400,7 @@ const startMode = async (mode: VoiceDemoMode) => {
 };
 
 guidedVoice.subscribe(() => {
+  bargeInEvidence.syncAssistantOutput();
   render();
   if (guidedVoice.status === "completed") {
     void renderSavedIntakes();
@@ -405,6 +408,7 @@ guidedVoice.subscribe(() => {
 });
 
 generalVoice.subscribe(() => {
+  bargeInEvidence.syncAssistantOutput();
   render();
   if (generalVoice.status === "completed") {
     void renderSavedIntakes();

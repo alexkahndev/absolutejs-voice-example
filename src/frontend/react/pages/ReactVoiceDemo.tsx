@@ -14,6 +14,7 @@ import {
 import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
+  createDemoBargeInEvidence,
   createDemoMicrophone,
   fetchSavedIntakes,
   formatErrorMessage,
@@ -54,7 +55,9 @@ type ReactVoiceDemoProps = {
   cssPath?: string;
 };
 
-const EMPTY_VOICE = {
+type ReactVoiceDemoStream = ReturnType<typeof useVoiceStream<SavedIntake>>;
+
+const EMPTY_VOICE: ReactVoiceDemoStream = {
   assistantTexts: [] as string[],
   assistantAudio: [] as Array<{
     chunk: Uint8Array;
@@ -85,7 +88,11 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
   const microphoneRef = useRef<ReturnType<typeof createDemoMicrophone> | null>(
     null,
   );
+  const bargeInRef = useRef<ReturnType<typeof createDemoBargeInEvidence> | null>(
+    null,
+  );
   const activeModeRef = useRef<VoiceDemoMode | null>(null);
+  const voicesRef = useRef({ general: EMPTY_VOICE, guided: EMPTY_VOICE });
   const [modelProvider, setModelProvider] = useState<VoiceModelProvider>(
     getInitialVoiceModelProvider,
   );
@@ -102,6 +109,7 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
       getVoiceRoutePath("general", modelProvider, routingMode),
     ) ??
     EMPTY_VOICE;
+  voicesRef.current = { general: generalVoice, guided: guidedVoice };
   const [activeMode, setActiveMode] = useState<VoiceDemoMode | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [hasStartedModes, setHasStartedModes] = useState<
@@ -114,6 +122,13 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
   const [savedIntakes, setSavedIntakes] = useState<SavedIntake[]>([]);
   const [waveLevels, setWaveLevels] = useState(createInitialVoiceWaveLevels);
   const currentVoice = activeMode === "general" ? generalVoice : guidedVoice;
+  useEffect(() => {
+    bargeInRef.current?.syncAssistantOutput();
+  }, [
+    currentVoice.assistantAudio.length,
+    currentVoice.assistantTexts.length,
+    currentVoice.sessionId,
+  ]);
   useEffect(() => {
     const refresh = () => {
       void fetchSavedIntakes().then(setSavedIntakes);
@@ -140,9 +155,12 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
         microphoneRef.current ??
         createDemoMicrophone(
           (audio) => {
-            const mode = activeModeRef.current;
-            const stream = mode === "general" ? generalVoice : guidedVoice;
-            stream.sendAudio(audio);
+            bargeInRef.current ??= createDemoBargeInEvidence(() =>
+              activeModeRef.current === "general"
+                ? voicesRef.current.general
+                : voicesRef.current.guided,
+            );
+            bargeInRef.current.sendAudio(audio);
           },
           (level) => {
             setWaveLevels((current) => pushVoiceWaveLevel(current, level));
@@ -448,6 +466,8 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                 <a href="/assistant">Open analytics</a> ·{" "}
                 <a href="/tasks">Open tasks</a> ·{" "}
                 <a href="/integrations">Open integration events</a>
+                {" · "}
+                <a href="/barge-in">Open barge-in proof</a>
               </p>
             </article>
 

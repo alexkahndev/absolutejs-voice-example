@@ -46,6 +46,7 @@ import {
 import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
+  createDemoBargeInEvidence,
   createDemoMicrophone,
   fetchSavedIntakes,
   getAppKitStatusLabel,
@@ -456,7 +457,8 @@ import {
             <p class="voice-footnote">
               <a href="/assistant">Open analytics</a> ·
               <a href="/tasks">Open tasks</a> ·
-              <a href="/integrations">Open integration events</a>
+              <a href="/integrations">Open integration events</a> ·
+              <a href="/barge-in">Open barge-in proof</a>
             </p>
           </article>
 
@@ -742,6 +744,15 @@ export class AngularVoiceDemoComponent {
       ? `${call.disposition} after ${call.events.length} lifecycle event${call.events.length === 1 ? "" : "s"}`
       : (call?.events.at(-1)?.type ?? "Not started");
   });
+  bargeInEvidence = createDemoBargeInEvidence(() => {
+    const voice = this.currentVoice();
+    return {
+      assistantAudio: voice.assistantAudio(),
+      assistantTexts: voice.assistantTexts(),
+      sendAudio: (audio) => voice.sendAudio(audio),
+      sessionId: voice.sessionId(),
+    };
+  });
   routingDescription = computed(
     () =>
       this.routingModes.find((item) => item.id === this.routingMode())
@@ -770,11 +781,7 @@ export class AngularVoiceDemoComponent {
   async startMic() {
     try {
       this.microphone ??= createDemoMicrophone(
-        (audio) =>
-          (this.activeMode() === "general"
-            ? this.generalVoice
-            : this.guidedVoice
-          ).sendAudio(audio),
+        (audio) => this.bargeInEvidence.sendAudio(audio),
         (level) => {
           this.waveLevels.update((current) =>
             pushVoiceWaveLevel(current, level),

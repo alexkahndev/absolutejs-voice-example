@@ -44,6 +44,7 @@
   import {
     createInitialVoiceWaveLevels,
     createVoiceWavePath,
+    createDemoBargeInEvidence,
     createDemoMicrophone,
     fetchSavedIntakes,
     formatErrorMessage,
@@ -137,6 +138,15 @@
   let currentVoice = $derived(
     activeMode === "general" ? generalState : guidedState,
   );
+  const bargeInEvidence = createDemoBargeInEvidence(() => {
+    const activeVoice = activeMode === "general" ? generalVoice : guidedVoice;
+    return {
+      assistantAudio: currentVoice.assistantAudio,
+      assistantTexts: currentVoice.assistantTexts,
+      sendAudio: (audio) => activeVoice?.sendAudio(audio),
+      sessionId: currentVoice.sessionId,
+    };
+  });
   let wavePath = $derived(createVoiceWavePath(waveLevels));
   let errorMessage = $derived(error || currentVoice.error || "None");
   let currentPrompt = $derived(
@@ -176,7 +186,7 @@
           const activeVoice =
             activeMode === "general" ? generalVoice : guidedVoice;
 
-          activeVoice?.sendAudio(audio);
+          bargeInEvidence.sendAudio(audio);
         },
         (level) => {
           waveLevels = pushVoiceWaveLevel(waveLevels, level);
@@ -229,9 +239,11 @@
     generalState = { ...generalVoice.getSnapshot() };
     unsubscribeGuided = guidedVoice.subscribe(() => {
       guidedState = { ...guidedVoice!.getSnapshot() };
+      bargeInEvidence.syncAssistantOutput();
     });
     unsubscribeGeneral = generalVoice.subscribe(() => {
       generalState = { ...generalVoice!.getSnapshot() };
+      bargeInEvidence.syncAssistantOutput();
     });
   };
 
@@ -526,6 +538,7 @@
           <a href="/assistant">Open analytics</a> ·
           <a href="/tasks">Open tasks</a>
           · <a href="/integrations">Open integration events</a>
+          · <a href="/barge-in">Open barge-in proof</a>
         </p>
       </article>
 

@@ -1,7 +1,12 @@
-import { createMicrophoneCapture } from "@absolutejs/voice/client";
+import {
+  createMicrophoneCapture,
+  createVoiceBargeInMonitor,
+} from "@absolutejs/voice/client";
 import type {
+  VoiceBargeInMonitor,
   VoiceAppKitStatusReport,
   VoiceRoutingDecisionSummary,
+  VoiceStreamState,
 } from "@absolutejs/voice";
 import type { SavedIntake } from "../../shared/demo";
 
@@ -232,5 +237,77 @@ export const createDemoMicrophone = (
       capture = null;
       onLevel?.(0);
     },
+  };
+};
+
+type DemoBargeInVoice<TResult = unknown> = Pick<
+  VoiceStreamState<TResult>,
+  "assistantAudio" | "assistantTexts" | "sessionId"
+> & {
+  sendAudio: (audio: Uint8Array | ArrayBuffer) => void;
+};
+
+export const createDemoBargeInEvidence = <TResult = unknown>(
+  getVoice: () => DemoBargeInVoice<TResult>,
+  options: {
+    recentAssistantWindowMs?: number;
+    speechThreshold?: number;
+    thresholdMs?: number;
+  } = {},
+) => {
+  const monitor: VoiceBargeInMonitor = createVoiceBargeInMonitor({
+    path: "/api/voice-barge-in",
+    thresholdMs: options.thresholdMs ?? 250,
+  });
+  let lastAssistantAt = 0;
+  let lastAssistantAudioCount = 0;
+  let lastAssistantTextCount = 0;
+
+  const syncAssistantOutput = () => {
+    const voice = getVoice();
+    const audioCount = voice.assistantAudio.length;
+    const textCount = voice.assistantTexts.length;
+
+    if (
+      audioCount > lastAssistantAudioCount ||
+      textCount > lastAssistantTextCount
+    ) {
+      lastAssistantAt = Date.now();
+    }
+
+    lastAssistantAudioCount = audioCount;
+    lastAssistantTextCount = textCount;
+  };
+
+  const sendAudio = (audio: Uint8Array | ArrayBuffer) => {
+    syncAssistantOutput();
+
+    const voice = getVoice();
+    const isRecentAssistantOutput =
+      Date.now() - lastAssistantAt <=
+      (options.recentAssistantWindowMs ?? 4_000);
+    const isSpeechLike = getPcmLevel(audio) >= (options.speechThreshold ?? 0.04);
+
+    if (isRecentAssistantOutput && isSpeechLike) {
+      monitor.recordRequested({
+        reason: "manual-audio",
+        sessionId: voice.sessionId,
+      });
+      monitor.recordStopped({
+        latencyMs: 0,
+        playbackStopLatencyMs: 0,
+        reason: "manual-audio",
+        sessionId: voice.sessionId,
+      });
+    }
+
+    voice.sendAudio(audio);
+  };
+
+  return {
+    getSnapshot: monitor.getSnapshot,
+    sendAudio,
+    subscribe: monitor.subscribe,
+    syncAssistantOutput,
   };
 };

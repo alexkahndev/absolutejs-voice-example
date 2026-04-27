@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref, watchEffect } from "vue";
 import {
   useVoiceStream,
   VoiceOpsStatus,
@@ -43,6 +43,7 @@ import {
 import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
+  createDemoBargeInEvidence,
   createDemoMicrophone,
   fetchSavedIntakes,
   formatErrorMessage,
@@ -75,6 +76,15 @@ let refreshTimer: ReturnType<typeof setInterval> | null = null;
 const currentVoice = computed(() =>
   activeMode.value === "general" ? generalVoice : guidedVoice,
 );
+const bargeInEvidence = createDemoBargeInEvidence(() => {
+  const voice = currentVoice.value;
+  return {
+    assistantAudio: voice.assistantAudio.value,
+    assistantTexts: voice.assistantTexts.value,
+    sendAudio: voice.sendAudio,
+    sessionId: voice.sessionId.value,
+  };
+});
 const wavePath = computed(() => createVoiceWavePath(waveLevels.value));
 const errorMessage = computed(
   () => micError.value || currentVoice.value.error.value || "None",
@@ -116,6 +126,12 @@ const traceTimelineModel = computed(() =>
     { limit: 2 },
   ),
 );
+watchEffect(() => {
+  currentVoice.value.assistantAudio.value.length;
+  currentVoice.value.assistantTexts.value.length;
+  currentVoice.value.sessionId.value;
+  bargeInEvidence.syncAssistantOutput();
+});
 
 const refreshIntakes = async () => {
   savedIntakes.value = await fetchSavedIntakes();
@@ -124,10 +140,7 @@ const refreshIntakes = async () => {
 const startMic = async () => {
   try {
     microphone ??= createDemoMicrophone(
-      (audio) =>
-        (activeMode.value === "general" ? generalVoice : guidedVoice).sendAudio(
-          audio,
-        ),
+      (audio) => bargeInEvidence.sendAudio(audio),
       (level) => {
         waveLevels.value = pushVoiceWaveLevel(waveLevels.value, level);
       },
@@ -469,7 +482,8 @@ onUnmounted(() => {
           <p class="voice-footnote">
             <a href="/assistant">Open analytics</a> ·
             <a href="/tasks">Open tasks</a> ·
-            <a href="/integrations">Open integration events</a>
+            <a href="/integrations">Open integration events</a> ·
+            <a href="/barge-in">Open barge-in proof</a>
           </p>
         </article>
 
