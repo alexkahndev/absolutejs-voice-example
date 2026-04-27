@@ -26,6 +26,7 @@ import {
   createVoiceWorkflowContractPreset,
   createVoiceOpsWebhookReceiverRoutes,
   createVoiceOpsWebhookSink,
+  createVoiceOutcomeContractRoutes,
   createVoiceWebhookHandoffAdapter,
   deliverVoiceIntegrationEventToSinks,
   reopenVoiceOpsTask,
@@ -48,6 +49,7 @@ import {
   type VoiceProviderRouterEvent,
   type VoiceOpsTaskStatus,
   type VoiceOpsTaskStore,
+  type VoiceOutcomeContractDefinition,
   type VoiceToolContractDefinition,
   type VoiceOpsWebhookEnvelope,
   type VoiceTurnCorrectionHandler,
@@ -889,6 +891,59 @@ const workflowScenarios = [
   transferWorkflowContract.toScenarioEval(),
 ];
 
+const demoOutcomeContracts = [
+  {
+    description:
+      "Completed calls must persist the session review and emit call/review integration events.",
+    expectedDisposition: "completed",
+    id: "completed-call-artifacts",
+    label: "Completed call artifacts",
+    requireIntegrationEvents: ["call.completed", "review.saved"],
+    requireReview: true,
+  },
+  {
+    description:
+      "Transfers must leave review evidence, a follow-up task, a transfer handoff, and integration events.",
+    expectedDisposition: "transferred",
+    id: "transfer-call-artifacts",
+    label: "Transfer call artifacts",
+    requireHandoffActions: ["transfer"],
+    requireIntegrationEvents: ["call.completed", "review.saved", "task.created"],
+    requireReview: true,
+    requireTask: true,
+  },
+  {
+    description:
+      "Escalations must create a review, follow-up task, and task integration event.",
+    expectedDisposition: "escalated",
+    id: "escalation-call-artifacts",
+    label: "Escalation call artifacts",
+    requireIntegrationEvents: ["call.completed", "review.saved", "task.created"],
+    requireReview: true,
+    requireTask: true,
+  },
+  {
+    description:
+      "Voicemail outcomes must create review evidence and callback work.",
+    expectedDisposition: "voicemail",
+    id: "voicemail-call-artifacts",
+    label: "Voicemail call artifacts",
+    requireIntegrationEvents: ["call.completed", "review.saved", "task.created"],
+    requireReview: true,
+    requireTask: true,
+  },
+  {
+    description:
+      "No-answer outcomes must create review evidence and retry/callback work.",
+    expectedDisposition: "no-answer",
+    id: "no-answer-call-artifacts",
+    label: "No-answer call artifacts",
+    requireIntegrationEvents: ["call.completed", "review.saved", "task.created"],
+    requireReview: true,
+    requireTask: true,
+  },
+] satisfies VoiceOutcomeContractDefinition[];
+
 const appKitLinks = [
   { href: "/react", label: "Back to demo" },
   {
@@ -954,6 +1009,13 @@ const appKitLinks = [
     href: "/turn-quality",
     label: "Turn Quality",
     statusHref: "/api/turn-quality",
+  },
+  {
+    description:
+      "Business outcome contracts for sessions, reviews, tasks, handoffs, and integration events.",
+    href: "/outcome-contracts",
+    label: "Outcome Contracts",
+    statusHref: "/api/outcome-contracts",
   },
   {
     description: "Redacted trace exports for debugging and support.",
@@ -1444,6 +1506,19 @@ const server = new Elysia()
       path: "/api/turn-quality",
       store: runtimeStorage.session,
       title: "AbsoluteJS Voice Demo Turn Quality",
+    }),
+  )
+  .use(
+    createVoiceOutcomeContractRoutes({
+      contracts: demoOutcomeContracts,
+      events: runtimeStorage.events,
+      handoffs: handoffDeliveryStore as unknown as VoiceHandoffDeliveryStore,
+      htmlPath: "/outcome-contracts",
+      path: "/api/outcome-contracts",
+      reviews: runtimeStorage.reviews,
+      sessions: runtimeStorage.session,
+      tasks: runtimeStorage.tasks,
+      title: "AbsoluteJS Voice Demo Outcome Contracts",
     }),
   )
   .use(
