@@ -78,6 +78,27 @@
           "type": "call.lifecycle"
         },
         {
+          "at": 1777200008000,
+          "id": "fixture-guided-workflow-contract",
+          "payload": {
+            "contractId": "guided-demo-completes",
+            "issues": [],
+            "missingFields": [],
+            "outcome": "complete",
+            "requiredFields": [
+              "transcript",
+              "assistantSummary",
+              "promptAnswers",
+              "turnCount"
+            ],
+            "status": "pass"
+          },
+          "scenarioId": "guided",
+          "sessionId": "fixture-guided",
+          "turnId": "guided-3",
+          "type": "workflow.contract"
+        },
+        {
           "at": 1777200010000,
           "id": "fixture-general-start",
           "payload": {},
@@ -110,6 +131,22 @@
           "scenarioId": "general",
           "sessionId": "fixture-general",
           "type": "call.lifecycle"
+        },
+        {
+          "at": 1777200014000,
+          "id": "fixture-general-workflow-contract",
+          "payload": {
+            "contractId": "general-recording-completes",
+            "issues": [],
+            "missingFields": [],
+            "outcome": "complete",
+            "requiredFields": ["transcript", "assistantSummary", "turnCount"],
+            "status": "pass"
+          },
+          "scenarioId": "general",
+          "sessionId": "fixture-general",
+          "turnId": "general-1",
+          "type": "workflow.contract"
         },
         {
           "at": 1777200020000,
@@ -169,6 +206,22 @@
           "scenarioId": "transfer",
           "sessionId": "fixture-transfer",
           "type": "call.lifecycle"
+        },
+        {
+          "at": 1777200026000,
+          "id": "fixture-transfer-workflow-contract",
+          "payload": {
+            "contractId": "transfer-handoff-delivered",
+            "issues": [],
+            "missingFields": [],
+            "outcome": "transfer",
+            "requiredFields": ["transcript", "assistantSummary"],
+            "status": "pass"
+          },
+          "scenarioId": "transfer",
+          "sessionId": "fixture-transfer",
+          "turnId": "transfer-1",
+          "type": "workflow.contract"
         }
       ]
     }

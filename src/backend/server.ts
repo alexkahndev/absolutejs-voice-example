@@ -27,6 +27,8 @@ import {
   createVoiceSessionReplayRoutes,
   createVoiceSTTProviderRouter,
   createVoiceTaskUpdatedEvent,
+  createVoiceWorkflowContract,
+  createVoiceWorkflowContractHandler,
   createVoiceOpsWebhookReceiverRoutes,
   createVoiceOpsWebhookSink,
   createVoiceWebhookHandoffAdapter,
@@ -639,6 +641,67 @@ const persistIntake = (intake: SavedIntake) => {
   savedIntakes.splice(12);
 };
 
+const guidedWorkflowContract = createVoiceWorkflowContract<SavedIntake>({
+  description:
+    "The guided demo should collect the expected test answers and complete without provider errors.",
+  fields: [
+    { path: "transcript" },
+    { path: "assistantSummary" },
+    { match: "non-empty", path: "promptAnswers" },
+    { match: "number", path: "turnCount" },
+  ],
+  id: "guided-demo-completes",
+  label: "Guided demo completes",
+  maxProviderErrors: 0,
+  minSessions: 1,
+  minTurns: 3,
+  outcome: "complete",
+  requiredDisposition: "completed",
+  requiredTranscriptIncludes: ["name", "integration", "follow up"],
+  scenarioId: "guided",
+});
+
+const generalWorkflowContract = createVoiceWorkflowContract<SavedIntake>({
+  description:
+    "General recording should save at least one freeform turn and end cleanly.",
+  fields: [
+    { path: "transcript" },
+    { path: "assistantSummary" },
+    { match: "number", path: "turnCount" },
+  ],
+  id: "general-recording-completes",
+  label: "General recording completes",
+  maxProviderErrors: 0,
+  minSessions: 1,
+  minTurns: 1,
+  outcome: "complete",
+  requiredDisposition: "completed",
+  scenarioId: "general",
+});
+
+const transferWorkflowContract = createVoiceWorkflowContract<SavedIntake>({
+  description:
+    "Any transfer outcome must create a handoff delivery path for downstream ops.",
+  fields: [
+    { path: "transcript" },
+    { path: "assistantSummary" },
+    { path: "callTarget", required: false },
+  ],
+  id: "transfer-handoff-delivered",
+  label: "Transfer handoff delivered",
+  minSessions: 0,
+  outcome: "transfer",
+  requiredDisposition: "transferred",
+  requiredHandoffActions: ["transfer"],
+  scenarioId: "transfer",
+});
+
+const workflowScenarios = [
+  guidedWorkflowContract.toScenarioEval(),
+  generalWorkflowContract.toScenarioEval(),
+  transferWorkflowContract.toScenarioEval(),
+];
+
 const normalizeTaskFilters = (
   query: Record<string, unknown>,
 ): VoiceOpsTaskFilterInput => ({
@@ -945,6 +1008,23 @@ const createDemoAssistant = (
   });
 
 const assistant = createDemoAssistant(modelProvider, assistantModel);
+const contractAwareOnTurn = createVoiceWorkflowContractHandler({
+  handler: assistant.onTurn,
+  resolveContract: ({ result, session }) => {
+    if (result.transfer) {
+      return transferWorkflowContract;
+    }
+
+    if (!result.complete) {
+      return undefined;
+    }
+
+    return session.scenarioId === "general"
+      ? generalWorkflowContract
+      : guidedWorkflowContract;
+  },
+  store: runtimeStorage.traces,
+});
 
 const server = new Elysia()
   .use(absolutejs)
@@ -999,7 +1079,7 @@ const server = new Elysia()
       ops: assistant.ops,
       correctTurn: correctDemoTurn,
       phraseHints: VOICE_DEMO_PHRASE_HINTS,
-      onTurn: assistant.onTurn,
+      onTurn: contractAwareOnTurn,
       path: "/voice/intake",
       preset: "reliability",
       session: runtimeStorage.session,
@@ -1109,41 +1189,7 @@ const server = new Elysia()
       fixtureStore: createVoiceFileScenarioFixtureStore(
         resolve(import.meta.dir, "fixtures", "voice-scenario-fixtures.json"),
       ),
-      scenarios: [
-        {
-          description:
-            "The guided demo should collect the expected test answers and complete without provider errors.",
-          id: "guided-demo-completes",
-          label: "Guided demo completes",
-          maxProviderErrors: 0,
-          minSessions: 1,
-          minTurns: 3,
-          requiredDisposition: "completed",
-          requiredTranscriptIncludes: ["name", "integration", "follow up"],
-          scenarioId: "guided",
-        },
-        {
-          description:
-            "General recording should save at least one freeform turn and end cleanly.",
-          id: "general-recording-completes",
-          label: "General recording completes",
-          maxProviderErrors: 0,
-          minSessions: 1,
-          minTurns: 1,
-          requiredDisposition: "completed",
-          scenarioId: "general",
-        },
-        {
-          description:
-            "Any transfer outcome must create a handoff delivery path for downstream ops.",
-          id: "transfer-handoff-delivered",
-          label: "Transfer handoff delivered",
-          minSessions: 0,
-          requiredDisposition: "transferred",
-          requiredHandoffActions: ["transfer"],
-          scenarioId: "transfer",
-        },
-      ],
+      scenarios: workflowScenarios,
       store: runtimeStorage.traces,
       title: "AbsoluteJS Voice Demo Evals",
     }),

@@ -6,8 +6,8 @@
       "name": "absolutejs-voice-example",
       "dependencies": {
         "@absolutejs/absolute": "0.19.0-beta.648",
-        "@absolutejs/voice": "0.0.22-beta.45",
-        "@absolutejs/voice-assemblyai": "0.0.19-beta.11",
+        "@absolutejs/voice": "0.0.22-beta.46",
+        "@absolutejs/voice-assemblyai": "0.0.19-beta.12",
         "@absolutejs/voice-deepgram": "0.0.20-beta.0",
         "@angular/common": "^21.0.0",
         "@angular/compiler": "^21.0.0",
@@ -62,9 +62,9 @@
 
     "@absolutejs/native-windows-x64": ["@absolutejs/native-windows-x64@0.19.0-beta.648", "", { "os": "win32", "cpu": "x64" }, "sha512-cYVJhSSTWavwlfor0DSUd2Xz/dW5BReom8MmdxN4QA6PncU/9yTMWcCtLZehlQld8kpDncryWtOURwJZ+g4Y+A=="],
 
-    "@absolutejs/voice": ["@absolutejs/voice@0.0.22-beta.45", "", { "peerDependencies": { "@absolutejs/absolute": ">=0.19.0-beta.646", "@angular/core": ">=21.0.0", "elysia": ">=1.4.18", "react": ">=19.0.0", "vue": ">=3.5.0" }, "optionalPeers": ["@angular/core", "react", "vue"] }, "sha512-Km27bd7ASG+ilYgaTf73Szd02Lr4+Hf+3SDzVLRfTZIPVrFeBjKIHMASFYkmT+6a2qkhtIRRzMdzlR+s7wG+lg=="],
+    "@absolutejs/voice": ["@absolutejs/voice@0.0.22-beta.46", "", { "peerDependencies": { "@absolutejs/absolute": ">=0.19.0-beta.646", "@angular/core": ">=21.0.0", "elysia": ">=1.4.18", "react": ">=19.0.0", "vue": ">=3.5.0" }, "optionalPeers": ["@angular/core", "react", "vue"] }, "sha512-n8orf4Gy+CRfqfRxJVKEPH/TNMmC6PfEiyp9Dkkov7TNkjhHNOP3gLhMsMRWFTyHAFlqsMGcjjuRs6eR9bl8yQ=="],
 
-    "@absolutejs/voice-assemblyai": ["@absolutejs/voice-assemblyai@0.0.19-beta.11", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.45" } }, "sha512-gMVRc/KNW0zQlclsS4xLm5HZhGa6AOquwUbqkJfOBrYqNn+VT0bc+4McHV3OaziQNcGTA6bX/pMs7ZM/9vW8CQ=="],
+    "@absolutejs/voice-assemblyai": ["@absolutejs/voice-assemblyai@0.0.19-beta.12", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.46" } }, "sha512-n01s2z+WQbx6k7xNut2J6c012HTl3vgp9lG5xCvhYcKDIcFYSXNIR5DihEPAA/CF4f0fAqygv1e6bwc6aeRQUg=="],
 
     "@absolutejs/voice-deepgram": ["@absolutejs/voice-deepgram@0.0.20-beta.0", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.0" } }, "sha512-Dp0cBXE6inHVcAy2lzsSoOu0gw2Lkpe+c1nI5VcI5bHa3rvjPXkX7BPdlq4mxBCI1dASC7wCNgXeRqCjTgUODg=="],
 
