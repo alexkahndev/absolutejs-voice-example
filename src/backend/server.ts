@@ -16,6 +16,7 @@ import {
   createVoiceHandoffDeliveryWorker,
   createVoiceHandoffHealthRoutes,
   createVoiceProviderHealthRoutes,
+  createVoiceQualityRoutes,
   createVoiceProviderRouter,
   createVoiceResilienceRoutes,
   createVoiceSessionListRoutes,
@@ -1033,6 +1034,8 @@ const server = new Elysia()
       links: [
         { href: "/react", label: "Back to demo" },
         { href: "/assistant", label: "Assistant" },
+        { href: "/quality", label: "Quality" },
+        { href: "/diagnostics", label: "Diagnostics" },
         { href: "/sessions", label: "Sessions" },
         { href: "/handoffs", label: "Handoffs" },
         { href: "/reviews", label: "Reviews" },
@@ -1059,6 +1062,21 @@ const server = new Elysia()
     createVoiceDiagnosticsRoutes({
       store: runtimeStorage.traces,
       title: "AbsoluteJS Voice Demo Diagnostics",
+    }),
+  )
+  .use(
+    createVoiceQualityRoutes({
+      links: [
+        { href: "/react", label: "Back to demo" },
+        { href: "/resilience", label: "Resilience" },
+        { href: "/diagnostics", label: "Diagnostics" },
+        { href: "/sessions", label: "Sessions" },
+        { href: "/handoffs", label: "Handoffs" },
+        { href: "/reviews", label: "Reviews" },
+        { href: "/tasks", label: "Tasks" },
+        { href: "/integrations", label: "Integrations" },
+      ],
+      store: runtimeStorage.traces,
     }),
   )
   .use(
