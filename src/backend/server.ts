@@ -3,6 +3,7 @@ import {
   applyPhraseHintCorrections,
   assignVoiceOpsTask,
   completeVoiceOpsTask,
+  createMemoryVoiceTelephonyWebhookIdempotencyStore,
   createAnthropicVoiceAssistantModel,
   createGeminiVoiceAssistantModel,
   createVoiceAppKitRoutes,
@@ -959,6 +960,8 @@ const telephonyOutcomePolicy = createVoiceTelephonyOutcomePolicy({
   transferTarget: ({ metadata }) =>
     typeof metadata?.queue === "string" ? metadata.queue : undefined,
 });
+const telephonyWebhookIdempotencyStore =
+  createMemoryVoiceTelephonyWebhookIdempotencyStore();
 
 const telephonyOutcomeSamples = [
   {
@@ -1643,6 +1646,9 @@ const server = new Elysia()
   )
   .use(
     createVoiceTelephonyWebhookRoutes({
+      idempotency: {
+        store: telephonyWebhookIdempotencyStore,
+      },
       onDecision: ({ decision }) => {
         console.info("telephony outcome webhook", {
           action: decision.action,
