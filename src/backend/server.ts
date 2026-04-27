@@ -1235,6 +1235,13 @@ const appKitLinks = [
   },
   {
     description:
+      "Single pass/warn/fail report for quality, providers, routing evidence, handoffs, sessions, and carriers.",
+    href: "/production-readiness",
+    label: "Production Readiness",
+    statusHref: "/api/production-readiness",
+  },
+  {
+    description:
       "Configured, selected, and healthy LLM/STT providers for this deployment.",
     href: "/provider-capabilities",
     label: "Provider Capabilities",
@@ -1946,6 +1953,16 @@ const server = new Elysia()
         },
       },
       providerHealth: {},
+      productionReadiness: {
+        carriers: loadCarrierMatrixInputs,
+        links: {
+          carriers: "/carriers",
+          handoffs: "/handoffs",
+          quality: "/quality",
+          resilience: "/resilience",
+          sessions: "/sessions",
+        },
+      },
       resilience: {
         sttSimulation: {
           failureMessage:
