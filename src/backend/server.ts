@@ -11,9 +11,11 @@ import {
   createVoiceFileScenarioFixtureStore,
   createVoiceAssistant,
   createVoiceAgentTool,
+  createVoiceCampaignRoutes,
   createVoiceExperiment,
   createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
+  createVoiceMemoryCampaignStore,
   createOpenAIVoiceAssistantModel,
   createOpenAIVoiceTTS,
   createVoiceHandoffDeliveryWorker,
@@ -1091,6 +1093,7 @@ const telephonyWebhookIdempotencyStore =
   createVoiceSQLiteTelephonyWebhookIdempotencyStore<SavedIntake>({
     path: resolve(runtimeDirectory, "telephony-webhook-idempotency.sqlite"),
   });
+const campaignStore = createVoiceMemoryCampaignStore();
 
 const telephonyOutcomeSamples = [
   {
@@ -1296,6 +1299,13 @@ const appKitLinks = [
     href: "/telephony-outcomes",
     label: "Telephony Outcomes",
     statusHref: "/api/telephony-outcomes",
+  },
+  {
+    description:
+      "Self-hosted outbound campaign orchestration for recipients, attempts, retries, and outcomes.",
+    href: "/voice/campaigns",
+    label: "Campaigns",
+    statusHref: "/api/voice/campaigns",
   },
   {
     description:
@@ -2364,6 +2374,14 @@ const server = new Elysia()
         },
       ],
     }).routes,
+  )
+  .use(
+    createVoiceCampaignRoutes({
+      htmlPath: "/voice/campaigns",
+      path: "/api/voice/campaigns",
+      store: campaignStore,
+      title: "AbsoluteJS Voice Demo Campaigns",
+    }),
   )
   .use(
     createVoiceOpsWebhookReceiverRoutes({

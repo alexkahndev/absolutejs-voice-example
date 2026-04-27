@@ -3,6 +3,7 @@ export {};
 type EndpointName =
   | "appKit"
   | "bargeIn"
+  | "campaigns"
   | "carriers"
   | "handoffs"
   | "liveLatency"
@@ -73,6 +74,27 @@ const endpoints: Array<{
       return {
         carrierPass: matrix.pass,
         carrierSummary: matrix.summary,
+      };
+    },
+  },
+  {
+    name: "campaigns",
+    path: "/api/voice/campaigns",
+    summarize: (body) => {
+      const report = body as {
+        campaigns?: unknown[];
+        summary?: {
+          attempts?: { total?: unknown };
+          campaigns?: { total?: unknown };
+          recipients?: { total?: unknown };
+        };
+      };
+      return {
+        attempts: report.summary?.attempts?.total,
+        campaignCount: Array.isArray(report.campaigns)
+          ? report.campaigns.length
+          : report.summary?.campaigns?.total,
+        recipients: report.summary?.recipients?.total,
       };
     },
   },
