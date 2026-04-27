@@ -1,4 +1,11 @@
-import { Component, computed, inject, signal } from "@angular/core";
+import {
+  Component,
+  CUSTOM_ELEMENTS_SCHEMA,
+  computed,
+  inject,
+  signal,
+} from "@angular/core";
+import { defineVoiceProviderSimulationControlsElement } from "@absolutejs/voice/client";
 import {
   VoiceAppKitStatusService,
   VoiceProviderStatusService,
@@ -46,6 +53,7 @@ import {
 
 @Component({
   selector: "angular-voice-demo-page",
+  schemas: [CUSTOM_ELEMENTS_SCHEMA],
   standalone: true,
   template: `
     <div class="voice-demo-page">
@@ -234,6 +242,16 @@ import {
               <p class="empty-copy">Run assistant traffic to see provider health.</p>
             }
           </article>
+
+          <absolute-voice-provider-simulation
+            class="voice-card voice-provider-simulation-card"
+            failure-message="Prove Deepgram STT failover to AssemblyAI without changing credentials."
+            failure-providers="deepgram"
+            fallback-required-message="Add ASSEMBLYAI_API_KEY to enable the fallback simulation."
+            fallback-required-provider="assemblyai"
+            kind="stt"
+            providers="deepgram,assemblyai"
+          ></absolute-voice-provider-simulation>
 
           <article
             class="voice-card voice-workflow-card"
@@ -596,6 +614,7 @@ export class AngularVoiceDemoComponent {
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
+    defineVoiceProviderSimulationControlsElement();
     if (typeof window !== "undefined") {
       void this.refreshIntakes();
       this.refreshTimer = setInterval(() => {

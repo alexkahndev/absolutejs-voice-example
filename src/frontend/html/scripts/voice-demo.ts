@@ -1,6 +1,7 @@
 import {
   createVoiceStream,
   mountVoiceOpsStatus,
+  mountVoiceProviderSimulationControls,
   mountVoiceProviderStatus,
   mountVoiceRoutingStatus,
 } from "@absolutejs/voice/client";
@@ -75,6 +76,9 @@ const voiceWaveGlow = document.querySelector("#voice-wave-glow");
 const voiceWavePath = document.querySelector("#voice-wave-path");
 const workflowStatusHost = document.querySelector("#workflow-status-card");
 const providerStatusHost = document.querySelector("#provider-status-card");
+const providerSimulationHost = document.querySelector(
+  "#provider-simulation-card",
+);
 const routingModeCopy = document.querySelector("#routing-mode-copy");
 const routingDecisionRoot = document.querySelector("#routing-decision");
 const routingModeMetric = document.querySelector("#metric-routing");
@@ -103,6 +107,7 @@ if (
   !(voiceWavePath instanceof SVGPathElement) ||
   !(workflowStatusHost instanceof HTMLElement) ||
   !(providerStatusHost instanceof HTMLElement) ||
+  !(providerSimulationHost instanceof HTMLElement) ||
   !(routingModeCopy instanceof HTMLElement) ||
   !(routingDecisionRoot instanceof HTMLElement) ||
   !(routingModeMetric instanceof HTMLElement) ||
@@ -130,6 +135,19 @@ const providerStatus = mountVoiceProviderStatus(
   "/api/provider-status",
   {
     intervalMs: 5_000,
+  },
+);
+const providerSimulation = mountVoiceProviderSimulationControls(
+  providerSimulationHost,
+  {
+    failureMessage:
+      "Prove Deepgram STT failover to AssemblyAI without changing credentials.",
+    failureProviders: ["deepgram"],
+    fallbackRequiredMessage:
+      "Add ASSEMBLYAI_API_KEY to enable the fallback simulation.",
+    fallbackRequiredProvider: "assemblyai",
+    kind: "stt",
+    providers: [{ provider: "deepgram" }, { provider: "assemblyai" }],
   },
 );
 const routingStatus = mountVoiceRoutingStatus(
@@ -397,6 +415,7 @@ render();
 void renderSavedIntakes();
 window.addEventListener("beforeunload", () => {
   opsStatus.close();
+  providerSimulation.close();
   providerStatus.close();
   routingStatus.close();
 });

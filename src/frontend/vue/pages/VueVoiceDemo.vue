@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import {
   useVoiceStream,
   VoiceOpsStatus,
+  VoiceProviderSimulationControls,
   VoiceProviderStatus,
   VoiceRoutingStatus,
 } from "@absolutejs/voice/vue";
@@ -318,6 +319,16 @@ onUnmounted(() => {
         <VoiceProviderStatus
           class="voice-card voice-provider-health-card"
           :interval-ms="5000"
+        />
+
+        <VoiceProviderSimulationControls
+          class="voice-card voice-provider-simulation-card"
+          failure-message="Prove Deepgram STT failover to AssemblyAI without changing credentials."
+          :failure-providers="['deepgram']"
+          fallback-required-message="Add ASSEMBLYAI_API_KEY to enable the fallback simulation."
+          fallback-required-provider="assemblyai"
+          kind="stt"
+          :providers="[{ provider: 'deepgram' }, { provider: 'assemblyai' }]"
         />
 
         <VoiceOpsStatus

@@ -140,6 +140,16 @@
           interval-ms="5000"
         ></absolute-voice-provider-status>
 
+        <absolute-voice-provider-simulation
+          class="voice-card voice-provider-simulation-card"
+          failure-message="Prove Deepgram STT failover to AssemblyAI without changing credentials."
+          failure-providers="deepgram"
+          fallback-required-message="Add ASSEMBLYAI_API_KEY to enable the fallback simulation."
+          fallback-required-provider="assemblyai"
+          kind="stt"
+          providers="deepgram,assemblyai"
+        ></absolute-voice-provider-simulation>
+
         <absolute-voice-ops-status
           class="voice-card voice-workflow-card"
           interval-ms="5000"

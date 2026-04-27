@@ -3,6 +3,7 @@
   import Head from "@absolutejs/absolute/svelte/components/Head.js";
   import {
     createVoiceOpsStatus,
+    createVoiceProviderSimulationControls,
     createVoiceProviderStatus,
     createVoiceRoutingStatus,
     createVoiceStream,
@@ -74,12 +75,14 @@
   let isCapturing = $state(false);
   let savedIntakes = $state<SavedIntake[]>([]);
   let opsStatusHTML = $state("");
+  let providerSimulationHTML = $state("");
   let providerStatusHTML = $state("");
   let routingStatusHTML = $state("");
   let guidedState = $state(createInitialVoiceState());
   let generalState = $state(createInitialVoiceState());
   let waveLevels = $state(createInitialVoiceWaveLevels());
   let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
+  let providerSimulationElement: HTMLElement | null = null;
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
   let guidedVoice: VoiceStream<SavedIntake> | null = null;
   let generalVoice: VoiceStream<SavedIntake> | null = null;
@@ -89,12 +92,24 @@
   const providerStatus = createVoiceProviderStatus("/api/provider-status", {
     intervalMs: 5_000,
   });
+  const providerSimulation = createVoiceProviderSimulationControls({
+    failureMessage:
+      "Prove Deepgram STT failover to AssemblyAI without changing credentials.",
+    failureProviders: ["deepgram"],
+    fallbackRequiredMessage:
+      "Add ASSEMBLYAI_API_KEY to enable the fallback simulation.",
+    fallbackRequiredProvider: "assemblyai",
+    kind: "stt",
+    providers: [{ provider: "deepgram" }, { provider: "assemblyai" }],
+  });
   const routingStatus = createVoiceRoutingStatus("/api/routing/latest", {
     intervalMs: 4_000,
   });
   let unsubscribeGuided = () => {};
   let unsubscribeGeneral = () => {};
   let unsubscribeOpsStatus = () => {};
+  let unsubscribeProviderSimulation = () => {};
+  let unbindProviderSimulation = () => {};
   let unsubscribeProviderStatus = () => {};
   let unsubscribeRoutingStatus = () => {};
   let currentVoice = $derived(
@@ -236,15 +251,24 @@
     unsubscribeProviderStatus = providerStatus.subscribe(() => {
       providerStatusHTML = providerStatus.getHTML();
     });
+    unsubscribeProviderSimulation = providerSimulation.subscribe(() => {
+      providerSimulationHTML = providerSimulation.getHTML();
+    });
     unsubscribeRoutingStatus = routingStatus.subscribe(() => {
       routingStatusHTML = routingStatus.getHTML();
     });
     opsStatusHTML = opsStatus.getHTML();
+    providerSimulationHTML = providerSimulation.getHTML();
     providerStatusHTML = providerStatus.getHTML();
     routingStatusHTML = routingStatus.getHTML();
     void opsStatus.refresh().catch(() => {});
     void providerStatus.refresh().catch(() => {});
     void routingStatus.refresh().catch(() => {});
+    if (providerSimulationElement) {
+      unbindProviderSimulation = providerSimulation.bind(
+        providerSimulationElement,
+      );
+    }
     void refreshIntakes();
     refreshTimer = setInterval(() => {
       void refreshIntakes();
@@ -259,11 +283,14 @@
     unsubscribeGuided();
     unsubscribeGeneral();
     unsubscribeOpsStatus();
+    unsubscribeProviderSimulation();
+    unbindProviderSimulation();
     unsubscribeProviderStatus();
     unsubscribeRoutingStatus();
     guidedVoice?.close();
     generalVoice?.close();
     opsStatus.close();
+    providerSimulation.close();
     providerStatus.close();
     routingStatus.close();
   });
@@ -375,6 +402,13 @@
 
       <div class="voice-card voice-provider-health-card voice-provider-status-host">
         {@html providerStatusHTML}
+      </div>
+
+      <div
+        bind:this={providerSimulationElement}
+        class="voice-card voice-provider-simulation-card voice-provider-simulation-host"
+      >
+        {@html providerSimulationHTML}
       </div>
 
       <div class="voice-card voice-workflow-card voice-ops-status-host">

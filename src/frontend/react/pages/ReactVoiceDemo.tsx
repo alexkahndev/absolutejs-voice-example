@@ -4,6 +4,7 @@ import type { VoiceTurnRecord } from "@absolutejs/voice";
 import {
   useVoiceStream,
   VoiceOpsStatus,
+  VoiceProviderSimulationControls,
   VoiceProviderStatus,
   VoiceRoutingStatus,
 } from "@absolutejs/voice/react";
@@ -355,6 +356,16 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
             <VoiceProviderStatus
               className="voice-card voice-provider-health-card"
               intervalMs={5_000}
+            />
+
+            <VoiceProviderSimulationControls
+              className="voice-card voice-provider-simulation-card"
+              failureMessage="Prove Deepgram STT failover to AssemblyAI without changing credentials."
+              failureProviders={["deepgram"]}
+              fallbackRequiredMessage="Add ASSEMBLYAI_API_KEY to enable the fallback simulation."
+              fallbackRequiredProvider="assemblyai"
+              kind="stt"
+              providers={[{ provider: "deepgram" }, { provider: "assemblyai" }]}
             />
 
             <VoiceOpsStatus
