@@ -6,6 +6,7 @@ import {
 import type {
   VoiceAudioPlayer,
   VoiceBargeInMonitor,
+  VoiceBargeInReport,
   VoiceAppKitStatusReport,
   VoiceRoutingDecisionSummary,
   VoiceStreamState,
@@ -18,6 +19,14 @@ const VOICE_WAVE_HEIGHT = 88;
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
+
+const escapeHtml = (value: string) =>
+  value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 
 const getPcmLevel = (audio: Uint8Array | ArrayBuffer) => {
   const bytes = audio instanceof Uint8Array ? audio : new Uint8Array(audio);
@@ -78,6 +87,16 @@ export const fetchLatestRoutingDecision = async () => {
   }
 
   return (await response.json()) as VoiceRoutingDecisionSummary | null;
+};
+
+export const fetchBargeInReport = async () => {
+  const response = await fetch("/api/voice-barge-in");
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return (await response.json()) as VoiceBargeInReport;
 };
 
 export const getAppKitStatusLabel = (
@@ -239,6 +258,133 @@ export const createDemoMicrophone = (
       capture = null;
       onLevel?.(0);
     },
+  };
+};
+
+const formatLatency = (value?: number) =>
+  typeof value === "number" ? `${Math.round(value)}ms` : "Not measured";
+
+const formatBargeInStatus = (status?: VoiceBargeInReport["status"]) => {
+  if (!status || status === "empty") {
+    return {
+      className: "empty",
+      copy: "Waiting for an interruption",
+      label: "No proof yet",
+    };
+  }
+
+  if (status === "pass") {
+    return {
+      className: "pass",
+      copy: "Assistant playback stopped inside the latency budget.",
+      label: "Barge-in passing",
+    };
+  }
+
+  if (status === "warn") {
+    return {
+      className: "warn",
+      copy: "Interruption was detected but playback stop latency is not complete.",
+      label: "Needs a full playback interruption",
+    };
+  }
+
+  return {
+    className: "fail",
+    copy: "At least one interruption missed the latency budget.",
+    label: "Barge-in failing",
+  };
+};
+
+export const renderDemoBargeInProofHTML = (
+  report: VoiceBargeInReport | null,
+  error?: string | null,
+) => {
+  const status = formatBargeInStatus(report?.status);
+  const lastEvent = report?.lastEvent;
+  const sessions = report?.sessions ?? [];
+
+  return `<article class="voice-card voice-barge-in-proof voice-barge-in-proof--${status.className}">
+  <header class="voice-barge-in-proof__header">
+    <span class="voice-framework-pill">Live Barge-in Proof</span>
+    <strong>${escapeHtml(status.label)}</strong>
+  </header>
+  <p class="voice-footnote">${escapeHtml(error || status.copy)}</p>
+  <div class="voice-barge-in-proof__grid">
+    <div>
+      <span>Interrupt latency</span>
+      <strong>${escapeHtml(formatLatency(lastEvent?.latencyMs))}</strong>
+    </div>
+    <div>
+      <span>Playback stop</span>
+      <strong>${escapeHtml(formatLatency(lastEvent?.playbackStopLatencyMs))}</strong>
+    </div>
+    <div>
+      <span>Passed</span>
+      <strong>${report?.passed ?? 0}</strong>
+    </div>
+    <div>
+      <span>Failed</span>
+      <strong>${report?.failed ?? 0}</strong>
+    </div>
+  </div>
+  ${
+    lastEvent
+      ? `<p class="voice-footnote">Last ${escapeHtml(lastEvent.status)} event: ${escapeHtml(lastEvent.reason)}${lastEvent.sessionId ? ` · ${escapeHtml(lastEvent.sessionId)}` : ""}</p>`
+      : `<p class="voice-footnote">Start assistant audio, speak over it, then open this card for measured proof.</p>`
+  }
+  ${
+    sessions.length
+      ? `<div class="voice-barge-in-proof__sessions">${sessions
+          .slice(0, 2)
+          .map(
+            (session) => `<div>
+      <strong>${escapeHtml(session.sessionId)}</strong>
+      <span>${session.passed} pass · ${session.failed} fail · ${escapeHtml(formatLatency(session.averageLatencyMs))}</span>
+    </div>`,
+          )
+          .join("")}</div>`
+      : ""
+  }
+  <a href="/barge-in">Open barge-in dashboard</a>
+</article>`;
+};
+
+export const mountDemoBargeInProof = (
+  element: HTMLElement,
+  options: { intervalMs?: number } = {},
+) => {
+  let isClosed = false;
+  let timer: ReturnType<typeof setInterval> | null = null;
+
+  const refresh = async () => {
+    try {
+      const report = await fetchBargeInReport();
+      if (!isClosed) {
+        element.innerHTML = renderDemoBargeInProofHTML(report);
+      }
+    } catch (error) {
+      if (!isClosed) {
+        element.innerHTML = renderDemoBargeInProofHTML(
+          null,
+          formatErrorMessage(error),
+        );
+      }
+    }
+  };
+
+  element.innerHTML = renderDemoBargeInProofHTML(null);
+  void refresh();
+  timer = setInterval(refresh, options.intervalMs ?? 3_000);
+
+  return {
+    close: () => {
+      isClosed = true;
+      if (timer) {
+        clearInterval(timer);
+      }
+    },
+    refresh,
   };
 };
 

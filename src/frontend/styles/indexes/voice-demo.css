@@ -1107,6 +1107,75 @@ nav a.active {
   font-weight: 800;
 }
 
+.voice-barge-in-proof {
+  border-color: rgba(94, 234, 212, 0.28);
+  overflow: hidden;
+}
+
+.voice-barge-in-proof--pass {
+  border-color: rgba(52, 211, 153, 0.5);
+}
+
+.voice-barge-in-proof--warn,
+.voice-barge-in-proof--empty {
+  border-color: rgba(251, 191, 36, 0.42);
+}
+
+.voice-barge-in-proof--fail {
+  border-color: rgba(251, 113, 133, 0.55);
+}
+
+.voice-barge-in-proof__header,
+.voice-barge-in-proof__sessions div {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.voice-barge-in-proof__header strong {
+  color: var(--text);
+  font-size: 1.05rem;
+}
+
+.voice-barge-in-proof__grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 1rem 0;
+}
+
+.voice-barge-in-proof__grid div,
+.voice-barge-in-proof__sessions div {
+  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
+  padding: 0.85rem;
+}
+
+.voice-barge-in-proof__grid span,
+.voice-barge-in-proof__sessions span {
+  color: var(--muted);
+  display: block;
+  font-size: 0.78rem;
+}
+
+.voice-barge-in-proof__grid strong,
+.voice-barge-in-proof__sessions strong {
+  color: var(--text);
+}
+
+.voice-barge-in-proof__sessions {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.voice-barge-in-proof a {
+  color: #5eead4;
+  font-weight: 800;
+}
+
 .footer {
   align-items: center;
   color: var(--muted);

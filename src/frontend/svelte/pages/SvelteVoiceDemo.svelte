@@ -49,6 +49,7 @@
     fetchSavedIntakes,
     formatErrorMessage,
     formatDateTime,
+    mountDemoBargeInProof,
     pushVoiceWaveLevel,
   } from "../../shared/browser";
 
@@ -89,6 +90,8 @@
   let generalState = $state(createInitialVoiceState());
   let waveLevels = $state(createInitialVoiceWaveLevels());
   let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
+  let bargeInProofElement: HTMLElement | null = null;
+  let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
   let providerSimulationElement: HTMLElement | null = null;
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
   let guidedVoice: VoiceStream<SavedIntake> | null = null;
@@ -318,6 +321,9 @@
         providerSimulationElement,
       );
     }
+    if (bargeInProofElement) {
+      bargeInProof = mountDemoBargeInProof(bargeInProofElement);
+    }
     void refreshIntakes();
     refreshTimer = setInterval(() => {
       void refreshIntakes();
@@ -339,6 +345,7 @@
     unsubscribeRoutingStatus();
     unsubscribeTraceTimeline();
     unsubscribeTurnQuality();
+    bargeInProof?.close();
     guidedVoice?.close();
     generalVoice?.close();
     opsStatus.close();
@@ -483,6 +490,8 @@
       <div class="voice-card voice-provider-health-card voice-trace-timeline-host">
         {@html traceTimelineHTML}
       </div>
+
+      <div bind:this={bargeInProofElement}></div>
 
       <article class="voice-card voice-card-side">
         <h2>{VOICE_DEMO_GUIDE_TITLE}</h2>

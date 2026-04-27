@@ -19,6 +19,7 @@ import {
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
+  mountDemoBargeInProof,
   pushVoiceWaveLevel,
 } from "../../shared/browser";
 import {
@@ -88,6 +89,7 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
   const microphoneRef = useRef<ReturnType<typeof createDemoMicrophone> | null>(
     null,
   );
+  const bargeInProofRef = useRef<HTMLDivElement | null>(null);
   const bargeInRef = useRef<ReturnType<typeof createDemoBargeInEvidence> | null>(
     null,
   );
@@ -148,6 +150,14 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
     },
     [],
   );
+  useEffect(() => {
+    if (!bargeInProofRef.current) {
+      return;
+    }
+
+    const proof = mountDemoBargeInProof(bargeInProofRef.current);
+    return () => proof.close();
+  }, []);
 
   const startMic = async () => {
     try {
@@ -411,6 +421,8 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
               intervalMs={5_000}
               limit={2}
             />
+
+            <div ref={bargeInProofRef} />
 
             <article className="voice-card voice-card-side">
               <h2>{VOICE_DEMO_GUIDE_TITLE}</h2>

@@ -48,10 +48,12 @@ import {
   createVoiceWavePath,
   createDemoBargeInEvidence,
   createDemoMicrophone,
+  fetchBargeInReport,
   fetchSavedIntakes,
   getAppKitStatusLabel,
   formatErrorMessage,
   formatDateTime,
+  renderDemoBargeInProofHTML,
   pushVoiceWaveLevel,
 } from "../../shared/browser";
 
@@ -404,6 +406,8 @@ import {
             }
           </article>
 
+          <div [innerHTML]="bargeInProofHtml()"></div>
+
           <article class="voice-card voice-card-side">
             <h2>{{ guideTitle }}</h2>
             <ol class="voice-guide-list">
@@ -668,6 +672,7 @@ export class AngularVoiceDemoComponent {
   idleMicCopy = VOICE_DEMO_MIC_IDLE;
   liveMicCopy = VOICE_DEMO_MIC_LIVE;
   micError = signal<string | null>(null);
+  bargeInProofHtml = signal(renderDemoBargeInProofHTML(null));
   savedIntakes = signal<SavedIntake[]>([]);
   generalLabel = VOICE_DEMO_GENERAL_LABEL;
   guidedLabel = VOICE_DEMO_GUIDED_LABEL;
@@ -761,10 +766,15 @@ export class AngularVoiceDemoComponent {
   wavePath = computed(() => createVoiceWavePath(this.waveLevels()));
   private microphone: ReturnType<typeof createDemoMicrophone> | null = null;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
+  private bargeInProofTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     defineVoiceProviderSimulationControlsElement();
     if (typeof window !== "undefined") {
+      void this.refreshBargeInProof();
+      this.bargeInProofTimer = setInterval(() => {
+        void this.refreshBargeInProof();
+      }, 3_000);
       void this.refreshIntakes();
       this.refreshTimer = setInterval(() => {
         void this.refreshIntakes();
@@ -776,6 +786,18 @@ export class AngularVoiceDemoComponent {
 
   async refreshIntakes() {
     this.savedIntakes.set(await fetchSavedIntakes());
+  }
+
+  async refreshBargeInProof() {
+    try {
+      this.bargeInProofHtml.set(
+        renderDemoBargeInProofHTML(await fetchBargeInReport()),
+      );
+    } catch (error) {
+      this.bargeInProofHtml.set(
+        renderDemoBargeInProofHTML(null, formatErrorMessage(error)),
+      );
+    }
   }
 
   async startMic() {
@@ -839,6 +861,9 @@ export class AngularVoiceDemoComponent {
   ngOnDestroy() {
     if (this.refreshTimer) {
       clearInterval(this.refreshTimer);
+    }
+    if (this.bargeInProofTimer) {
+      clearInterval(this.bargeInProofTimer);
     }
     this.stopMic();
     this.guidedVoice.close();

@@ -15,6 +15,7 @@ import {
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
+  mountDemoBargeInProof,
   pushVoiceWaveLevel,
 } from "../../shared/browser";
 import {
@@ -87,6 +88,7 @@ const providerSimulationHost = document.querySelector(
 );
 const routingModeCopy = document.querySelector("#routing-mode-copy");
 const routingDecisionRoot = document.querySelector("#routing-decision");
+const bargeInProofHost = document.querySelector("#barge-in-proof-card");
 const turnQualityHost = document.querySelector("#turn-quality-card");
 const routingModeMetric = document.querySelector("#metric-routing");
 const routingModeSelect = document.querySelector("#routing-mode-select");
@@ -118,6 +120,7 @@ if (
   !(providerSimulationHost instanceof HTMLElement) ||
   !(routingModeCopy instanceof HTMLElement) ||
   !(routingDecisionRoot instanceof HTMLElement) ||
+  !(bargeInProofHost instanceof HTMLElement) ||
   !(turnQualityHost instanceof HTMLElement) ||
   !(routingModeMetric instanceof HTMLElement) ||
   !(routingModeSelect instanceof HTMLSelectElement) ||
@@ -176,6 +179,7 @@ const routingStatus = mountVoiceRoutingStatus(
 const turnQuality = mountVoiceTurnQuality(turnQualityHost, "/api/turn-quality", {
   intervalMs: 5_000,
 });
+const bargeInProof = mountDemoBargeInProof(bargeInProofHost);
 let activeMode: VoiceDemoMode | null = null;
 let hasStartedModes: Record<VoiceDemoMode, boolean> = {
   general: false,
@@ -442,4 +446,5 @@ window.addEventListener("beforeunload", () => {
   providerStatus.close();
   routingStatus.close();
   turnQuality.close();
+  bargeInProof.close();
 });

@@ -48,6 +48,7 @@ import {
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
+  mountDemoBargeInProof,
   pushVoiceWaveLevel,
 } from "../../shared/browser";
 
@@ -71,8 +72,10 @@ const hasStartedModes = ref<Record<VoiceDemoMode, boolean>>({
 const micError = ref<string | null>(null);
 const savedIntakes = ref<SavedIntake[]>([]);
 const waveLevels = ref(createInitialVoiceWaveLevels());
+const bargeInProofEl = ref<HTMLElement | null>(null);
 let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
+let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
 const currentVoice = computed(() =>
   activeMode.value === "general" ? generalVoice : guidedVoice,
 );
@@ -210,6 +213,9 @@ const runCallControl = (
 };
 
 onMounted(() => {
+  if (bargeInProofEl.value) {
+    bargeInProof = mountDemoBargeInProof(bargeInProofEl.value);
+  }
   void refreshIntakes();
   refreshTimer = setInterval(() => {
     void refreshIntakes();
@@ -220,6 +226,7 @@ onUnmounted(() => {
   if (refreshTimer) {
     clearInterval(refreshTimer);
   }
+  bargeInProof?.close();
   stopMic();
 });
 </script>
@@ -419,6 +426,8 @@ onUnmounted(() => {
             Run a voice session to see call timelines.
           </p>
         </article>
+
+        <div ref="bargeInProofEl" />
 
         <article class="voice-card voice-card-side">
           <h2>{{ VOICE_DEMO_GUIDE_TITLE }}</h2>
