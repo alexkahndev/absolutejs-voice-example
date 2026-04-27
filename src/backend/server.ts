@@ -1684,6 +1684,10 @@ const server = new Elysia()
         },
         title: "AbsoluteJS Voice Demo Twilio Setup",
       },
+      smoke: {
+        path: "/api/twilio/smoke",
+        title: "AbsoluteJS Voice Demo Twilio Smoke Test",
+      },
       streamPath: "/api/twilio/stream",
       stt: sttAdapter,
       twiml: {
