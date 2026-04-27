@@ -1305,10 +1305,10 @@ const appKitLinks = [
   },
   {
     description:
-      "Self-hosted outbound campaign orchestration for recipients, attempts, retries, and outcomes.",
-    href: "/voice/campaigns",
-    label: "Campaigns",
-    statusHref: "/api/voice/campaigns",
+      "Self-hosted outbound campaign queue depth, active attempts, stuck work, and failure reasons.",
+    href: "/voice/campaigns/observability",
+    label: "Campaign Observability",
+    statusHref: "/api/voice/campaigns/observability",
   },
   {
     description:
