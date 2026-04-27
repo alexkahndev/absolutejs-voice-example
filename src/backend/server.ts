@@ -69,6 +69,7 @@ import {
   type VoiceTelephonySmokeReport,
   type VoiceToolContractDefinition,
   type VoiceOpsWebhookEnvelope,
+  type VoiceTraceEvent,
   type VoiceTurnCorrectionHandler,
   type VoiceTurnRecord,
   type VoiceSessionRecord,
@@ -1692,6 +1693,45 @@ const seedTurnLatencyProof = async () => {
   return { ok: true, sessionId, turnId };
 };
 
+const toNumber = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) ? value : undefined;
+
+const toStringValue = (value: unknown) =>
+  typeof value === "string" && value.trim() ? value : undefined;
+
+const storeLiveTurnLatencyTrace = async (body: unknown) => {
+  const input = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  const id = toStringValue(input.id) ?? `live-turn-${crypto.randomUUID()}`;
+  const sessionId = toStringValue(input.sessionId) ?? `live-latency-${crypto.randomUUID()}`;
+  const latencyMs = toNumber(input.latencyMs);
+  const startedAt = toNumber(input.startedAt) ?? Date.now();
+  const completedAt = toNumber(input.completedAt) ?? Date.now();
+  const status = toStringValue(input.status) ?? "unknown";
+  const event: VoiceTraceEvent = {
+    at: completedAt,
+    metadata: {
+      source: "browser",
+      surface: "live-latency-proof",
+    },
+    payload: {
+      assistantAudioAt: toNumber(input.assistantAudioAt),
+      assistantTextAt: toNumber(input.assistantTextAt),
+      completedAt,
+      elapsedMs: latencyMs,
+      latencyMs,
+      startedAt,
+      status,
+      thresholdMs: toNumber(input.thresholdMs),
+    },
+    sessionId,
+    traceId: id,
+    type: "client.live_latency",
+  };
+  await runtimeStorage.traces.append(event);
+
+  return { ok: true, sessionId, traceId: id };
+};
+
 const summarizeAssistantRuns = async () =>
   summarizeVoiceAssistantRuns({ store: runtimeStorage.traces });
 
@@ -2092,6 +2132,7 @@ const server = new Elysia()
     }),
   )
   .post("/api/turn-latency/proof", () => seedTurnLatencyProof())
+  .post("/api/live-turn-latency", ({ body }) => storeLiveTurnLatencyTrace(body))
   .use(
     createVoiceTurnLatencyRoutes({
       htmlPath: "/turn-latency",

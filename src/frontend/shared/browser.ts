@@ -701,7 +701,10 @@ export const createDemoLiveTurnLatencyEvidence = <TResult = unknown>(
   getVoice: () => DemoLiveTurnLatencyVoice<TResult>,
   options: VoiceLiveTurnLatencyMonitorOptions = {},
 ) => {
-  const monitor = createVoiceLiveTurnLatencyMonitor(options);
+  const monitor = createVoiceLiveTurnLatencyMonitor({
+    reportPath: "/api/live-turn-latency",
+    ...options,
+  });
   const syncAssistantOutput = () => {
     monitor.observe(getVoice());
   };
