@@ -3,7 +3,7 @@ import {
   applyPhraseHintCorrections,
   assignVoiceOpsTask,
   completeVoiceOpsTask,
-  createMemoryVoiceTelephonyWebhookIdempotencyStore,
+  createVoiceSQLiteTelephonyWebhookIdempotencyStore,
   createAnthropicVoiceAssistantModel,
   createGeminiVoiceAssistantModel,
   createVoiceAppKitRoutes,
@@ -961,7 +961,9 @@ const telephonyOutcomePolicy = createVoiceTelephonyOutcomePolicy({
     typeof metadata?.queue === "string" ? metadata.queue : undefined,
 });
 const telephonyWebhookIdempotencyStore =
-  createMemoryVoiceTelephonyWebhookIdempotencyStore();
+  createVoiceSQLiteTelephonyWebhookIdempotencyStore({
+    path: resolve(runtimeDirectory, "telephony-webhook-idempotency.sqlite"),
+  });
 
 const telephonyOutcomeSamples = [
   {
