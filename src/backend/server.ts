@@ -21,7 +21,7 @@ import {
   createVoiceSTTProviderRouter,
   createVoiceTaskUpdatedEvent,
   createVoiceTelephonyOutcomePolicy,
-  createVoiceTelephonyWebhookRoutes,
+  createTwilioVoiceRoutes,
   createVoiceToolContractRoutes,
   createVoiceToolRuntimeContractDefaults,
   createVoiceTurnQualityRoutes,
@@ -961,7 +961,7 @@ const telephonyOutcomePolicy = createVoiceTelephonyOutcomePolicy({
     typeof metadata?.queue === "string" ? metadata.queue : undefined,
 });
 const telephonyWebhookIdempotencyStore =
-  createVoiceSQLiteTelephonyWebhookIdempotencyStore({
+  createVoiceSQLiteTelephonyWebhookIdempotencyStore<SavedIntake>({
     path: resolve(runtimeDirectory, "telephony-webhook-idempotency.sqlite"),
   });
 
@@ -1647,24 +1647,63 @@ const server = new Elysia()
     }),
   )
   .use(
-    createVoiceTelephonyWebhookRoutes({
-      idempotency: {
-        store: telephonyWebhookIdempotencyStore,
+    createTwilioVoiceRoutes<unknown, VoiceSessionRecord, SavedIntake>({
+      context: {},
+      correctTurn: correctDemoTurn,
+      handoff:
+        handoffAdapters.length > 0
+          ? {
+              adapters: handoffAdapters,
+              deliveryQueue: handoffDeliveryStore,
+            }
+          : undefined,
+      onComplete: async ({ session }) => {
+        const result = session.turns
+          .toReversed()
+          .find((turn) => turn.result !== undefined)?.result as
+          | SavedIntake
+          | undefined;
+        const savedIntake = result ?? buildSavedIntake(session);
+        persistIntake(savedIntake);
       },
-      onDecision: ({ decision }) => {
-        console.info("telephony outcome webhook", {
-          action: decision.action,
-          disposition: decision.disposition,
-          source: decision.source,
-        });
+      onTurn: contractAwareOnTurn,
+      ops: assistant.ops,
+      outcomePolicy: telephonyOutcomePolicy,
+      phraseHints: (input) => {
+        rememberSessionRoutingMode(input);
+        return VOICE_DEMO_PHRASE_HINTS;
       },
-      path: "/api/telephony-webhook",
-      policy: telephonyOutcomePolicy,
-      provider: "twilio",
-      signingSecret: telephonyWebhookSigningSecret,
-      verificationUrl: publicBaseUrl
-        ? `${publicBaseUrl.replace(/\/$/, "")}/api/telephony-webhook`
-        : undefined,
+      preset: "reliability",
+      session: runtimeStorage.session,
+      streamPath: "/api/twilio/stream",
+      stt: sttAdapter,
+      twiml: {
+        parameters: ({ query }) => ({
+          scenarioId:
+            typeof query.scenarioId === "string" ? query.scenarioId : "guided",
+          sessionId:
+            typeof query.sessionId === "string" ? query.sessionId : undefined,
+        }),
+        path: "/api/twilio/voice",
+        streamName: "absolutejs-voice-demo",
+      },
+      webhook: {
+        idempotency: {
+          store: telephonyWebhookIdempotencyStore,
+        },
+        onDecision: ({ decision }) => {
+          console.info("telephony outcome webhook", {
+            action: decision.action,
+            disposition: decision.disposition,
+            source: decision.source,
+          });
+        },
+        path: "/api/telephony-webhook",
+        signingSecret: telephonyWebhookSigningSecret,
+        verificationUrl: publicBaseUrl
+          ? `${publicBaseUrl.replace(/\/$/, "")}/api/telephony-webhook`
+          : undefined,
+      },
     }),
   )
   .use(
