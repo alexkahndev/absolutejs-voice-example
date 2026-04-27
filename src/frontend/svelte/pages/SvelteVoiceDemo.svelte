@@ -8,6 +8,7 @@
     createVoiceProviderStatus,
     createVoiceRoutingStatus,
     createVoiceStream,
+    createVoiceTurnQuality,
   } from "@absolutejs/voice/svelte";
   import type { VoiceStream, VoiceStreamState } from "@absolutejs/voice";
   import {
@@ -80,6 +81,7 @@
   let providerSimulationHTML = $state("");
   let providerStatusHTML = $state("");
   let routingStatusHTML = $state("");
+  let turnQualityHTML = $state("");
   let guidedState = $state(createInitialVoiceState());
   let generalState = $state(createInitialVoiceState());
   let waveLevels = $state(createInitialVoiceWaveLevels());
@@ -113,6 +115,9 @@
   const routingStatus = createVoiceRoutingStatus("/api/routing/latest", {
     intervalMs: 4_000,
   });
+  const turnQuality = createVoiceTurnQuality("/api/turn-quality", {
+    intervalMs: 5_000,
+  });
   let unsubscribeGuided = () => {};
   let unsubscribeGeneral = () => {};
   let unsubscribeOpsStatus = () => {};
@@ -121,6 +126,7 @@
   let unsubscribeProviderCapabilities = () => {};
   let unsubscribeProviderStatus = () => {};
   let unsubscribeRoutingStatus = () => {};
+  let unsubscribeTurnQuality = () => {};
   let currentVoice = $derived(
     activeMode === "general" ? generalState : guidedState,
   );
@@ -269,15 +275,20 @@
     unsubscribeRoutingStatus = routingStatus.subscribe(() => {
       routingStatusHTML = routingStatus.getHTML();
     });
+    unsubscribeTurnQuality = turnQuality.subscribe(() => {
+      turnQualityHTML = turnQuality.getHTML();
+    });
     opsStatusHTML = opsStatus.getHTML();
     providerCapabilitiesHTML = providerCapabilities.getHTML();
     providerSimulationHTML = providerSimulation.getHTML();
     providerStatusHTML = providerStatus.getHTML();
     routingStatusHTML = routingStatus.getHTML();
+    turnQualityHTML = turnQuality.getHTML();
     void opsStatus.refresh().catch(() => {});
     void providerCapabilities.refresh().catch(() => {});
     void providerStatus.refresh().catch(() => {});
     void routingStatus.refresh().catch(() => {});
+    void turnQuality.refresh().catch(() => {});
     if (providerSimulationElement) {
       unbindProviderSimulation = providerSimulation.bind(
         providerSimulationElement,
@@ -302,6 +313,7 @@
     unsubscribeProviderCapabilities();
     unsubscribeProviderStatus();
     unsubscribeRoutingStatus();
+    unsubscribeTurnQuality();
     guidedVoice?.close();
     generalVoice?.close();
     opsStatus.close();
@@ -309,6 +321,7 @@
     providerSimulation.close();
     providerStatus.close();
     routingStatus.close();
+    turnQuality.close();
   });
 </script>
 
@@ -429,6 +442,10 @@
         class="voice-card voice-provider-simulation-card voice-provider-simulation-host"
       >
         {@html providerSimulationHTML}
+      </div>
+
+      <div class="voice-card voice-provider-health-card voice-turn-quality-host">
+        {@html turnQualityHTML}
       </div>
 
       <div class="voice-card voice-workflow-card voice-ops-status-host">

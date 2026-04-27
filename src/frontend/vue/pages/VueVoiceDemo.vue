@@ -7,6 +7,7 @@ import {
   VoiceProviderSimulationControls,
   VoiceProviderStatus,
   VoiceRoutingStatus,
+  VoiceTurnQuality,
 } from "@absolutejs/voice/vue";
 import {
   FRAMEWORKS,
@@ -335,6 +336,11 @@ onUnmounted(() => {
           fallback-required-provider="assemblyai"
           kind="stt"
           :providers="[{ provider: 'deepgram' }, { provider: 'assemblyai' }]"
+        />
+
+        <VoiceTurnQuality
+          class="voice-card voice-provider-health-card"
+          :interval-ms="5000"
         />
 
         <VoiceOpsStatus

@@ -12,6 +12,7 @@ import {
   VoiceProviderStatusService,
   VoiceRoutingStatusService,
   VoiceStreamService,
+  VoiceTurnQualityService,
 } from "@absolutejs/voice/angular";
 import {
   FRAMEWORK_DESCRIPTIONS,
@@ -286,6 +287,42 @@ import {
             kind="stt"
             providers="deepgram,assemblyai"
           ></absolute-voice-provider-simulation>
+
+          <article class="voice-card voice-provider-health-card">
+            <span class="voice-framework-pill">Turn Quality</span>
+            <h2>
+              {{
+                turnQuality.report()
+                  ? turnQuality.report()!.warnings + " warnings"
+                  : "Checking turns"
+              }}
+            </h2>
+            <p class="voice-footnote">
+              STT confidence, fallback selection, correction, and transcript coverage.
+            </p>
+            @if (turnQuality.report()?.turns?.length) {
+              <div class="voice-provider-health-list">
+                @for (turn of turnQuality.report()!.turns; track turn.sessionId + ":" + turn.turnId) {
+                  <div class="voice-provider-health-item">
+                    <strong>{{ turn.text || "Empty turn" }}</strong>
+                    <span>{{ turn.status }}</span>
+                    <small>
+                      {{ turn.source || "unknown" }} ·
+                      {{ turn.fallbackUsed ? "fallback" : "primary" }} ·
+                      confidence
+                      {{
+                        turn.averageConfidence === undefined
+                          ? "n/a"
+                          : (turn.averageConfidence * 100).toFixed(0) + "%"
+                      }}
+                    </small>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="empty-copy">Complete a turn to see quality diagnostics.</p>
+            }
+          </article>
 
           <article
             class="voice-card voice-workflow-card"
@@ -609,6 +646,9 @@ export class AngularVoiceDemoComponent {
       intervalMs: 4_000,
     },
   );
+  turnQuality = inject(VoiceTurnQualityService).connect("/api/turn-quality", {
+    intervalMs: 5_000,
+  });
   currentVoice = computed(() =>
     this.activeMode() === "general" ? this.generalVoice : this.guidedVoice,
   );
@@ -742,6 +782,7 @@ export class AngularVoiceDemoComponent {
     this.providerCapabilities.close();
     this.providerStatus.close();
     this.routingStatus.close();
+    this.turnQuality.close();
   }
 }
 

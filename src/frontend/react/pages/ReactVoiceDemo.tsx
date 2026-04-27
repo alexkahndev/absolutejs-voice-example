@@ -8,6 +8,7 @@ import {
   VoiceProviderSimulationControls,
   VoiceProviderStatus,
   VoiceRoutingStatus,
+  VoiceTurnQuality,
 } from "@absolutejs/voice/react";
 import {
   createInitialVoiceWaveLevels,
@@ -372,6 +373,11 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
               fallbackRequiredProvider="assemblyai"
               kind="stt"
               providers={[{ provider: "deepgram" }, { provider: "assemblyai" }]}
+            />
+
+            <VoiceTurnQuality
+              className="voice-card voice-provider-health-card"
+              intervalMs={5_000}
             />
 
             <VoiceOpsStatus

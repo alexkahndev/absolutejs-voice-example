@@ -21,6 +21,7 @@ import {
   createVoiceTaskUpdatedEvent,
   createVoiceToolContractRoutes,
   createVoiceToolRuntimeContractDefaults,
+  createVoiceTurnQualityRoutes,
   createVoiceWorkflowContractHandler,
   createVoiceWorkflowContractPreset,
   createVoiceOpsWebhookReceiverRoutes,
@@ -948,6 +949,13 @@ const appKitLinks = [
     statusHref: "/api/tool-contracts",
   },
   {
+    description:
+      "Per-turn STT confidence, fallback, correction, and transcript diagnostics.",
+    href: "/turn-quality",
+    label: "Turn Quality",
+    statusHref: "/api/turn-quality",
+  },
+  {
     description: "Redacted trace exports for debugging and support.",
     href: "/diagnostics",
     label: "Diagnostics",
@@ -1428,6 +1436,14 @@ const server = new Elysia()
       htmlPath: "/tool-contracts",
       path: "/api/tool-contracts",
       title: "AbsoluteJS Voice Demo Tool Contracts",
+    }),
+  )
+  .use(
+    createVoiceTurnQualityRoutes({
+      htmlPath: "/turn-quality",
+      path: "/api/turn-quality",
+      store: runtimeStorage.session,
+      title: "AbsoluteJS Voice Demo Turn Quality",
     }),
   )
   .use(

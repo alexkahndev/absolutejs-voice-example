@@ -5,6 +5,7 @@ import {
   mountVoiceProviderSimulationControls,
   mountVoiceProviderStatus,
   mountVoiceRoutingStatus,
+  mountVoiceTurnQuality,
 } from "@absolutejs/voice/client";
 import {
   createInitialVoiceWaveLevels,
@@ -85,6 +86,7 @@ const providerSimulationHost = document.querySelector(
 );
 const routingModeCopy = document.querySelector("#routing-mode-copy");
 const routingDecisionRoot = document.querySelector("#routing-decision");
+const turnQualityHost = document.querySelector("#turn-quality-card");
 const routingModeMetric = document.querySelector("#metric-routing");
 const routingModeSelect = document.querySelector("#routing-mode-select");
 
@@ -115,6 +117,7 @@ if (
   !(providerSimulationHost instanceof HTMLElement) ||
   !(routingModeCopy instanceof HTMLElement) ||
   !(routingDecisionRoot instanceof HTMLElement) ||
+  !(turnQualityHost instanceof HTMLElement) ||
   !(routingModeMetric instanceof HTMLElement) ||
   !(routingModeSelect instanceof HTMLSelectElement) ||
   !(voiceStatus instanceof HTMLElement)
@@ -169,6 +172,9 @@ const routingStatus = mountVoiceRoutingStatus(
     intervalMs: 4_000,
   },
 );
+const turnQuality = mountVoiceTurnQuality(turnQualityHost, "/api/turn-quality", {
+  intervalMs: 5_000,
+});
 let activeMode: VoiceDemoMode | null = null;
 let hasStartedModes: Record<VoiceDemoMode, boolean> = {
   general: false,
@@ -431,4 +437,5 @@ window.addEventListener("beforeunload", () => {
   providerSimulation.close();
   providerStatus.close();
   routingStatus.close();
+  turnQuality.close();
 });
