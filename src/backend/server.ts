@@ -495,6 +495,10 @@ const sttAdapter = createVoiceSTTProviderRouter({
       type: "session.error",
     });
   },
+  providerHealth: {
+    cooldownMs: 30_000,
+    failureThreshold: 1,
+  },
   providerProfiles: {
     deepgram: {
       latencyMs: 250,
@@ -713,6 +717,18 @@ const summarizeProviderHealth = async (): Promise<
     providers: configuredModelProviders,
     store: runtimeStorage.traces,
   });
+
+const summarizeSTTProviderHealth = async (): Promise<
+  VoiceProviderHealthSummary<string>[]
+> => {
+  const events = (await runtimeStorage.traces.list()).filter(
+    (event) => event.payload.kind === "stt",
+  );
+  return summarizeVoiceProviderHealth({
+    events,
+    providers: ["deepgram"],
+  });
+};
 
 const listAssistantMemory = async (): Promise<VoiceAssistantMemoryRecord[]> =>
   memoryStore.list({
@@ -1104,8 +1120,9 @@ const server = new Elysia()
     async () =>
       new Response(
         renderVoiceResiliencePage({
-          providerHealth: await summarizeProviderHealth(),
+          llmProviderHealth: await summarizeProviderHealth(),
           routingEvents: listVoiceRoutingEvents(await runtimeStorage.traces.list()),
+          sttProviderHealth: await summarizeSTTProviderHealth(),
         }),
         {
           headers: {

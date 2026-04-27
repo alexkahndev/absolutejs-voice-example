@@ -100,10 +100,11 @@ const summarizeRoutingEvents = (events: RoutingEvent[]) => {
 };
 
 const renderProviderCards = (
+  title: string,
   providers: VoiceProviderHealthSummary<string>[],
 ) => {
   if (providers.length === 0) {
-    return `<p class="muted">No LLM provider health yet.</p>`;
+    return `<p class="muted">No ${escapeHtml(title)} provider health yet.</p>`;
   }
 
   return `<div class="provider-grid">${providers
@@ -170,8 +171,9 @@ const renderTimeline = (events: RoutingEvent[]) => {
 };
 
 export const renderVoiceResiliencePage = (input: {
-  providerHealth: VoiceProviderHealthSummary<string>[];
+  llmProviderHealth: VoiceProviderHealthSummary<string>[];
   routingEvents: RoutingEvent[];
+  sttProviderHealth: VoiceProviderHealthSummary<string>[];
 }) => {
   const summary = summarizeRoutingEvents(input.routingEvents);
   const kindCounts = [...summary.byKind.entries()]
@@ -226,7 +228,11 @@ export const renderVoiceResiliencePage = (input: {
     </section>
     <section>
       <h2>LLM provider health</h2>
-      ${renderProviderCards(input.providerHealth)}
+      ${renderProviderCards("LLM", input.llmProviderHealth)}
+    </section>
+    <section>
+      <h2>STT provider health</h2>
+      ${renderProviderCards("STT", input.sttProviderHealth)}
     </section>
     <section>
       <h2>Routing timeline</h2>
