@@ -27,12 +27,15 @@ import {
   renderVoiceSessionsHTML,
   startVoiceOpsTask,
   summarizeVoiceAssistantRuns,
+  summarizeVoiceHandoffDeliveries,
   summarizeVoiceHandoffHealth,
   summarizeVoiceProviderHealth,
   summarizeVoiceSessions,
+  type StoredVoiceHandoffDelivery,
   type VoiceCallReviewStore,
   type VoiceAssistantMemoryRecord,
   type VoiceAgentModel,
+  type VoiceHandoffDeliveryStore,
   type VoiceProviderHealthSummary,
   type VoiceProviderRouterEvent,
   type VoiceOpsTaskStatus,
@@ -44,7 +47,8 @@ import {
 } from "@absolutejs/voice";
 import { deepgram } from "@absolutejs/voice-deepgram";
 import { Elysia } from "elysia";
-import { resolve } from "node:path";
+import { mkdir } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import {
   filterVoiceOpsTasks,
   listVoiceOpsTasks,
@@ -94,6 +98,43 @@ const escapeHtml = (value: string) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+
+const createJsonHandoffDeliveryStore = <
+  TDelivery extends StoredVoiceHandoffDelivery,
+>(
+  filePath: string,
+): VoiceHandoffDeliveryStore<TDelivery> => {
+  const read = async () => {
+    const file = Bun.file(filePath);
+    if (!(await file.exists())) {
+      return [];
+    }
+
+    const text = await file.text();
+    return text.trim() ? (JSON.parse(text) as TDelivery[]) : [];
+  };
+  const write = async (deliveries: TDelivery[]) => {
+    await mkdir(dirname(filePath), { recursive: true });
+    await Bun.write(filePath, JSON.stringify(deliveries, null, 2));
+  };
+
+  return {
+    get: async (id) => (await read()).find((delivery) => delivery.id === id),
+    list: async () =>
+      (await read()).sort(
+        (left, right) =>
+          left.createdAt - right.createdAt || left.id.localeCompare(right.id),
+      ),
+    remove: async (id) => {
+      await write((await read()).filter((delivery) => delivery.id !== id));
+    },
+    set: async (id, delivery) => {
+      const deliveries = (await read()).filter((item) => item.id !== id);
+      deliveries.push(delivery);
+      await write(deliveries);
+    },
+  };
+};
 
 const formatCallDisposition = (value: SavedIntake["callDisposition"]) => {
   switch (value) {
@@ -168,6 +209,9 @@ const runtimeStorage = createVoiceFileRuntimeStorage<
 >({
   directory: runtimeDirectory,
 });
+const handoffDeliveryStore = createJsonHandoffDeliveryStore<
+  StoredVoiceHandoffDelivery<unknown, VoiceSessionRecord, SavedIntake>
+>(resolve(runtimeDirectory, "handoff-deliveries.json"));
 const memoryStore = createVoiceFileAssistantMemoryStore({
   directory: resolve(runtimeDirectory, "memories"),
 });
@@ -749,6 +793,7 @@ const server = new Elysia()
         handoffAdapters.length > 0
           ? {
               adapters: handoffAdapters,
+              deliveryQueue: handoffDeliveryStore,
             }
           : undefined,
       ops: assistant.ops,
@@ -931,8 +976,16 @@ const server = new Elysia()
   )
   .get(
     "/handoffs",
-    async () =>
-      new Response(
+    async () => {
+      const handoffDeliveries = await Promise.resolve(
+        handoffDeliveryStore.list(),
+      );
+      const [handoffHealth, handoffQueue] = await Promise.all([
+        summarizeVoiceHandoffHealth({ store: runtimeStorage.traces }),
+        Promise.resolve(summarizeVoiceHandoffDeliveries(handoffDeliveries)),
+      ]);
+
+      return new Response(
         `<!doctype html>
 <html lang="en">
 <head>
@@ -950,6 +1003,9 @@ const server = new Elysia()
     .voice-handoff-health-events article.failed { border-color: rgba(239, 68, 68, 0.7); }
     .voice-handoff-health-events article.delivered { border-color: rgba(34, 197, 94, 0.5); }
     .voice-handoff-health-event-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .handoff-queue-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+    .handoff-queue-grid article { background: #0f1217; }
+    .handoff-metric { font-size: 2rem; font-weight: 800; margin: 0; }
     span, small { color: #a1a1aa; }
     a { color: #f59e0b; }
   </style>
@@ -958,11 +1014,22 @@ const server = new Elysia()
   <main>
     <section>
       <h1>Voice handoffs</h1>
-      <p>Trace-backed transfer and escalation delivery health with replay links.</p>
+      <p>Trace-backed transfer and escalation delivery health with replay links and a durable retry queue.</p>
       <p><a href="/assistant">Assistant control plane</a> · <a href="/sessions">Sessions</a> · <a href="/tasks">Tasks</a> · <a href="/integrations">Integrations</a></p>
     </section>
     <section>
-      ${renderVoiceHandoffHealthHTML(await summarizeVoiceHandoffHealth({ store: runtimeStorage.traces }))}
+      <h2>Delivery queue</h2>
+      <div class="handoff-queue-grid">
+        <article><span>Total</span><p class="handoff-metric">${handoffQueue.total}</p></article>
+        <article><span>Pending</span><p class="handoff-metric">${handoffQueue.pending}</p></article>
+        <article><span>Retry eligible</span><p class="handoff-metric">${handoffQueue.retryEligible}</p></article>
+        <article><span>Failed</span><p class="handoff-metric">${handoffQueue.failed}</p></article>
+        <article><span>Delivered</span><p class="handoff-metric">${handoffQueue.delivered}</p></article>
+      </div>
+      <p><small>Queue file: ${escapeHtml(resolve(runtimeDirectory, "handoff-deliveries.json"))}</small></p>
+    </section>
+    <section>
+      ${renderVoiceHandoffHealthHTML(handoffHealth)}
     </section>
   </main>
 </body>
@@ -972,7 +1039,8 @@ const server = new Elysia()
             "Content-Type": "text/html; charset=utf-8",
           },
         },
-      ),
+      );
+    },
   )
   .get(
     "/sessions",
