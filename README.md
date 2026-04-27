@@ -15,6 +15,7 @@ The server uses:
 
 - `@absolutejs/voice` for the WebSocket voice route
 - `@absolutejs/voice-deepgram` with Deepgram Flux for STT
+- `@absolutejs/voice-assemblyai` as an optional STT fallback provider
 - route-level `phraseHints`
 - route-level `correctTurn` with deterministic phrase correction
 - `createVoiceFileRuntimeStorage(...)` for durable runtime storage
@@ -40,8 +41,10 @@ Each framework page keeps feature parity:
 ```bash
 cd ~/alex/absolutejs-voice-example
 bun install
-DEEPGRAM_API_KEY=... bun run dev
+DEEPGRAM_API_KEY=... ASSEMBLYAI_API_KEY=... bun run dev
 ```
+
+`ASSEMBLYAI_API_KEY` is optional. When present, the backend keeps Deepgram as the primary realtime STT provider and routes to AssemblyAI when Deepgram open/send fails, times out, or is temporarily suppressed by provider health.
 
 Optional LLM routing:
 

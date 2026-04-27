@@ -33,6 +33,7 @@ import {
   summarizeVoiceHandoffHealth,
   summarizeVoiceProviderHealth,
   summarizeVoiceSessions,
+  type STTAdapter,
   type StoredVoiceHandoffDelivery,
   type VoiceCallReviewStore,
   type VoiceAssistantMemoryRecord,
@@ -47,6 +48,7 @@ import {
   type VoiceSessionRecord,
   voice,
 } from "@absolutejs/voice";
+import { assemblyai } from "@absolutejs/voice-assemblyai";
 import { deepgram } from "@absolutejs/voice-deepgram";
 import { Elysia } from "elysia";
 import { mkdir } from "node:fs/promises";
@@ -264,6 +266,7 @@ const memoryStore = createVoiceFileAssistantMemoryStore({
   directory: resolve(runtimeDirectory, "memories"),
 });
 const deepgramApiKey = getEnv("DEEPGRAM_API_KEY");
+const assemblyAIApiKey = process.env.ASSEMBLYAI_API_KEY;
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
 const geminiApiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
 const openAIApiKey = process.env.OPENAI_API_KEY;
@@ -283,14 +286,20 @@ const providerLatencyBudgets = {
   openai: readPositiveNumberEnv("VOICE_OPENAI_TIMEOUT_MS", 6_000),
 } satisfies Record<VoiceModelProvider, number>;
 const sttLatencyBudgets = {
+  assemblyai: readPositiveNumberEnv("VOICE_ASSEMBLYAI_STT_TIMEOUT_MS", 6_000),
   deepgram: readPositiveNumberEnv("VOICE_DEEPGRAM_STT_TIMEOUT_MS", 5_000),
 };
+type VoiceSTTProvider = "deepgram" | "assemblyai";
 const configuredModelProviders: VoiceModelProvider[] = [
   "deterministic",
   openAIApiKey ? "openai" : undefined,
   anthropicApiKey ? "anthropic" : undefined,
   geminiApiKey ? "gemini" : undefined,
 ].filter(Boolean) as VoiceModelProvider[];
+const configuredSTTProviders: VoiceSTTProvider[] = [
+  "deepgram",
+  assemblyAIApiKey ? "assemblyai" : undefined,
+].filter(Boolean) as VoiceSTTProvider[];
 const resolveModelProvider = () => {
   if (
     requestedModelProvider === "openai" ||
@@ -472,18 +481,28 @@ const assistantModel = createVoiceProviderRouter<
   providers: providerModels,
   selectProvider: ({ context }) => resolveRequestedProvider(context),
 });
-const sttAdapter = createVoiceSTTProviderRouter({
-  adapters: {
-    deepgram: deepgram({
-      apiKey: deepgramApiKey,
-      interimResults: true,
-      model: "flux-general-en",
-      punctuate: true,
-      smartFormat: true,
-      vadEvents: true,
-    }),
-  },
-  fallback: ["deepgram"],
+const sttProviderAdapters = {
+  deepgram: deepgram({
+    apiKey: deepgramApiKey,
+    interimResults: true,
+    model: "flux-general-en",
+    punctuate: true,
+    smartFormat: true,
+    vadEvents: true,
+  }),
+  ...(assemblyAIApiKey
+    ? {
+        assemblyai: assemblyai({
+          apiKey: assemblyAIApiKey,
+          formatTurns: true,
+          speechModel: process.env.ASSEMBLYAI_SPEECH_MODEL ?? "u3-rt-pro",
+        }),
+      }
+    : {}),
+} satisfies Partial<Record<VoiceSTTProvider, STTAdapter>>;
+const sttAdapter = createVoiceSTTProviderRouter<VoiceSTTProvider>({
+  adapters: sttProviderAdapters,
+  fallback: configuredSTTProviders,
   onProviderEvent: async (event, input) => {
     await runtimeStorage.traces.append({
       at: event.at,
@@ -504,6 +523,11 @@ const sttAdapter = createVoiceSTTProviderRouter({
       latencyMs: 250,
       priority: 1,
       timeoutMs: sttLatencyBudgets.deepgram,
+    },
+    assemblyai: {
+      latencyMs: 450,
+      priority: 2,
+      timeoutMs: sttLatencyBudgets.assemblyai,
     },
   },
   selectProvider: () => "deepgram",
@@ -726,7 +750,7 @@ const summarizeSTTProviderHealth = async (): Promise<
   );
   return summarizeVoiceProviderHealth({
     events,
-    providers: ["deepgram"],
+    providers: configuredSTTProviders,
   });
 };
 
