@@ -34,7 +34,7 @@ Each framework page keeps feature parity:
 - show completed intakes persisted by the server
 - show the exact framework-specific client primitive being used
 - show the same assistant config panel
-- link directly into reviews and ops pages
+- link directly into reviews, trace timelines, and ops pages
 
 ## Run
 
@@ -70,6 +70,7 @@ Then open:
 - `http://localhost:3000/assistant`
 - `http://localhost:3000/tasks`
 - `http://localhost:3000/integrations`
+- `http://localhost:3000/traces`
 
 ## Recommended Pattern
 
@@ -183,9 +184,10 @@ A good end-to-end demo flow is:
    - `send it to voicemail`
    - `no answer`
 4. Open `/reviews` to inspect the call artifact.
-5. Open `/assistant` to inspect assistant variants, outcomes, guardrails, and tools.
-6. Open `/tasks` to see the generated follow-up work.
-7. Open `/integrations` to inspect the portable outbound event payloads.
+5. Open `/traces` to inspect the per-call provider timeline.
+6. Open `/assistant` to inspect assistant variants, outcomes, guardrails, and tools.
+7. Open `/tasks` to see the generated follow-up work.
+8. Open `/integrations` to inspect the portable outbound event payloads.
 
 The demo uses the support-triage recipe, so completed calls create triage review tasks, escalations route to `support-escalations`, transfers create handoff checks, and voicemail/no-answer outcomes create callback work.
 

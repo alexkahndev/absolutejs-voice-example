@@ -344,6 +344,7 @@
         </a>
       {/each}
       <a href="/reviews">Reviews</a>
+      <a href="/traces">Traces</a>
       <a href="/carriers">Carriers</a>
     </nav>
   </header>

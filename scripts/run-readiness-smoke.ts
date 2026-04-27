@@ -5,7 +5,8 @@ type EndpointName =
   | "carriers"
   | "handoffs"
   | "productionReadiness"
-  | "providerCapabilities";
+  | "providerCapabilities"
+  | "voiceTraces";
 
 type EndpointResult = {
   elapsedMs: number;
@@ -97,6 +98,22 @@ const endpoints: Array<{
       return {
         failed: summary.failed,
         total: summary.total,
+      };
+    },
+  },
+  {
+    name: "voiceTraces",
+    path: "/api/voice-traces",
+    summarize: (body) => {
+      const report = body as {
+        failed?: unknown;
+        total?: unknown;
+        warnings?: unknown;
+      };
+      return {
+        failed: report.failed,
+        total: report.total,
+        warnings: report.warnings,
       };
     },
   },

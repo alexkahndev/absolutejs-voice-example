@@ -1288,6 +1288,13 @@ const appKitLinks = [
     label: "Diagnostics",
   },
   {
+    description:
+      "Per-call timelines with provider latency, fallback, timeout, handoff, and error context.",
+    href: "/traces",
+    label: "Trace Timelines",
+    statusHref: "/api/voice-traces",
+  },
+  {
     description: "Recent calls with replay links.",
     href: "/sessions",
     label: "Sessions",
