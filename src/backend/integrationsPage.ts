@@ -77,7 +77,7 @@ export const renderVoiceIntegrationEventsPage = (
       <p>This stream shows the payloads AbsoluteJS Voice can hand to external systems like CRMs, helpdesks, or automation webhooks.</p>
       <p>${options.webhookUrl ? `Signed ops webhook delivery is enabled for ${escapeHtml(options.webhookUrl)}.` : "Webhook delivery is disabled; events are being stored locally only."}</p>
       <p>Receiver: <code>${escapeHtml(options.receiverPath ?? "/api/voice-ops/webhook")}</code> · Signing ${options.signingEnabled ? "enabled" : "optional"} · Received ${options.receivedWebhookCount ?? 0}</p>
-      <p><a href="/reviews">Back to reviews</a> · <a href="/tasks">Open task queue</a> · <a href="/sessions">Sessions</a> · <a href="/handoffs">Handoffs</a></p>
+      <p><a href="/reviews">Back to reviews</a> · <a href="/resilience">Resilience</a> · <a href="/tasks">Open task queue</a> · <a href="/sessions">Sessions</a> · <a href="/handoffs">Handoffs</a></p>
     </section>
     <section class="event-list">
       ${items || "<p>No integration events yet. Complete a call or change a task state first.</p>"}

@@ -599,7 +599,7 @@ export const renderVoiceReviewIndexPage = (
           <ul>${targetItems || "<li>No transfer targets yet.</li>"}</ul>
         </div>
       </div>
-      <p><a href="/react">Back to demo</a> · <a href="/sessions">Sessions</a> · <a href="/handoffs">Handoffs</a> · <a href="/tasks">Open task queue</a> · <a href="/integrations">Integration events</a></p>
+      <p><a href="/react">Back to demo</a> · <a href="/resilience">Resilience</a> · <a href="/sessions">Sessions</a> · <a href="/handoffs">Handoffs</a> · <a href="/tasks">Open task queue</a> · <a href="/integrations">Integration events</a></p>
     </section>
     <form action="/reviews" method="get">
       <div class="toolbar">
@@ -733,6 +733,7 @@ export const renderVoiceReviewPage = (
       <h1>${escapeHtml(artifact.title)}</h1>
       <div class="toolbar">
         <a href="/reviews">Back to reviews</a>
+        <a href="/resilience">Resilience</a>
         <a href="/sessions">Sessions</a>
         <a href="/handoffs">Handoffs</a>
         <a href="/tasks">Open task queue</a>

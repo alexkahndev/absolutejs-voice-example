@@ -65,6 +65,10 @@ import {
   type SavedVoiceIntegrationEvent,
 } from "./integrationsPage";
 import { renderVoiceAssistantPage } from "./assistantPage";
+import {
+  listVoiceRoutingEvents,
+  renderVoiceResiliencePage,
+} from "./resiliencePage";
 import { createVoiceProviderFailureSimulator } from "@absolutejs/voice/testing";
 import { pagesPlugin } from "./plugins/pagesPlugin";
 import {
@@ -1096,6 +1100,21 @@ const server = new Elysia()
       ),
   )
   .get(
+    "/resilience",
+    async () =>
+      new Response(
+        renderVoiceResiliencePage({
+          providerHealth: await summarizeProviderHealth(),
+          routingEvents: listVoiceRoutingEvents(await runtimeStorage.traces.list()),
+        }),
+        {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+          },
+        },
+      ),
+  )
+  .get(
     "/handoffs",
     async () => {
       const handoffDeliveries = await Promise.resolve(
@@ -1161,7 +1180,7 @@ const server = new Elysia()
     <section>
       <h1>Voice handoffs</h1>
       <p>Trace-backed transfer and escalation delivery health with replay links and a durable retry queue.</p>
-      <p><a href="/assistant">Assistant control plane</a> · <a href="/sessions">Sessions</a> · <a href="/tasks">Tasks</a> · <a href="/integrations">Integrations</a></p>
+      <p><a href="/assistant">Assistant control plane</a> · <a href="/resilience">Resilience</a> · <a href="/sessions">Sessions</a> · <a href="/tasks">Tasks</a> · <a href="/integrations">Integrations</a></p>
     </section>
     <section>
       <h2>Delivery queue</h2>
@@ -1224,7 +1243,7 @@ const server = new Elysia()
     <section>
       <h1>Voice sessions</h1>
       <p>Searchable trace-backed sessions with direct replay links.</p>
-      <p><a href="/assistant">Assistant control plane</a> · <a href="/reviews">Reviews</a> · <a href="/tasks">Tasks</a> · <a href="/handoffs">Handoffs</a></p>
+      <p><a href="/assistant">Assistant control plane</a> · <a href="/resilience">Resilience</a> · <a href="/reviews">Reviews</a> · <a href="/tasks">Tasks</a> · <a href="/handoffs">Handoffs</a></p>
     </section>
     <section>
       ${renderVoiceSessionsHTML(await summarizeVoiceSessions({ store: runtimeStorage.traces }))}
