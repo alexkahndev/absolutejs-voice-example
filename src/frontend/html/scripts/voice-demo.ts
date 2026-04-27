@@ -199,10 +199,10 @@ const renderSavedIntakes = async () => {
   routingDecisionRoot.innerHTML = routingDecision
     ? `<div class="voice-routing-grid">
   <div><span>Policy</span><strong>${escapeHtml(getVoiceRoutingLabel(routingDecision.routing))}</strong></div>
-  <div><span>Provider</span><strong>${escapeHtml(routingDecision.provider)}</strong></div>
-  <div><span>Selected</span><strong>${escapeHtml(routingDecision.selectedProvider)}</strong></div>
+  <div><span>Provider</span><strong>${escapeHtml(routingDecision.provider ?? "Unknown")}</strong></div>
+  <div><span>Selected</span><strong>${escapeHtml(routingDecision.selectedProvider ?? "Unknown")}</strong></div>
   <div><span>Fallback</span><strong>${escapeHtml(routingDecision.fallbackProvider ?? "None")}</strong></div>
-  <div><span>Status</span><strong>${escapeHtml(routingDecision.status)}</strong></div>
+  <div><span>Status</span><strong>${escapeHtml(routingDecision.status ?? "unknown")}</strong></div>
   <div><span>Latency budget</span><strong>${routingDecision.latencyBudgetMs ? `${routingDecision.latencyBudgetMs}ms` : "None"}</strong></div>
 </div>`
     : `<p class="empty-copy">Start a voice session to see the selected STT provider.</p>`;

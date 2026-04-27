@@ -37,20 +37,6 @@ export type VoiceProviderStatusRecord = {
   suppressedUntil?: number;
 };
 
-export type VoiceRoutingDecision = {
-  at: number;
-  attempt: number;
-  fallbackProvider?: string;
-  latencyBudgetMs?: number;
-  provider: string;
-  routing: VoiceRoutingMode;
-  selectedProvider: string;
-  sessionId: string;
-  status: "error" | "fallback" | "success";
-  suppressionRemainingMs?: number;
-  timedOut?: boolean;
-};
-
 export const VOICE_MODEL_PROVIDERS: Array<{
   id: VoiceModelProvider;
   label: string;
@@ -231,8 +217,10 @@ export const getVoiceRoutePath = (
 export const getVoiceProviderLabel = (provider: VoiceModelProvider) =>
   VOICE_MODEL_PROVIDERS.find((item) => item.id === provider)?.label ?? provider;
 
-export const getVoiceRoutingLabel = (routing: VoiceRoutingMode) =>
-  VOICE_ROUTING_MODES.find((item) => item.id === routing)?.label ?? routing;
+export const getVoiceRoutingLabel = (routing?: string) =>
+  VOICE_ROUTING_MODES.find((item) => item.id === routing)?.label ??
+  routing ??
+  "Unknown";
 
 export const getVoiceProviderStatusLabel = (status: VoiceProviderStatus) => {
   switch (status) {

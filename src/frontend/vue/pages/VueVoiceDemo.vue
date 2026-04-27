@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
+import type { VoiceRoutingDecisionSummary } from "@absolutejs/voice";
 import { useVoiceStream, VoiceOpsStatus } from "@absolutejs/voice/vue";
 import {
   FRAMEWORKS,
@@ -28,7 +29,6 @@ import {
   type SavedIntake,
   type VoiceDemoMode,
   type VoiceModelProvider,
-  type VoiceRoutingDecision,
   type VoiceRoutingMode,
 } from "../../../shared/demo";
 import {
@@ -57,7 +57,7 @@ const hasStartedModes = ref<Record<VoiceDemoMode, boolean>>({
   guided: false,
 });
 const micError = ref<string | null>(null);
-const routingDecision = ref<VoiceRoutingDecision | null>(null);
+const routingDecision = ref<VoiceRoutingDecisionSummary | null>(null);
 const savedIntakes = ref<SavedIntake[]>([]);
 const waveLevels = ref(createInitialVoiceWaveLevels());
 let microphone: ReturnType<typeof createDemoMicrophone> | null = null;

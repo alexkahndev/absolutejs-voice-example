@@ -105,7 +105,7 @@ export const getVoiceRoutePath = (scenarioId, provider, routing) => {
   return `${VOICE_ROUTE_PATH}?${params.toString()}`;
 };
 export const getVoiceProviderLabel = (provider) => VOICE_MODEL_PROVIDERS.find((item) => item.id === provider)?.label ?? provider;
-export const getVoiceRoutingLabel = (routing) => VOICE_ROUTING_MODES.find((item) => item.id === routing)?.label ?? routing;
+export const getVoiceRoutingLabel = (routing) => VOICE_ROUTING_MODES.find((item) => item.id === routing)?.label ?? routing ?? "Unknown";
 export const getVoiceProviderStatusLabel = (status) => {
   switch (status) {
     case "healthy":

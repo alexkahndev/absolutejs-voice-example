@@ -1,6 +1,9 @@
 import { Head } from "@absolutejs/absolute/react/components";
 import { useEffect, useRef, useState } from "react";
-import type { VoiceTurnRecord } from "@absolutejs/voice";
+import type {
+  VoiceRoutingDecisionSummary,
+  VoiceTurnRecord,
+} from "@absolutejs/voice";
 import { useVoiceStream, VoiceOpsStatus } from "@absolutejs/voice/react";
 import {
   createInitialVoiceWaveLevels,
@@ -38,7 +41,6 @@ import {
   VOICE_ROUTING_MODES,
   type VoiceDemoMode,
   type VoiceModelProvider,
-  type VoiceRoutingDecision,
   type VoiceRoutingMode,
   type SavedIntake,
 } from "../../../shared/demo";
@@ -105,7 +107,7 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
   });
   const [micError, setMicError] = useState<string | null>(null);
   const [routingDecision, setRoutingDecision] =
-    useState<VoiceRoutingDecision | null>(null);
+    useState<VoiceRoutingDecisionSummary | null>(null);
   const [savedIntakes, setSavedIntakes] = useState<SavedIntake[]>([]);
   const [waveLevels, setWaveLevels] = useState(createInitialVoiceWaveLevels);
   const currentVoice = activeMode === "general" ? generalVoice : guidedVoice;

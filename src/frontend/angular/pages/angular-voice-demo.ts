@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from "@angular/core";
+import type { VoiceRoutingDecisionSummary } from "@absolutejs/voice";
 import {
   VoiceAppKitStatusService,
   VoiceStreamService,
@@ -29,7 +30,6 @@ import {
   type SavedIntake,
   type VoiceDemoMode,
   type VoiceModelProvider,
-  type VoiceRoutingDecision,
   type VoiceRoutingMode,
 } from "../../../shared/demo";
 import {
@@ -495,7 +495,7 @@ export class AngularVoiceDemoComponent {
   idleMicCopy = VOICE_DEMO_MIC_IDLE;
   liveMicCopy = VOICE_DEMO_MIC_LIVE;
   micError = signal<string | null>(null);
-  routingDecision = signal<VoiceRoutingDecision | null>(null);
+  routingDecision = signal<VoiceRoutingDecisionSummary | null>(null);
   savedIntakes = signal<SavedIntake[]>([]);
   generalLabel = VOICE_DEMO_GENERAL_LABEL;
   guidedLabel = VOICE_DEMO_GUIDED_LABEL;

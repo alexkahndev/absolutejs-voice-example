@@ -5,7 +5,11 @@
     createVoiceOpsStatus,
     createVoiceStream,
   } from "@absolutejs/voice/svelte";
-  import type { VoiceStream, VoiceStreamState } from "@absolutejs/voice";
+  import type {
+    VoiceRoutingDecisionSummary,
+    VoiceStream,
+    VoiceStreamState,
+  } from "@absolutejs/voice";
   import {
     FRAMEWORKS,
     FRAMEWORK_DESCRIPTIONS,
@@ -33,7 +37,6 @@
     type SavedIntake,
     type VoiceDemoMode,
     type VoiceModelProvider,
-    type VoiceRoutingDecision,
     type VoiceRoutingMode,
   } from "../../../shared/demo";
   import {
@@ -72,7 +75,7 @@
     guided: false,
   });
   let isCapturing = $state(false);
-  let routingDecision = $state<VoiceRoutingDecision | null>(null);
+  let routingDecision = $state<VoiceRoutingDecisionSummary | null>(null);
   let savedIntakes = $state<SavedIntake[]>([]);
   let opsStatusHTML = $state("");
   let guidedState = $state(createInitialVoiceState());
