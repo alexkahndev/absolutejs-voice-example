@@ -1675,6 +1675,15 @@ const server = new Elysia()
       },
       preset: "reliability",
       session: runtimeStorage.session,
+      setup: {
+        path: "/api/twilio/setup",
+        requiredEnv: {
+          VOICE_DEMO_PUBLIC_BASE_URL: publicBaseUrl,
+          VOICE_DEMO_TELEPHONY_WEBHOOK_SECRET:
+            telephonyWebhookSigningSecret,
+        },
+        title: "AbsoluteJS Voice Demo Twilio Setup",
+      },
       streamPath: "/api/twilio/stream",
       stt: sttAdapter,
       twiml: {
