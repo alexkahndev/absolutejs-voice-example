@@ -41,6 +41,7 @@ const endpoints: Array<{
         summary?: {
           carriers?: unknown;
           handoffs?: unknown;
+          liveLatency?: unknown;
           providers?: unknown;
           quality?: unknown;
           routing?: unknown;
@@ -50,6 +51,7 @@ const endpoints: Array<{
       return {
         carriers: report.summary?.carriers,
         handoffs: report.summary?.handoffs,
+        liveLatency: report.summary?.liveLatency,
         providers: report.summary?.providers,
         quality: report.summary?.quality,
         readinessStatus: report.status,
