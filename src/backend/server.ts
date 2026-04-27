@@ -2020,6 +2020,7 @@ const server = new Elysia()
       path: "/api/turn-latency",
       store: runtimeStorage.session,
       title: "AbsoluteJS Voice Demo Turn Latency",
+      traceStore: runtimeStorage.traces,
     }),
   )
   .use(
