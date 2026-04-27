@@ -29,6 +29,7 @@ import {
   createTwilioVoiceRoutes,
   createVoiceToolContractRoutes,
   createVoiceToolRuntimeContractDefaults,
+  createVoiceTurnLatencyRoutes,
   createVoiceTurnQualityRoutes,
   createVoiceWorkflowContractHandler,
   createVoiceWorkflowContractPreset,
@@ -1256,6 +1257,13 @@ const appKitLinks = [
   },
   {
     description:
+      "Per-turn responsiveness from transcript timing to committed assistant response.",
+    href: "/turn-latency",
+    label: "Turn Latency",
+    statusHref: "/api/turn-latency",
+  },
+  {
+    description:
       "Per-turn STT confidence, fallback, correction, and transcript diagnostics.",
     href: "/turn-quality",
     label: "Turn Quality",
@@ -2004,6 +2012,14 @@ const server = new Elysia()
       htmlPath: "/tool-contracts",
       path: "/api/tool-contracts",
       title: "AbsoluteJS Voice Demo Tool Contracts",
+    }),
+  )
+  .use(
+    createVoiceTurnLatencyRoutes({
+      htmlPath: "/turn-latency",
+      path: "/api/turn-latency",
+      store: runtimeStorage.session,
+      title: "AbsoluteJS Voice Demo Turn Latency",
     }),
   )
   .use(

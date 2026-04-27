@@ -13,6 +13,7 @@ import {
   VoiceRoutingStatusService,
   VoiceStreamService,
   VoiceTraceTimelineService,
+  VoiceTurnLatencyService,
   VoiceTurnQualityService,
 } from "@absolutejs/voice/angular";
 import {
@@ -327,6 +328,38 @@ import {
               </div>
             } @else {
               <p class="empty-copy">Complete a turn to see quality diagnostics.</p>
+            }
+          </article>
+
+          <article class="voice-card voice-provider-health-card">
+            <span class="voice-framework-pill">Turn Latency</span>
+            <h2>
+              {{
+                turnLatency.report()?.averageTotalMs
+                  ? turnLatency.report()!.averageTotalMs + "ms avg"
+                  : "Checking latency"
+              }}
+            </h2>
+            <p class="voice-footnote">
+              End-to-end turn responsiveness from transcript timing to assistant start.
+            </p>
+            @if (turnLatency.report()?.turns?.length) {
+              <div class="voice-provider-health-list">
+                @for (turn of turnLatency.report()!.turns; track turn.sessionId + ":" + turn.turnId) {
+                  <div class="voice-provider-health-item">
+                    <strong>{{ turn.text || "Empty turn" }}</strong>
+                    <span>{{ turn.status }}</span>
+                    <small>
+                      {{
+                        turn.totalMs === undefined ? "n/a" : turn.totalMs + "ms"
+                      }}
+                      · {{ turn.stages[0]?.label || "stage" }}
+                    </small>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="empty-copy">Complete a turn to see latency diagnostics.</p>
             }
           </article>
 
@@ -708,6 +741,9 @@ export class AngularVoiceDemoComponent {
   turnQuality = inject(VoiceTurnQualityService).connect("/api/turn-quality", {
     intervalMs: 5_000,
   });
+  turnLatency = inject(VoiceTurnLatencyService).connect("/api/turn-latency", {
+    intervalMs: 5_000,
+  });
   traceTimeline = inject(VoiceTraceTimelineService).connect(
     "/api/voice-traces",
     {
@@ -873,6 +909,7 @@ export class AngularVoiceDemoComponent {
     this.providerStatus.close();
     this.routingStatus.close();
     this.turnQuality.close();
+    this.turnLatency.close();
   }
 }
 

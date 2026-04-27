@@ -5,6 +5,7 @@ import {
   mountVoiceProviderSimulationControls,
   mountVoiceProviderStatus,
   mountVoiceRoutingStatus,
+  defineVoiceTurnLatencyElement,
   mountVoiceTurnQuality,
 } from "@absolutejs/voice/client";
 import {
@@ -57,6 +58,7 @@ type HtmxWindow = Window & {
 };
 
 const framework = document.body.dataset.framework ?? "html";
+defineVoiceTurnLatencyElement();
 const chatList = document.querySelector("#chat-list");
 const connectionMetric = document.querySelector("#metric-connection");
 const errorStatus = document.querySelector("#status-error");

@@ -9,6 +9,7 @@ import {
   VoiceProviderStatus,
   VoiceRoutingStatus,
   VoiceTraceTimeline,
+  VoiceTurnLatency,
   VoiceTurnQuality,
 } from "@absolutejs/voice/react";
 import {
@@ -407,6 +408,11 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
             />
 
             <VoiceTurnQuality
+              className="voice-card voice-provider-health-card"
+              intervalMs={5_000}
+            />
+
+            <VoiceTurnLatency
               className="voice-card voice-provider-health-card"
               intervalMs={5_000}
             />

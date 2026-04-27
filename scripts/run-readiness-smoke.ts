@@ -7,6 +7,7 @@ type EndpointName =
   | "handoffs"
   | "productionReadiness"
   | "providerCapabilities"
+  | "turnLatency"
   | "voiceTraces";
 
 type EndpointResult = {
@@ -113,6 +114,26 @@ const endpoints: Array<{
       };
       return {
         failed: report.failed,
+        total: report.total,
+        warnings: report.warnings,
+      };
+    },
+  },
+  {
+    name: "turnLatency",
+    path: "/api/turn-latency",
+    summarize: (body) => {
+      const report = body as {
+        averageTotalMs?: unknown;
+        failed?: unknown;
+        status?: unknown;
+        total?: unknown;
+        warnings?: unknown;
+      };
+      return {
+        averageTotalMs: report.averageTotalMs,
+        failed: report.failed,
+        status: report.status,
         total: report.total,
         warnings: report.warnings,
       };

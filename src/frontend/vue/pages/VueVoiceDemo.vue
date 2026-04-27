@@ -8,6 +8,7 @@ import {
   VoiceProviderStatus,
   VoiceRoutingStatus,
   useVoiceTraceTimeline,
+  VoiceTurnLatency,
   VoiceTurnQuality,
 } from "@absolutejs/voice/vue";
 import { createVoiceTraceTimelineViewModel } from "@absolutejs/voice/client";
@@ -377,6 +378,11 @@ onUnmounted(() => {
         />
 
         <VoiceTurnQuality
+          class="voice-card voice-provider-health-card"
+          :interval-ms="5000"
+        />
+
+        <VoiceTurnLatency
           class="voice-card voice-provider-health-card"
           :interval-ms="5000"
         />

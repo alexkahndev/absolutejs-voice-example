@@ -5,6 +5,7 @@ import {
   defineVoiceProviderStatusElement,
   defineVoiceRoutingStatusElement,
   defineVoiceTraceTimelineElement,
+  defineVoiceTurnLatencyElement,
   defineVoiceTurnQualityElement,
 } from "@absolutejs/voice/client";
 import { mountDemoBargeInProof } from "../../shared/browser";
@@ -15,6 +16,7 @@ defineVoiceProviderSimulationControlsElement();
 defineVoiceProviderStatusElement();
 defineVoiceRoutingStatusElement();
 defineVoiceTraceTimelineElement();
+defineVoiceTurnLatencyElement();
 defineVoiceTurnQualityElement();
 
 const bargeInProofHost = document.querySelector("#barge-in-proof-card");
