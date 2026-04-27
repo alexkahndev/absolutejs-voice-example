@@ -264,6 +264,36 @@ export const createDemoMicrophone = (
 const formatLatency = (value?: number) =>
   typeof value === "number" ? `${Math.round(value)}ms` : "Not measured";
 
+const createBargeInTestChunk = () => {
+  const sampleRateHz = 16_000;
+  const durationSeconds = 5;
+  const sampleCount = sampleRateHz * durationSeconds;
+  const chunk = new Uint8Array(sampleCount * 2);
+  const view = new DataView(chunk.buffer);
+
+  for (let index = 0; index < sampleCount; index += 1) {
+    const seconds = index / sampleRateHz;
+    const carrier = Math.sin(2 * Math.PI * 440 * seconds);
+    const pulse = 0.55 + 0.25 * Math.sin(2 * Math.PI * 2.2 * seconds);
+    const fadeIn = Math.min(1, seconds / 0.08);
+    const fadeOut = Math.min(1, (durationSeconds - seconds) / 0.18);
+    const sample = Math.max(-1, Math.min(1, carrier * pulse * fadeIn * fadeOut));
+    view.setInt16(index * 2, Math.round(sample * 0x7fff), true);
+  }
+
+  return {
+    chunk,
+    format: {
+      channels: 1 as const,
+      container: "raw" as const,
+      encoding: "pcm_s16le" as const,
+      sampleRateHz,
+    },
+    receivedAt: Date.now(),
+    turnId: "barge-in-test",
+  };
+};
+
 const formatBargeInStatus = (status?: VoiceBargeInReport["status"]) => {
   if (!status || status === "empty") {
     return {
@@ -298,11 +328,13 @@ const formatBargeInStatus = (status?: VoiceBargeInReport["status"]) => {
 
 export const renderDemoBargeInProofHTML = (
   report: VoiceBargeInReport | null,
-  error?: string | null,
+  input?: string | null | { error?: string | null; testState?: string | null },
 ) => {
   const status = formatBargeInStatus(report?.status);
   const lastEvent = report?.lastEvent;
   const sessions = report?.sessions ?? [];
+  const error = typeof input === "string" ? input : input?.error;
+  const testState = typeof input === "string" ? null : input?.testState;
 
   return `<article class="voice-card voice-barge-in-proof voice-barge-in-proof--${status.className}">
   <header class="voice-barge-in-proof__header">
@@ -310,6 +342,12 @@ export const renderDemoBargeInProofHTML = (
     <strong>${escapeHtml(status.label)}</strong>
   </header>
   <p class="voice-footnote">${escapeHtml(error || status.copy)}</p>
+  <div class="voice-barge-in-proof__actions">
+    <button type="button" data-barge-in-test>
+      ${testState === "running" ? "Listening - speak now" : "Try barge-in test"}
+    </button>
+    <span>${escapeHtml(testState === "running" ? "A local assistant test clip is playing. Talk over it." : testState === "done" ? "Test submitted. Results refresh automatically." : "Runs locally through the browser audio player.")}</span>
+  </div>
   <div class="voice-barge-in-proof__grid">
     <div>
       <span>Interrupt latency</span>
@@ -356,30 +394,134 @@ export const mountDemoBargeInProof = (
 ) => {
   let isClosed = false;
   let timer: ReturnType<typeof setInterval> | null = null;
+  let report: VoiceBargeInReport | null = null;
+  let errorMessage: string | null = null;
+  let testState: "idle" | "running" | "done" = "idle";
+  let testPlayer: VoiceAudioPlayer | null = null;
+  let testCapture: ReturnType<typeof createMicrophoneCapture> | null = null;
+
+  const render = () => {
+    element.innerHTML = renderDemoBargeInProofHTML(report, {
+      error: errorMessage,
+      testState,
+    });
+  };
 
   const refresh = async () => {
     try {
-      const report = await fetchBargeInReport();
+      report = await fetchBargeInReport();
+      errorMessage = null;
       if (!isClosed) {
-        element.innerHTML = renderDemoBargeInProofHTML(report);
+        render();
       }
     } catch (error) {
+      errorMessage = formatErrorMessage(error);
       if (!isClosed) {
-        element.innerHTML = renderDemoBargeInProofHTML(
-          null,
-          formatErrorMessage(error),
-        );
+        render();
       }
     }
   };
 
-  element.innerHTML = renderDemoBargeInProofHTML(null);
+  const stopTest = () => {
+    testCapture?.stop();
+    testCapture = null;
+  };
+
+  const runTest = async () => {
+    if (testState === "running") {
+      return;
+    }
+
+    const monitor = createVoiceBargeInMonitor({
+      path: "/api/voice-barge-in",
+      thresholdMs: 250,
+    });
+    const assistantAudio = [createBargeInTestChunk()];
+    let hasInterrupted = false;
+
+    testState = "running";
+    errorMessage = null;
+    render();
+    stopTest();
+    void testPlayer?.close();
+    testPlayer = createVoiceAudioPlayer({
+      assistantAudio,
+      subscribe: () => () => {},
+    });
+
+    try {
+      testCapture = createMicrophoneCapture({
+        onAudio: (audio) => {
+          if (
+            hasInterrupted ||
+            !testPlayer?.isPlaying ||
+            getPcmLevel(audio) < 0.04
+          ) {
+            return;
+          }
+
+          hasInterrupted = true;
+          stopTest();
+          monitor.recordRequested({
+            reason: "manual-audio",
+            sessionId: "barge-in-proof-test",
+          });
+          void testPlayer.interrupt().then(() => {
+            monitor.recordStopped({
+              latencyMs: testPlayer?.lastInterruptLatencyMs,
+              playbackStopLatencyMs: testPlayer?.lastPlaybackStopLatencyMs,
+              reason: "manual-audio",
+              sessionId: "barge-in-proof-test",
+            });
+            testState = "done";
+            void refresh();
+          });
+        },
+        sampleRateHz: 16_000,
+      });
+
+      await testCapture.start();
+      await testPlayer.start();
+      setTimeout(() => {
+        if (hasInterrupted || isClosed) {
+          return;
+        }
+
+        stopTest();
+        monitor.recordSkipped({
+          reason: "manual-audio",
+          sessionId: "barge-in-proof-test",
+        });
+        testState = "done";
+        void refresh();
+      }, 5_500);
+    } catch (error) {
+      stopTest();
+      void testPlayer?.close();
+      testState = "idle";
+      errorMessage = formatErrorMessage(error);
+      render();
+    }
+  };
+
+  const onClick = (event: Event) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.closest("[data-barge-in-test]")) {
+      void runTest();
+    }
+  };
+
+  element.addEventListener("click", onClick);
+  render();
   void refresh();
   timer = setInterval(refresh, options.intervalMs ?? 3_000);
 
   return {
     close: () => {
       isClosed = true;
+      element.removeEventListener("click", onClick);
+      stopTest();
+      void testPlayer?.close();
       if (timer) {
         clearInterval(timer);
       }

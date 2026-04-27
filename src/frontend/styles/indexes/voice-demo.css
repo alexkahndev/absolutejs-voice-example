@@ -1145,6 +1145,29 @@ nav a.active {
   margin: 1rem 0;
 }
 
+.voice-barge-in-proof__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.voice-barge-in-proof__actions button {
+  background: #5eead4;
+  border: 0;
+  border-radius: 999px;
+  color: #042f2e;
+  cursor: pointer;
+  font-weight: 900;
+  padding: 0.72rem 1rem;
+}
+
+.voice-barge-in-proof__actions span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .voice-barge-in-proof__grid div,
 .voice-barge-in-proof__sessions div {
   background: rgba(255, 255, 255, 0.055);
