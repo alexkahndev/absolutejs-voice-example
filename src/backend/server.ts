@@ -5,8 +5,7 @@ import {
   completeVoiceOpsTask,
   createAnthropicVoiceAssistantModel,
   createGeminiVoiceAssistantModel,
-  createVoiceDiagnosticsRoutes,
-  createVoiceEvalRoutes,
+  createVoiceAppKitRoutes,
   createVoiceFileEvalBaselineStore,
   createVoiceFileScenarioFixtureStore,
   createVoiceAssistant,
@@ -15,16 +14,8 @@ import {
   createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
   createOpenAIVoiceAssistantModel,
-  createVoiceAssistantHealthRoutes,
   createVoiceHandoffDeliveryWorker,
-  createVoiceHandoffHealthRoutes,
-  createVoiceOpsConsoleRoutes,
-  createVoiceProviderHealthRoutes,
-  createVoiceQualityRoutes,
   createVoiceProviderRouter,
-  createVoiceResilienceRoutes,
-  createVoiceSessionListRoutes,
-  createVoiceSessionReplayRoutes,
   createVoiceSTTProviderRouter,
   createVoiceTaskUpdatedEvent,
   createVoiceWorkflowContractHandler,
@@ -711,6 +702,78 @@ const workflowScenarios = [
   transferWorkflowContract.toScenarioEval(),
 ];
 
+const appKitLinks = [
+  { href: "/react", label: "Back to demo" },
+  {
+    description: "Integrated voice operations console.",
+    href: "/ops-console",
+    label: "Ops Console",
+  },
+  {
+    description: "Acceptance gates for production readiness.",
+    href: "/quality",
+    label: "Quality",
+    statusHref: "/quality/status",
+  },
+  {
+    description:
+      "Replay stored sessions against quality gates and trend regressions.",
+    href: "/evals",
+    label: "Evals",
+    statusHref: "/evals/status",
+  },
+  {
+    description: "Compare current evals against a saved known-good baseline.",
+    href: "/evals/baseline",
+    label: "Eval Baseline",
+    statusHref: "/evals/baseline/status",
+  },
+  {
+    description:
+      "Business-workflow evals for guided recordings, general captures, and transfer handoffs.",
+    href: "/evals/scenarios",
+    label: "Scenario Evals",
+    statusHref: "/evals/scenarios/status",
+  },
+  {
+    description:
+      "Seeded certification fixtures that prove workflows pass before live traffic.",
+    href: "/evals/fixtures",
+    label: "Fixture Evals",
+    statusHref: "/evals/fixtures/status",
+  },
+  {
+    description: "Provider failover, degradation, and simulator controls.",
+    href: "/resilience",
+    label: "Resilience",
+  },
+  {
+    description: "Redacted trace exports for debugging and support.",
+    href: "/diagnostics",
+    label: "Diagnostics",
+  },
+  {
+    description: "Recent calls with replay links.",
+    href: "/sessions",
+    label: "Sessions",
+  },
+  {
+    description: "Transfer and webhook delivery health.",
+    href: "/handoffs",
+    label: "Handoffs",
+  },
+  {
+    description: "Follow-up tasks created from call outcomes.",
+    href: "/tasks",
+    label: "Tasks",
+  },
+  {
+    description: "CRM/helpdesk sync and integration events.",
+    href: "/integrations",
+    label: "Integrations",
+  },
+];
+
 const normalizeTaskFilters = (
   query: Record<string, unknown>,
 ): VoiceOpsTaskFilterInput => ({
@@ -1095,187 +1158,45 @@ const server = new Elysia()
     }),
   )
   .use(
-    createVoiceProviderHealthRoutes({
-      providers: configuredModelProviders,
-      store: runtimeStorage.traces,
-    }),
-  )
-  .use(
-    createVoiceAssistantHealthRoutes({
-      providers: configuredModelProviders,
-      store: runtimeStorage.traces,
-    }),
-  )
-  .use(
-    createVoiceSessionReplayRoutes({
-      store: runtimeStorage.traces,
-    }),
-  )
-  .use(
-    createVoiceSessionListRoutes({
-      store: runtimeStorage.traces,
-    }),
-  )
-  .use(
-    createVoiceHandoffHealthRoutes({
-      store: runtimeStorage.traces,
-    }),
-  )
-  .use(
-    createVoiceResilienceRoutes({
-      links: [
-        { href: "/react", label: "Back to demo" },
-        { href: "/ops-console", label: "Ops Console" },
-        { href: "/assistant", label: "Assistant" },
-        { href: "/quality", label: "Quality" },
-        { href: "/evals", label: "Evals" },
-        { href: "/diagnostics", label: "Diagnostics" },
-        { href: "/sessions", label: "Sessions" },
-        { href: "/handoffs", label: "Handoffs" },
-        { href: "/reviews", label: "Reviews" },
-        { href: "/tasks", label: "Tasks" },
-        { href: "/integrations", label: "Integrations" },
-      ],
-      llmProviders: configuredModelProviders,
-      sttProviders: configuredSTTProviders,
-      sttSimulation: {
-        failureMessage:
-          "Simulate Deepgram failure to prove the realtime route falls back to AssemblyAI without changing provider credentials.",
-        failureProviders: ["deepgram"],
-        fallbackRequiredMessage:
-          "Add ASSEMBLYAI_API_KEY to enable the real fallback provider.",
-        fallbackRequiredProvider: "assemblyai",
-        providers: sttProviderSimulationStatus(),
-        run: (provider, mode) =>
-          sttProviderFailureSimulator.run(provider as VoiceSTTProvider, mode),
+    createVoiceAppKitRoutes({
+      assistantHealth: {},
+      diagnostics: {
+        title: "AbsoluteJS Voice Demo Diagnostics",
       },
-      store: runtimeStorage.traces,
-    }),
-  )
-  .use(
-    createVoiceDiagnosticsRoutes({
-      store: runtimeStorage.traces,
-      title: "AbsoluteJS Voice Demo Diagnostics",
-    }),
-  )
-  .use(
-    createVoiceQualityRoutes({
-      links: [
-        { href: "/react", label: "Back to demo" },
-        { href: "/ops-console", label: "Ops Console" },
-        { href: "/resilience", label: "Resilience" },
-        { href: "/evals", label: "Evals" },
-        { href: "/diagnostics", label: "Diagnostics" },
-        { href: "/sessions", label: "Sessions" },
-        { href: "/handoffs", label: "Handoffs" },
-        { href: "/reviews", label: "Reviews" },
-        { href: "/tasks", label: "Tasks" },
-        { href: "/integrations", label: "Integrations" },
-      ],
-      store: runtimeStorage.traces,
-    }),
-  )
-  .use(
-    createVoiceEvalRoutes({
-      links: [
-        { href: "/react", label: "Back to demo" },
-        { href: "/ops-console", label: "Ops Console" },
-        { href: "/quality", label: "Quality" },
-        { href: "/evals/baseline", label: "Baseline" },
-        { href: "/evals/scenarios", label: "Scenarios" },
-        { href: "/evals/fixtures", label: "Fixtures" },
-        { href: "/resilience", label: "Resilience" },
-        { href: "/diagnostics", label: "Diagnostics" },
-        { href: "/sessions", label: "Sessions" },
-        { href: "/handoffs", label: "Handoffs" },
-        { href: "/tasks", label: "Tasks" },
-        { href: "/integrations", label: "Integrations" },
-      ],
-      baselineStore: createVoiceFileEvalBaselineStore(
-        resolve(runtimeDirectory, "eval-baseline.json"),
-      ),
-      fixtureStore: createVoiceFileScenarioFixtureStore(
-        resolve(import.meta.dir, "fixtures", "voice-scenario-fixtures.json"),
-      ),
-      scenarios: workflowScenarios,
-      store: runtimeStorage.traces,
-      title: "AbsoluteJS Voice Demo Evals",
-    }),
-  )
-  .use(
-    createVoiceOpsConsoleRoutes({
-      links: [
-        {
-          description: "Acceptance gates for production readiness.",
-          href: "/quality",
-          label: "Quality",
-          statusHref: "/quality/status",
-        },
-        {
-          description:
-            "Replay stored sessions against quality gates and trend regressions.",
-          href: "/evals",
-          label: "Evals",
-          statusHref: "/evals/status",
-        },
-        {
-          description:
-            "Compare current evals against a saved known-good baseline.",
-          href: "/evals/baseline",
-          label: "Eval Baseline",
-          statusHref: "/evals/baseline/status",
-        },
-        {
-          description:
-            "Business-workflow evals for guided recordings, general captures, and transfer handoffs.",
-          href: "/evals/scenarios",
-          label: "Scenario Evals",
-          statusHref: "/evals/scenarios/status",
-        },
-        {
-          description:
-            "Seeded certification fixtures that prove workflows pass before live traffic.",
-          href: "/evals/fixtures",
-          label: "Fixture Evals",
-          statusHref: "/evals/fixtures/status",
-        },
-        {
-          description:
-            "Provider failover, degradation, and simulator controls.",
-          href: "/resilience",
-          label: "Resilience",
-        },
-        {
-          description: "Redacted trace exports for debugging and support.",
-          href: "/diagnostics",
-          label: "Diagnostics",
-        },
-        {
-          description: "Recent calls with replay links.",
-          href: "/sessions",
-          label: "Sessions",
-        },
-        {
-          description: "Transfer and webhook delivery health.",
-          href: "/handoffs",
-          label: "Handoffs",
-        },
-        {
-          description: "Follow-up tasks created from call outcomes.",
-          href: "/tasks",
-          label: "Tasks",
-        },
-        {
-          description: "CRM/helpdesk sync and integration events.",
-          href: "/integrations",
-          label: "Integrations",
-        },
-      ],
+      evals: {
+        baselineStore: createVoiceFileEvalBaselineStore(
+          resolve(runtimeDirectory, "eval-baseline.json"),
+        ),
+        fixtureStore: createVoiceFileScenarioFixtureStore(
+          resolve(import.meta.dir, "fixtures", "voice-scenario-fixtures.json"),
+        ),
+        scenarios: workflowScenarios,
+        title: "AbsoluteJS Voice Demo Evals",
+      },
+      handoffs: {},
+      links: appKitLinks,
       llmProviders: configuredModelProviders,
+      providerHealth: {},
+      resilience: {
+        sttSimulation: {
+          failureMessage:
+            "Simulate Deepgram failure to prove the realtime route falls back to AssemblyAI without changing provider credentials.",
+          failureProviders: ["deepgram"],
+          fallbackRequiredMessage:
+            "Add ASSEMBLYAI_API_KEY to enable the real fallback provider.",
+          fallbackRequiredProvider: "assemblyai",
+          providers: sttProviderSimulationStatus(),
+          run: (provider, mode) =>
+            sttProviderFailureSimulator.run(provider as VoiceSTTProvider, mode),
+        },
+      },
+      sessions: {
+        htmlPath: false,
+      },
       store: runtimeStorage.traces,
       sttProviders: configuredSTTProviders,
       title: "AbsoluteJS Voice Demo Ops Console",
-    }),
+    }).routes,
   )
   .use(
     createVoiceOpsWebhookReceiverRoutes({
