@@ -71,7 +71,10 @@ import {
   listVoiceRoutingEvents,
   renderVoiceResiliencePage,
 } from "./resiliencePage";
-import { createVoiceProviderFailureSimulator } from "@absolutejs/voice/testing";
+import {
+  createVoiceIOProviderFailureSimulator,
+  createVoiceProviderFailureSimulator,
+} from "@absolutejs/voice/testing";
 import { pagesPlugin } from "./plugins/pagesPlugin";
 import {
   buildSavedVoiceReview,
@@ -763,6 +766,35 @@ const sttProviderSimulationStatus = () =>
 const isVoiceSTTProvider = (value: unknown): value is VoiceSTTProvider =>
   value === "deepgram" || value === "assemblyai";
 
+const sttProviderFailureSimulator = createVoiceIOProviderFailureSimulator<
+  VoiceSTTProvider
+>({
+  failureElapsedMs: 12,
+  failureMessage: ({ provider }) =>
+    `Simulated ${provider} websocket open failure.`,
+  fallback: (provider) =>
+    configuredSTTProviders.filter((candidate) => candidate !== provider),
+  kind: "stt",
+  latencyBudgets: sttLatencyBudgets,
+  onProviderEvent: async (event, input) => {
+    await runtimeStorage.traces.append({
+      at: event.at,
+      payload: {
+        ...event,
+        providerStatus: event.status,
+      },
+      sessionId: input.sessionId,
+      type: "session.error",
+    });
+  },
+  providers: configuredSTTProviders,
+  recoveryElapsedMs: {
+    assemblyai: 28,
+    deepgram: 18,
+  },
+  sessionId: ({ now }) => `stt-sim-${now}`,
+});
+
 const simulateSTTProviderFailure = async (provider: VoiceSTTProvider) => {
   if (!configuredSTTProviders.includes(provider)) {
     return {
@@ -782,64 +814,7 @@ const simulateSTTProviderFailure = async (provider: VoiceSTTProvider) => {
     };
   }
 
-  const now = Date.now();
-  const sessionId = `stt-sim-${now}`;
-  const suppressedUntil = now + 30_000;
-  await runtimeStorage.traces.append({
-    at: now,
-    payload: {
-      attempt: 0,
-      elapsedMs: 12,
-      error: "Simulated Deepgram websocket open failure.",
-      fallbackProvider: "assemblyai",
-      kind: "stt",
-      latencyBudgetMs: sttLatencyBudgets.deepgram,
-      operation: "open",
-      provider,
-      providerHealth: {
-        consecutiveFailures: 1,
-        lastFailureAt: now,
-        provider,
-        status: "suppressed",
-        suppressedUntil,
-      },
-      providerStatus: "error",
-      selectedProvider: "deepgram",
-      suppressedUntil,
-    },
-    sessionId,
-    type: "session.error",
-  });
-  await runtimeStorage.traces.append({
-    at: now + 1,
-    payload: {
-      attempt: 1,
-      elapsedMs: 28,
-      fallbackProvider: "assemblyai",
-      kind: "stt",
-      latencyBudgetMs: sttLatencyBudgets.assemblyai,
-      operation: "open",
-      provider: "assemblyai",
-      providerHealth: {
-        consecutiveFailures: 0,
-        provider: "assemblyai",
-        status: "healthy",
-      },
-      providerStatus: "fallback",
-      selectedProvider: "deepgram",
-    },
-    sessionId,
-    type: "session.error",
-  });
-
-  return {
-    fallbackProvider: "assemblyai",
-    mode: "failure",
-    provider,
-    sessionId,
-    status: "simulated",
-    suppressedUntil,
-  };
+  return sttProviderFailureSimulator.run(provider, "failure");
 };
 
 const simulateSTTProviderRecovery = async (provider: VoiceSTTProvider) => {
@@ -849,35 +824,7 @@ const simulateSTTProviderRecovery = async (provider: VoiceSTTProvider) => {
     };
   }
 
-  const now = Date.now();
-  const sessionId = `stt-sim-${now}`;
-  await runtimeStorage.traces.append({
-    at: now,
-    payload: {
-      attempt: 0,
-      elapsedMs: provider === "deepgram" ? 18 : 32,
-      kind: "stt",
-      latencyBudgetMs: sttLatencyBudgets[provider],
-      operation: "open",
-      provider,
-      providerHealth: {
-        consecutiveFailures: 0,
-        provider,
-        status: "healthy",
-      },
-      providerStatus: "success",
-      selectedProvider: provider,
-    },
-    sessionId,
-    type: "session.error",
-  });
-
-  return {
-    mode: "recovery",
-    provider,
-    sessionId,
-    status: "simulated",
-  };
+  return sttProviderFailureSimulator.run(provider, "recovery");
 };
 
 const listAssistantMemory = async (): Promise<VoiceAssistantMemoryRecord[]> =>
