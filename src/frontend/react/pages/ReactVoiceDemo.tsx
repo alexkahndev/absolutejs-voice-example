@@ -1,13 +1,12 @@
 import { Head } from "@absolutejs/absolute/react/components";
 import { useEffect, useRef, useState } from "react";
 import type { VoiceTurnRecord } from "@absolutejs/voice";
-import { useVoiceStream, useVoiceAppKitStatus } from "@absolutejs/voice/react";
+import { useVoiceStream, VoiceOpsStatus } from "@absolutejs/voice/react";
 import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoMicrophone,
   fetchSavedIntakes,
-  getAppKitStatusLabel,
   formatErrorMessage,
   formatDateTime,
   pushVoiceWaveLevel,
@@ -94,10 +93,6 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
   const [savedIntakes, setSavedIntakes] = useState<SavedIntake[]>([]);
   const [waveLevels, setWaveLevels] = useState(createInitialVoiceWaveLevels);
   const currentVoice = activeMode === "general" ? generalVoice : guidedVoice;
-  const appKitStatus = useVoiceAppKitStatus("/app-kit/status", {
-    intervalMs: 5_000,
-  });
-
   useEffect(() => {
     const refresh = () => {
       void fetchSavedIntakes().then(setSavedIntakes);
@@ -300,33 +295,10 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
               </label>
             </article>
 
-            <article
-              className={`voice-card voice-workflow-card ${
-                appKitStatus.report?.status === "fail" ? "is-failing" : ""
-              }`}
-            >
-              <span className="voice-framework-pill">Voice App Kit</span>
-              <h2>{getAppKitStatusLabel(appKitStatus.report)}</h2>
-              <p className="voice-footnote">
-                One embedded readiness check for certified workflows, provider
-                health, and handoffs.
-              </p>
-              <div className="voice-workflow-summary">
-                <span className="pill">
-                  {appKitStatus.report?.passed ?? 0} passing
-                </span>
-                <span className="pill">
-                  {appKitStatus.report?.failed ?? 0} failing
-                </span>
-                <span className="pill">
-                  {appKitStatus.report?.total ?? 0} checks
-                </span>
-              </div>
-              <p className="voice-footnote">
-                <a href="/app-kit/status">Open app-kit status</a> ·{" "}
-                <a href="/evals/fixtures">Open certified fixtures</a>
-              </p>
-            </article>
+            <VoiceOpsStatus
+              className="voice-card voice-workflow-card"
+              intervalMs={5_000}
+            />
 
             <article className="voice-card voice-card-side">
               <h2>{VOICE_DEMO_GUIDE_TITLE}</h2>

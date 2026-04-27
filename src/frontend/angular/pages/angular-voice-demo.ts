@@ -546,3 +546,7 @@ export class AngularVoiceDemoComponent {
 }
 
 export const factory = () => AngularVoiceDemoComponent;
+
+const AngularVoiceDemoDefault = AngularVoiceDemoComponent;
+
+export default AngularVoiceDemoDefault;

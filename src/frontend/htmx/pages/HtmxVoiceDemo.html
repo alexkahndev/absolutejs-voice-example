@@ -112,25 +112,10 @@
           </label>
         </article>
 
-        <article
+        <absolute-voice-ops-status
           class="voice-card voice-workflow-card"
-          id="workflow-status-card"
-        >
-          <span class="voice-framework-pill">Voice App Kit</span>
-          <h2 id="workflow-status-label">Checking</h2>
-          <p class="voice-footnote">
-            One embedded readiness check for certified workflows, provider
-            health, and handoffs.
-          </p>
-          <div
-            class="voice-workflow-summary"
-            id="workflow-status-summary"
-          ></div>
-          <p class="voice-footnote">
-            <a href="/app-kit/status">Open app-kit status</a> ·
-            <a href="/evals/fixtures">Open certified fixtures</a>
-          </p>
-        </article>
+          interval-ms="5000"
+        ></absolute-voice-ops-status>
 
         <article class="voice-card voice-card-side">
           <h2>Run the guided voice demo</h2>
@@ -310,32 +295,6 @@
         const shell = document.querySelector("[data-voice-htmx]");
         const select = document.querySelector("#model-provider-select");
         const metric = document.querySelector("#metric-provider");
-        const workflowCard = document.querySelector("#workflow-status-card");
-        const workflowLabel = document.querySelector("#workflow-status-label");
-        const workflowSummary = document.querySelector(
-          "#workflow-status-summary",
-        );
-        const renderWorkflowStatus = async () => {
-          if (!workflowCard || !workflowLabel || !workflowSummary) return;
-          try {
-            const response = await fetch("/app-kit/status");
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            const report = await response.json();
-            workflowCard.classList.toggle(
-              "is-failing",
-              report.status === "fail",
-            );
-            workflowLabel.textContent =
-              report.status === "pass" ? "Passing" : "Needs attention";
-            workflowSummary.innerHTML = `<span class="pill">${report.passed ?? 0} passing</span>
-<span class="pill">${report.failed ?? 0} failing</span>
-<span class="pill">${report.total ?? 0} checks</span>`;
-          } catch {
-            workflowCard.classList.add("is-failing");
-            workflowLabel.textContent = "Unavailable";
-            workflowSummary.innerHTML = `<span class="pill">Check /app-kit/status</span>`;
-          }
-        };
         if (shell) {
           shell.dataset.voiceGuidedPath = `/voice/intake?scenarioId=guided&provider=${provider}`;
           shell.dataset.voiceGeneralPath = `/voice/intake?scenarioId=general&provider=${provider}`;
@@ -352,10 +311,9 @@
         if (metric) {
           metric.textContent = labels[provider] ?? provider;
         }
-        void renderWorkflowStatus();
-        window.setInterval(renderWorkflowStatus, 5000);
       })();
     </script>
+    <script src="../../html/scripts/voice-ops-status.ts" type="module"></script>
     <script
       data-external
       src="/voice/intake/htmx/bootstrap.js"

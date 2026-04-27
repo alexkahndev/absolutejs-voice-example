@@ -2,8 +2,6 @@ import { createMicrophoneCapture } from "@absolutejs/voice/client";
 import type { VoiceAppKitStatusReport } from "@absolutejs/voice";
 import type { SavedIntake } from "../../shared/demo";
 
-export type { VoiceAppKitStatusReport };
-
 const VOICE_WAVE_POINTS = 48;
 const VOICE_WAVE_WIDTH = 320;
 const VOICE_WAVE_HEIGHT = 88;
@@ -60,16 +58,6 @@ export const fetchSavedIntakes = async () => {
   }
 
   return (await response.json()) as SavedIntake[];
-};
-
-export const fetchAppKitStatus = async () => {
-  const response = await fetch("/app-kit/status");
-
-  if (!response.ok) {
-    return null;
-  }
-
-  return (await response.json()) as VoiceAppKitStatusReport;
 };
 
 export const getAppKitStatusLabel = (

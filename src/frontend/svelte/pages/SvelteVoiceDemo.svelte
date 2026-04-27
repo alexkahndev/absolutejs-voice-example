@@ -2,7 +2,7 @@
   import { onDestroy, onMount } from "svelte";
   import Head from "@absolutejs/absolute/svelte/components/Head.js";
   import {
-    createVoiceAppKitStatus,
+    createVoiceOpsStatus,
     createVoiceStream,
   } from "@absolutejs/voice/svelte";
   import type { VoiceStream, VoiceStreamState } from "@absolutejs/voice";
@@ -35,11 +35,9 @@
     createVoiceWavePath,
     createDemoMicrophone,
     fetchSavedIntakes,
-    getAppKitStatusLabel,
     formatErrorMessage,
     formatDateTime,
     pushVoiceWaveLevel,
-    type VoiceAppKitStatusReport,
   } from "../../shared/browser";
 
   const createInitialVoiceState = (): VoiceStreamState<SavedIntake> => ({
@@ -67,7 +65,7 @@
   });
   let isCapturing = $state(false);
   let savedIntakes = $state<SavedIntake[]>([]);
-  let appKitReport = $state<VoiceAppKitStatusReport | null>(null);
+  let opsStatusHTML = $state("");
   let guidedState = $state(createInitialVoiceState());
   let generalState = $state(createInitialVoiceState());
   let waveLevels = $state(createInitialVoiceWaveLevels());
@@ -75,12 +73,12 @@
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
   let guidedVoice: VoiceStream<SavedIntake> | null = null;
   let generalVoice: VoiceStream<SavedIntake> | null = null;
-  const appKitStatus = createVoiceAppKitStatus("/app-kit/status", {
+  const opsStatus = createVoiceOpsStatus("/app-kit/status", {
     intervalMs: 5_000,
   });
   let unsubscribeGuided = () => {};
   let unsubscribeGeneral = () => {};
-  let unsubscribeAppKitStatus = () => {};
+  let unsubscribeOpsStatus = () => {};
   let currentVoice = $derived(
     activeMode === "general" ? generalState : guidedState,
   );
@@ -199,10 +197,11 @@
 
   onMount(() => {
     connectVoices();
-    unsubscribeAppKitStatus = appKitStatus.subscribe(() => {
-      appKitReport = appKitStatus.getSnapshot().report ?? null;
+    unsubscribeOpsStatus = opsStatus.subscribe(() => {
+      opsStatusHTML = opsStatus.getHTML();
     });
-    void appKitStatus.refresh().catch(() => {});
+    opsStatusHTML = opsStatus.getHTML();
+    void opsStatus.refresh().catch(() => {});
     void refreshIntakes();
     refreshTimer = setInterval(() => {
       void refreshIntakes();
@@ -216,10 +215,10 @@
     stopMic();
     unsubscribeGuided();
     unsubscribeGeneral();
-    unsubscribeAppKitStatus();
+    unsubscribeOpsStatus();
     guidedVoice?.close();
     generalVoice?.close();
-    appKitStatus.close();
+    opsStatus.close();
   });
 </script>
 
@@ -305,25 +304,9 @@
         </label>
       </article>
 
-      <article
-        class={`voice-card voice-workflow-card ${appKitReport?.status === "fail" ? "is-failing" : ""}`}
-      >
-        <span class="voice-framework-pill">Voice App Kit</span>
-        <h2>{getAppKitStatusLabel(appKitReport)}</h2>
-        <p class="voice-footnote">
-          One embedded status check for quality, workflow contracts, providers,
-          sessions, and handoffs.
-        </p>
-        <div class="voice-workflow-summary">
-          <span class="pill">{appKitReport?.passed ?? 0} passing</span>
-          <span class="pill">{appKitReport?.failed ?? 0} failing</span>
-          <span class="pill">{appKitReport?.total ?? 0} checks</span>
-        </div>
-        <p class="voice-footnote">
-          <a href="/app-kit/status">Open app-kit status</a> ·
-          <a href="/evals/fixtures">Open certified fixtures</a>
-        </p>
-      </article>
+      <div class="voice-card voice-workflow-card voice-ops-status-host">
+        {@html opsStatusHTML}
+      </div>
 
       <article class="voice-card voice-card-side">
         <h2>{VOICE_DEMO_GUIDE_TITLE}</h2>

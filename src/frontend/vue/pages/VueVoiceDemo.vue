@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { useVoiceAppKitStatus, useVoiceStream } from "@absolutejs/voice/vue";
+import { useVoiceStream, VoiceOpsStatus } from "@absolutejs/voice/vue";
 import {
   FRAMEWORKS,
   FRAMEWORK_DESCRIPTIONS,
@@ -30,7 +30,6 @@ import {
   createVoiceWavePath,
   createDemoMicrophone,
   fetchSavedIntakes,
-  getAppKitStatusLabel,
   formatErrorMessage,
   formatDateTime,
   pushVoiceWaveLevel,
@@ -43,9 +42,6 @@ const guidedVoice = useVoiceStream<SavedIntake>(
 const generalVoice = useVoiceStream<SavedIntake>(
   getVoiceRoutePath("general", modelProvider.value),
 );
-const appKitStatus = useVoiceAppKitStatus("/app-kit/status", {
-  intervalMs: 5_000,
-});
 const activeMode = ref<VoiceDemoMode | null>(null);
 const isCapturing = ref(false);
 const hasStartedModes = ref<Record<VoiceDemoMode, boolean>>({
@@ -264,35 +260,10 @@ onUnmounted(() => {
           </label>
         </article>
 
-        <article
-          :class="[
-            'voice-card',
-            'voice-workflow-card',
-            appKitStatus.report.value?.status === 'fail' ? 'is-failing' : '',
-          ]"
-        >
-          <span class="voice-framework-pill">Voice App Kit</span>
-          <h2>{{ getAppKitStatusLabel(appKitStatus.report.value) }}</h2>
-          <p class="voice-footnote">
-            One embedded readiness check for certified workflows, provider
-            health, and handoffs.
-          </p>
-          <div class="voice-workflow-summary">
-            <span class="pill"
-              >{{ appKitStatus.report.value?.passed ?? 0 }} passing</span
-            >
-            <span class="pill"
-              >{{ appKitStatus.report.value?.failed ?? 0 }} failing</span
-            >
-            <span class="pill"
-              >{{ appKitStatus.report.value?.total ?? 0 }} checks</span
-            >
-          </div>
-          <p class="voice-footnote">
-            <a href="/app-kit/status">Open app-kit status</a> ·
-            <a href="/evals/fixtures">Open certified fixtures</a>
-          </p>
-        </article>
+        <VoiceOpsStatus
+          class="voice-card voice-workflow-card"
+          :interval-ms="5000"
+        />
 
         <article class="voice-card voice-card-side">
           <h2>{{ VOICE_DEMO_GUIDE_TITLE }}</h2>

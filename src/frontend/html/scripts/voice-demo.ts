@@ -1,13 +1,12 @@
 import {
-  createVoiceAppKitStatusStore,
   createVoiceStream,
+  mountVoiceOpsStatus,
 } from "@absolutejs/voice/client";
 import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoMicrophone,
   fetchSavedIntakes,
-  getAppKitStatusLabel,
   formatErrorMessage,
   formatDateTime,
   pushVoiceWaveLevel,
@@ -67,11 +66,7 @@ const voiceMonitor = document.querySelector("#voice-monitor");
 const voiceMonitorCopy = document.querySelector("#voice-monitor-copy");
 const voiceWaveGlow = document.querySelector("#voice-wave-glow");
 const voiceWavePath = document.querySelector("#voice-wave-path");
-const workflowStatusCard = document.querySelector("#workflow-status-card");
-const workflowStatusLabel = document.querySelector("#workflow-status-label");
-const workflowStatusSummary = document.querySelector(
-  "#workflow-status-summary",
-);
+const workflowStatusHost = document.querySelector("#workflow-status-card");
 
 if (
   !(chatList instanceof HTMLElement) ||
@@ -94,9 +89,7 @@ if (
   !(voiceMonitorCopy instanceof HTMLElement) ||
   !(voiceWaveGlow instanceof SVGPathElement) ||
   !(voiceWavePath instanceof SVGPathElement) ||
-  !(workflowStatusCard instanceof HTMLElement) ||
-  !(workflowStatusLabel instanceof HTMLElement) ||
-  !(workflowStatusSummary instanceof HTMLElement) ||
+  !(workflowStatusHost instanceof HTMLElement) ||
   !(voiceStatus instanceof HTMLElement)
 ) {
   throw new Error("Voice demo page is missing expected elements.");
@@ -110,7 +103,7 @@ const guidedVoice = createVoiceStream<SavedIntake>(
 const generalVoice = createVoiceStream<SavedIntake>(
   getVoiceRoutePath("general", modelProvider),
 );
-const appKitStatus = createVoiceAppKitStatusStore("/app-kit/status", {
+const opsStatus = mountVoiceOpsStatus(workflowStatusHost, "/app-kit/status", {
   intervalMs: 5_000,
 });
 let activeMode: VoiceDemoMode | null = null;
@@ -140,15 +133,6 @@ const renderWave = () => {
   }`;
   voiceMonitorCopy.classList.toggle("is-live", isCapturing);
   voiceMonitor.classList.toggle("is-live", isCapturing);
-};
-
-const renderWorkflowStatus = () => {
-  const report = appKitStatus.getSnapshot().report;
-  workflowStatusCard.classList.toggle("is-failing", report?.status === "fail");
-  workflowStatusLabel.textContent = getAppKitStatusLabel(report);
-  workflowStatusSummary.innerHTML = `<span class="pill">${report?.passed ?? 0} passing</span>
-<span class="pill">${report?.failed ?? 0} failing</span>
-<span class="pill">${report?.total ?? 0} checks</span>`;
 };
 
 const renderChat = () => {
@@ -366,10 +350,6 @@ window.addEventListener("beforeunload", () => {
 
 render();
 void renderSavedIntakes();
-renderWorkflowStatus();
-const unsubscribeWorkflowStatus = appKitStatus.subscribe(renderWorkflowStatus);
-void appKitStatus.refresh().catch(() => {});
 window.addEventListener("beforeunload", () => {
-  unsubscribeWorkflowStatus();
-  appKitStatus.close();
+  opsStatus.close();
 });
