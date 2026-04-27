@@ -8,6 +8,7 @@ import {
   VoiceProviderSimulationControls,
   VoiceProviderStatus,
   VoiceRoutingStatus,
+  VoiceTraceTimeline,
   VoiceTurnQuality,
 } from "@absolutejs/voice/react";
 import {
@@ -385,6 +386,12 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
             <VoiceOpsStatus
               className="voice-card voice-workflow-card"
               intervalMs={5_000}
+            />
+
+            <VoiceTraceTimeline
+              className="voice-card voice-provider-health-card"
+              intervalMs={5_000}
+              limit={2}
             />
 
             <article className="voice-card voice-card-side">

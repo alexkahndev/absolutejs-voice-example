@@ -7,8 +7,10 @@ import {
   VoiceProviderSimulationControls,
   VoiceProviderStatus,
   VoiceRoutingStatus,
+  useVoiceTraceTimeline,
   VoiceTurnQuality,
 } from "@absolutejs/voice/vue";
+import { createVoiceTraceTimelineViewModel } from "@absolutejs/voice/client";
 import {
   FRAMEWORKS,
   FRAMEWORK_DESCRIPTIONS,
@@ -56,6 +58,9 @@ const guidedVoice = useVoiceStream<SavedIntake>(
 const generalVoice = useVoiceStream<SavedIntake>(
   getVoiceRoutePath("general", modelProvider.value, routingMode.value),
 );
+const traceTimeline = useVoiceTraceTimeline("/api/voice-traces", {
+  intervalMs: 5_000,
+});
 const activeMode = ref<VoiceDemoMode | null>(null);
 const isCapturing = ref(false);
 const hasStartedModes = ref<Record<VoiceDemoMode, boolean>>({
@@ -100,6 +105,17 @@ const callLifecycleLabel = computed(() => {
     ? `${call.disposition} after ${call.events.length} lifecycle event${call.events.length === 1 ? "" : "s"}`
     : (call?.events.at(-1)?.type ?? "Not started");
 });
+const traceTimelineModel = computed(() =>
+  createVoiceTraceTimelineViewModel(
+    {
+      error: traceTimeline.error.value,
+      isLoading: traceTimeline.isLoading.value,
+      report: traceTimeline.report.value,
+      updatedAt: traceTimeline.updatedAt.value,
+    },
+    { limit: 2 },
+  ),
+);
 
 const refreshIntakes = async () => {
   savedIntakes.value = await fetchSavedIntakes();
@@ -349,6 +365,47 @@ onUnmounted(() => {
           class="voice-card voice-workflow-card"
           :interval-ms="5000"
         />
+
+        <article
+          class="voice-card voice-provider-health-card absolute-voice-trace-timeline"
+          :class="`absolute-voice-trace-timeline--${traceTimelineModel.status}`"
+        >
+          <header class="absolute-voice-trace-timeline__header">
+            <span class="absolute-voice-trace-timeline__eyebrow">
+              {{ traceTimelineModel.title }}
+            </span>
+            <strong class="absolute-voice-trace-timeline__label">
+              {{ traceTimelineModel.label }}
+            </strong>
+          </header>
+          <p class="absolute-voice-trace-timeline__description">
+            {{ traceTimelineModel.description }}
+          </p>
+          <div
+            v-if="traceTimelineModel.sessions.length"
+            class="absolute-voice-trace-timeline__sessions"
+          >
+            <article
+              v-for="session in traceTimelineModel.sessions"
+              :key="session.sessionId"
+              class="absolute-voice-trace-timeline__session"
+              :class="`absolute-voice-trace-timeline__session--${session.status}`"
+            >
+              <header>
+                <strong>{{ session.sessionId }}</strong>
+                <span>{{ session.status }}</span>
+              </header>
+              <p>
+                {{ session.label }} · {{ session.durationLabel }} ·
+                {{ session.providerLabel }}
+              </p>
+              <a :href="session.detailHref">Open timeline</a>
+            </article>
+          </div>
+          <p v-else class="absolute-voice-trace-timeline__empty">
+            Run a voice session to see call timelines.
+          </p>
+        </article>
 
         <article class="voice-card voice-card-side">
           <h2>{{ VOICE_DEMO_GUIDE_TITLE }}</h2>

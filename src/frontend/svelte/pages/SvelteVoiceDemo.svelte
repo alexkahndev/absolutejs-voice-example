@@ -8,6 +8,7 @@
     createVoiceProviderStatus,
     createVoiceRoutingStatus,
     createVoiceStream,
+    createVoiceTraceTimeline,
     createVoiceTurnQuality,
   } from "@absolutejs/voice/svelte";
   import type { VoiceStream, VoiceStreamState } from "@absolutejs/voice";
@@ -81,6 +82,7 @@
   let providerSimulationHTML = $state("");
   let providerStatusHTML = $state("");
   let routingStatusHTML = $state("");
+  let traceTimelineHTML = $state("");
   let turnQualityHTML = $state("");
   let guidedState = $state(createInitialVoiceState());
   let generalState = $state(createInitialVoiceState());
@@ -118,6 +120,10 @@
   const turnQuality = createVoiceTurnQuality("/api/turn-quality", {
     intervalMs: 5_000,
   });
+  const traceTimeline = createVoiceTraceTimeline("/api/voice-traces", {
+    intervalMs: 5_000,
+    limit: 2,
+  });
   let unsubscribeGuided = () => {};
   let unsubscribeGeneral = () => {};
   let unsubscribeOpsStatus = () => {};
@@ -126,6 +132,7 @@
   let unsubscribeProviderCapabilities = () => {};
   let unsubscribeProviderStatus = () => {};
   let unsubscribeRoutingStatus = () => {};
+  let unsubscribeTraceTimeline = () => {};
   let unsubscribeTurnQuality = () => {};
   let currentVoice = $derived(
     activeMode === "general" ? generalState : guidedState,
@@ -278,17 +285,22 @@
     unsubscribeTurnQuality = turnQuality.subscribe(() => {
       turnQualityHTML = turnQuality.getHTML();
     });
+    unsubscribeTraceTimeline = traceTimeline.subscribe(() => {
+      traceTimelineHTML = traceTimeline.getHTML();
+    });
     opsStatusHTML = opsStatus.getHTML();
     providerCapabilitiesHTML = providerCapabilities.getHTML();
     providerSimulationHTML = providerSimulation.getHTML();
     providerStatusHTML = providerStatus.getHTML();
     routingStatusHTML = routingStatus.getHTML();
     turnQualityHTML = turnQuality.getHTML();
+    traceTimelineHTML = traceTimeline.getHTML();
     void opsStatus.refresh().catch(() => {});
     void providerCapabilities.refresh().catch(() => {});
     void providerStatus.refresh().catch(() => {});
     void routingStatus.refresh().catch(() => {});
     void turnQuality.refresh().catch(() => {});
+    void traceTimeline.refresh().catch(() => {});
     if (providerSimulationElement) {
       unbindProviderSimulation = providerSimulation.bind(
         providerSimulationElement,
@@ -313,6 +325,7 @@
     unsubscribeProviderCapabilities();
     unsubscribeProviderStatus();
     unsubscribeRoutingStatus();
+    unsubscribeTraceTimeline();
     unsubscribeTurnQuality();
     guidedVoice?.close();
     generalVoice?.close();
@@ -321,6 +334,7 @@
     providerSimulation.close();
     providerStatus.close();
     routingStatus.close();
+    traceTimeline.close();
     turnQuality.close();
   });
 </script>
@@ -452,6 +466,10 @@
 
       <div class="voice-card voice-workflow-card voice-ops-status-host">
         {@html opsStatusHTML}
+      </div>
+
+      <div class="voice-card voice-provider-health-card voice-trace-timeline-host">
+        {@html traceTimelineHTML}
       </div>
 
       <article class="voice-card voice-card-side">

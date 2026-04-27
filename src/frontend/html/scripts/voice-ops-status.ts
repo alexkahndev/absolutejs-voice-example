@@ -4,6 +4,7 @@ import {
   defineVoiceProviderSimulationControlsElement,
   defineVoiceProviderStatusElement,
   defineVoiceRoutingStatusElement,
+  defineVoiceTraceTimelineElement,
   defineVoiceTurnQualityElement,
 } from "@absolutejs/voice/client";
 
@@ -12,4 +13,5 @@ defineVoiceProviderCapabilitiesElement();
 defineVoiceProviderSimulationControlsElement();
 defineVoiceProviderStatusElement();
 defineVoiceRoutingStatusElement();
+defineVoiceTraceTimelineElement();
 defineVoiceTurnQualityElement();

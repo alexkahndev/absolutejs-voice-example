@@ -12,6 +12,7 @@ import {
   VoiceProviderStatusService,
   VoiceRoutingStatusService,
   VoiceStreamService,
+  VoiceTraceTimelineService,
   VoiceTurnQualityService,
 } from "@absolutejs/voice/angular";
 import {
@@ -353,6 +354,55 @@ import {
             </p>
           </article>
 
+          <article
+            class="voice-card voice-provider-health-card absolute-voice-trace-timeline"
+            [class.absolute-voice-trace-timeline--failed]="
+              (traceTimeline.report()?.failed ?? 0) > 0
+            "
+          >
+            <header class="absolute-voice-trace-timeline__header">
+              <span class="absolute-voice-trace-timeline__eyebrow"
+                >Voice Traces</span
+              >
+              <strong class="absolute-voice-trace-timeline__label">
+                {{ traceTimeline.report()?.total ?? 0 }} recent
+              </strong>
+            </header>
+            <p class="absolute-voice-trace-timeline__description">
+              Latest call timelines from the Angular service primitive.
+            </p>
+            @if ((traceTimeline.report()?.sessions?.length ?? 0) > 0) {
+              <div class="absolute-voice-trace-timeline__sessions">
+                @for (
+                  session of traceTimeline.report()?.sessions?.slice(0, 2) ?? [];
+                  track session.sessionId
+                ) {
+                  <article
+                    class="absolute-voice-trace-timeline__session"
+                    [class.absolute-voice-trace-timeline__session--failed]="
+                      session.status === 'failed'
+                    "
+                  >
+                    <header>
+                      <strong>{{ session.sessionId }}</strong>
+                      <span>{{ session.status }}</span>
+                    </header>
+                    <p>
+                      {{ session.summary.eventCount }} events ·
+                      {{ session.summary.turnCount }} turns ·
+                      {{ session.providers.length }} providers
+                    </p>
+                    <a href="/traces/{{ session.sessionId }}">Open timeline</a>
+                  </article>
+                }
+              </div>
+            } @else {
+              <p class="absolute-voice-trace-timeline__empty">
+                Run a voice session to see call timelines.
+              </p>
+            }
+          </article>
+
           <article class="voice-card voice-card-side">
             <h2>{{ guideTitle }}</h2>
             <ol class="voice-guide-list">
@@ -651,6 +701,12 @@ export class AngularVoiceDemoComponent {
   turnQuality = inject(VoiceTurnQualityService).connect("/api/turn-quality", {
     intervalMs: 5_000,
   });
+  traceTimeline = inject(VoiceTraceTimelineService).connect(
+    "/api/voice-traces",
+    {
+      intervalMs: 5_000,
+    },
+  );
   currentVoice = computed(() =>
     this.activeMode() === "general" ? this.generalVoice : this.guidedVoice,
   );
