@@ -343,6 +343,13 @@ import {
             <p class="voice-footnote">
               End-to-end turn responsiveness from transcript timing to assistant start.
             </p>
+            <button
+              class="absolute-voice-turn-latency__proof"
+              type="button"
+              (click)="runTurnLatencyProof()"
+            >
+              Run latency proof
+            </button>
             @if (turnLatency.report()?.turns?.length) {
               <div class="voice-provider-health-list">
                 @for (turn of turnLatency.report()!.turns; track turn.sessionId + ":" + turn.turnId) {
@@ -743,6 +750,7 @@ export class AngularVoiceDemoComponent {
   });
   turnLatency = inject(VoiceTurnLatencyService).connect("/api/turn-latency", {
     intervalMs: 5_000,
+    proofPath: "/api/turn-latency/proof",
   });
   traceTimeline = inject(VoiceTraceTimelineService).connect(
     "/api/voice-traces",
@@ -892,6 +900,10 @@ export class AngularVoiceDemoComponent {
   runCallControl(action: (typeof VOICE_CALL_CONTROL_ACTIONS)[number]) {
     this.currentVoice().callControl(action);
     this.stopMic();
+  }
+
+  runTurnLatencyProof() {
+    void this.turnLatency.runProof().catch(() => {});
   }
 
   ngOnDestroy() {

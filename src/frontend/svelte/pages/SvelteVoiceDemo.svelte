@@ -128,6 +128,8 @@
   });
   const turnLatency = createVoiceTurnLatency("/api/turn-latency", {
     intervalMs: 5_000,
+    proofLabel: "Run latency proof",
+    proofPath: "/api/turn-latency/proof",
   });
   const traceTimeline = createVoiceTraceTimeline("/api/voice-traces", {
     intervalMs: 5_000,
@@ -143,6 +145,15 @@
   let unsubscribeRoutingStatus = () => {};
   let unsubscribeTraceTimeline = () => {};
   let unsubscribeTurnLatency = () => {};
+  const handleTurnLatencyClick = (event: MouseEvent) => {
+    const target = event.target;
+    if (
+      target instanceof Element &&
+      target.closest("[data-absolute-voice-turn-latency-proof]")
+    ) {
+      void turnLatency.runProof().catch(() => {});
+    }
+  };
   let unsubscribeTurnQuality = () => {};
   let currentVoice = $derived(
     activeMode === "general" ? generalState : guidedState,
@@ -496,7 +507,10 @@
         {@html turnQualityHTML}
       </div>
 
-      <div class="voice-card voice-provider-health-card voice-turn-latency-host">
+      <div
+        class="voice-card voice-provider-health-card voice-turn-latency-host"
+        on:click={handleTurnLatencyClick}
+      >
         {@html turnLatencyHTML}
       </div>
 

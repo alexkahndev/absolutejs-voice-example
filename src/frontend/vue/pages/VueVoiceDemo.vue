@@ -385,6 +385,8 @@ onUnmounted(() => {
         <VoiceTurnLatency
           class="voice-card voice-provider-health-card"
           :interval-ms="5000"
+          proof-label="Run latency proof"
+          proof-path="/api/turn-latency/proof"
         />
 
         <VoiceOpsStatus

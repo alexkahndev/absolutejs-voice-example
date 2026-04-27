@@ -1615,6 +1615,83 @@ const listIntegrationEvents = async (): Promise<SavedVoiceIntegrationEvent[]> =>
 const listTasks = async (): Promise<SavedVoiceOpsTask[]> =>
   listVoiceOpsTasks(await runtimeStorage.tasks.list());
 
+const seedTurnLatencyProof = async () => {
+  const sessionId = `latency-proof-${crypto.randomUUID()}`;
+  const turnId = `turn-${crypto.randomUUID()}`;
+  const startedAt = Date.now() - 820;
+  const timestamps = {
+    speechDetected: startedAt,
+    finalTranscript: startedAt + 220,
+    committed: startedAt + 360,
+    assistantTextStarted: startedAt + 430,
+    ttsSendStarted: startedAt + 480,
+    ttsSendCompleted: startedAt + 535,
+    assistantAudioReceived: startedAt + 690,
+  };
+  const transcript = {
+    confidence: 0.96,
+    endedAtMs: timestamps.finalTranscript,
+    id: `transcript-${crypto.randomUUID()}`,
+    isFinal: true,
+    startedAtMs: timestamps.speechDetected,
+    text: "Show me the latency proof.",
+    vendor: "absolutejs-proof",
+  };
+  const session: VoiceSessionRecord = {
+    id: sessionId,
+    createdAt: startedAt - 120,
+    lastActivityAt: timestamps.assistantAudioReceived,
+    status: "completed",
+    transcripts: [transcript],
+    currentTurn: {
+      finalText: "",
+      partialText: "",
+      transcripts: [],
+    },
+    turns: [
+      {
+        assistantText: "Latency proof captured.",
+        committedAt: timestamps.committed,
+        id: turnId,
+        text: "Show me the latency proof.",
+        transcripts: [{ ...transcript, id: `turn-${transcript.id}` }],
+      },
+    ],
+    committedTurnIds: [turnId],
+    reconnect: {
+      attempts: 0,
+    },
+    lastCommittedTurn: {
+      committedAt: timestamps.committed,
+      signature: "show me the latency proof.",
+      text: "Show me the latency proof.",
+      transcriptIds: [transcript.id],
+    },
+  };
+  await runtimeStorage.session.set(sessionId, session);
+  const stageEntries = [
+    ["speech_detected", timestamps.speechDetected],
+    ["final_transcript", timestamps.finalTranscript],
+    ["turn_committed", timestamps.committed],
+    ["assistant_text_started", timestamps.assistantTextStarted],
+    ["tts_send_started", timestamps.ttsSendStarted],
+    ["tts_send_completed", timestamps.ttsSendCompleted],
+    ["assistant_audio_received", timestamps.assistantAudioReceived],
+  ] as const;
+  for (const [stage, at] of stageEntries) {
+    await runtimeStorage.traces.append({
+      at,
+      metadata: { proof: "turn-latency" },
+      payload: { stage },
+      sessionId,
+      turnId,
+      type: "turn_latency.stage",
+    });
+  }
+
+  return { ok: true, sessionId, turnId };
+};
+
 const summarizeAssistantRuns = async () =>
   summarizeVoiceAssistantRuns({ store: runtimeStorage.traces });
 
@@ -2014,6 +2091,7 @@ const server = new Elysia()
       title: "AbsoluteJS Voice Demo Tool Contracts",
     }),
   )
+  .post("/api/turn-latency/proof", () => seedTurnLatencyProof())
   .use(
     createVoiceTurnLatencyRoutes({
       htmlPath: "/turn-latency",

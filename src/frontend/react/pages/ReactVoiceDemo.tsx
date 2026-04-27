@@ -415,6 +415,8 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
             <VoiceTurnLatency
               className="voice-card voice-provider-health-card"
               intervalMs={5_000}
+              proofLabel="Run latency proof"
+              proofPath="/api/turn-latency/proof"
             />
 
             <VoiceOpsStatus
