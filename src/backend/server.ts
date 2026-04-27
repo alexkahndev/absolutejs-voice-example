@@ -1700,6 +1700,36 @@ const contractAwareOnTurn = createVoiceWorkflowContractHandler({
   store: runtimeStorage.traces,
 });
 
+const createTelephonyBridgeConfig = () => ({
+  context: {},
+  correctTurn: correctDemoTurn,
+  handoff:
+    handoffAdapters.length > 0
+      ? {
+          adapters: handoffAdapters,
+          deliveryQueue: handoffDeliveryStore,
+        }
+      : undefined,
+  onComplete: async ({ session }: { session: VoiceSessionRecord }) => {
+    const result = session.turns
+      .toReversed()
+      .find((turn) => turn.result !== undefined)?.result as
+      | SavedIntake
+      | undefined;
+    const savedIntake = result ?? buildSavedIntake(session);
+    persistIntake(savedIntake);
+  },
+  onTurn: contractAwareOnTurn,
+  ops: assistant.ops,
+  phraseHints: (input: { context: unknown; sessionId: string }) => {
+    rememberSessionRoutingMode(input);
+    return VOICE_DEMO_PHRASE_HINTS;
+  },
+  preset: "reliability" as const,
+  session: runtimeStorage.session,
+  stt: sttAdapter,
+});
+
 const server = new Elysia()
   .use(absolutejs)
   .use(pagesPlugin(manifest))
@@ -1857,6 +1887,7 @@ const server = new Elysia()
   )
   .use(
     createTelnyxVoiceRoutes<unknown, VoiceSessionRecord, SavedIntake>({
+      bridge: createTelephonyBridgeConfig(),
       context: {},
       outcomePolicy: telephonyOutcomePolicy,
       setup: {
@@ -1898,6 +1929,7 @@ const server = new Elysia()
   )
   .use(
     createPlivoVoiceRoutes<unknown, VoiceSessionRecord, SavedIntake>({
+      bridge: createTelephonyBridgeConfig(),
       context: {},
       outcomePolicy: telephonyOutcomePolicy,
       setup: {
@@ -1943,33 +1975,9 @@ const server = new Elysia()
   )
   .use(
     createTwilioVoiceRoutes<unknown, VoiceSessionRecord, SavedIntake>({
-      context: {},
-      correctTurn: correctDemoTurn,
-      handoff:
-        handoffAdapters.length > 0
-          ? {
-              adapters: handoffAdapters,
-              deliveryQueue: handoffDeliveryStore,
-            }
-          : undefined,
-      onComplete: async ({ session }) => {
-        const result = session.turns
-          .toReversed()
-          .find((turn) => turn.result !== undefined)?.result as
-          | SavedIntake
-          | undefined;
-        const savedIntake = result ?? buildSavedIntake(session);
-        persistIntake(savedIntake);
-      },
-      onTurn: contractAwareOnTurn,
+      ...createTelephonyBridgeConfig(),
       ops: assistant.ops,
       outcomePolicy: telephonyOutcomePolicy,
-      phraseHints: (input) => {
-        rememberSessionRoutingMode(input);
-        return VOICE_DEMO_PHRASE_HINTS;
-      },
-      preset: "reliability",
-      session: runtimeStorage.session,
       setup: {
         path: "/api/twilio/setup",
         requiredEnv: {
@@ -1984,7 +1992,6 @@ const server = new Elysia()
         title: "AbsoluteJS Voice Demo Twilio Smoke Test",
       },
       streamPath: "/api/twilio/stream",
-      stt: sttAdapter,
       twiml: {
         parameters: ({ query }) => ({
           scenarioId:
