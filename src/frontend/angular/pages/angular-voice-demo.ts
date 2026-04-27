@@ -6,12 +6,15 @@ import {
 import {
   FRAMEWORK_DESCRIPTIONS,
   getInitialVoiceModelProvider,
+  getInitialVoiceRoutingMode,
   getVoiceLeadMessage,
   getVoiceModeLabel,
   getVoiceModePrompt,
   getVoiceProviderLabel,
+  getVoiceRoutingLabel,
   getVoiceRoutePath,
   rememberVoiceModelProvider,
+  rememberVoiceRoutingMode,
   VOICE_ASSISTANT_CONFIG,
   VOICE_DEMO_GUIDE_STEPS,
   VOICE_DEMO_GUIDE_TITLE,
@@ -22,8 +25,10 @@ import {
   VOICE_DEMO_STOP_LABEL,
   VOICE_CALL_CONTROL_ACTIONS,
   VOICE_MODEL_PROVIDERS,
+  VOICE_ROUTING_MODES,
   type VoiceDemoMode,
   type VoiceModelProvider,
+  type VoiceRoutingMode,
   type SavedIntake,
 } from "../../../shared/demo";
 import {
@@ -102,6 +107,12 @@ import {
                     getVoiceProviderLabel(modelProvider())
                   }}</span>
                 </div>
+                <div class="voice-metric">
+                  <span class="voice-metric-label">Routing</span>
+                  <span class="voice-metric-value">{{
+                    getVoiceRoutingLabel(routingMode())
+                  }}</span>
+                </div>
               </div>
             </div>
           </article>
@@ -115,14 +126,37 @@ import {
             </p>
             <label class="voice-provider-select">
               <span>Provider</span>
-              <select (change)="changeModelProvider($any($event.target).value)">
+              <select
+                (change)="changeModelProvider($any($event.target).value)"
+              >
                 @for (provider of modelProviders; track provider.id) {
-                  <option value="{{ provider.id }}">
+                  <option
+                    value="{{ provider.id }}"
+                    [attr.selected]="provider.id === modelProvider() ? '' : null"
+                  >
                     {{ provider.label }}
                   </option>
                 }
               </select>
             </label>
+            <label class="voice-provider-select">
+              <span>STT routing</span>
+              <select
+                (change)="changeRoutingMode($any($event.target).value)"
+              >
+                @for (routing of routingModes; track routing.id) {
+                  <option
+                    value="{{ routing.id }}"
+                    [attr.selected]="routing.id === routingMode() ? '' : null"
+                  >
+                    {{ routing.label }}
+                  </option>
+                }
+              </select>
+            </label>
+            <p class="voice-footnote">
+              {{ routingDescription() }}
+            </p>
           </article>
 
           <article
@@ -400,9 +434,12 @@ export class AngularVoiceDemoComponent {
   guideTitle = VOICE_DEMO_GUIDE_TITLE;
   activeMode = signal<VoiceDemoMode | null>(null);
   modelProvider = signal<VoiceModelProvider>(getInitialVoiceModelProvider());
+  routingMode = signal<VoiceRoutingMode>(getInitialVoiceRoutingMode());
   modelProviders = VOICE_MODEL_PROVIDERS;
+  routingModes = VOICE_ROUTING_MODES;
   callControlActions = VOICE_CALL_CONTROL_ACTIONS;
   getVoiceProviderLabel = getVoiceProviderLabel;
+  getVoiceRoutingLabel = getVoiceRoutingLabel;
   getAppKitStatusLabel = getAppKitStatusLabel;
   hasStartedModes = signal<Record<VoiceDemoMode, boolean>>({
     general: false,
@@ -418,10 +455,10 @@ export class AngularVoiceDemoComponent {
   stopLabel = VOICE_DEMO_STOP_LABEL;
   getVoiceModeLabel = getVoiceModeLabel;
   guidedVoice = inject(VoiceStreamService).connect<SavedIntake>(
-    getVoiceRoutePath("guided", this.modelProvider()),
+    getVoiceRoutePath("guided", this.modelProvider(), this.routingMode()),
   );
   generalVoice = inject(VoiceStreamService).connect<SavedIntake>(
-    getVoiceRoutePath("general", this.modelProvider()),
+    getVoiceRoutePath("general", this.modelProvider(), this.routingMode()),
   );
   appKitStatus = inject(VoiceAppKitStatusService).connect("/app-kit/status", {
     intervalMs: 5_000,
@@ -461,6 +498,11 @@ export class AngularVoiceDemoComponent {
       ? `${call.disposition} after ${call.events.length} lifecycle event${call.events.length === 1 ? "" : "s"}`
       : (call?.events.at(-1)?.type ?? "Not started");
   });
+  routingDescription = computed(
+    () =>
+      this.routingModes.find((item) => item.id === this.routingMode())
+        ?.description ?? "",
+  );
   wavePath = computed(() => createVoiceWavePath(this.waveLevels()));
   private microphone: ReturnType<typeof createDemoMicrophone> | null = null;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
@@ -517,6 +559,14 @@ export class AngularVoiceDemoComponent {
     rememberVoiceModelProvider(provider);
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("provider", provider);
+    window.location.href = nextUrl.toString();
+  }
+
+  changeRoutingMode(routing: VoiceRoutingMode) {
+    this.stopMic();
+    rememberVoiceRoutingMode(routing);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("routing", routing);
     window.location.href = nextUrl.toString();
   }
 

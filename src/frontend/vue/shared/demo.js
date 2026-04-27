@@ -8,7 +8,34 @@ export const VOICE_MODEL_PROVIDERS = [
   { id: "anthropic", label: "Anthropic Claude", shortLabel: "Claude" },
   { id: "gemini", label: "Google Gemini", shortLabel: "Gemini" }
 ];
+export const VOICE_ROUTING_MODES = [
+  {
+    description: "Weighted cost, latency, and accuracy for normal production.",
+    id: "balanced",
+    label: "Balanced routing",
+    shortLabel: "Balanced"
+  },
+  {
+    description: "Prefer the lowest expected STT latency for live calls.",
+    id: "fastest",
+    label: "Fastest realtime",
+    shortLabel: "Fastest"
+  },
+  {
+    description: "Prefer lower-cost STT providers when available.",
+    id: "cheapest",
+    label: "Cheapest acceptable",
+    shortLabel: "Cheapest"
+  },
+  {
+    description: "Prefer the highest profiled transcript quality.",
+    id: "quality",
+    label: "Quality first",
+    shortLabel: "Quality"
+  }
+];
 export const isVoiceModelProvider = (value) => value === "deterministic" || value === "openai" || value === "anthropic" || value === "gemini";
+export const isVoiceRoutingMode = (value) => value === "balanced" || value === "fastest" || value === "cheapest" || value === "quality";
 export const VOICE_ROUTE_PATH = "/voice/intake";
 export const VOICE_DEMO_GUIDE_TITLE = "Run the guided voice test";
 export const VOICE_DEMO_GUIDE_STEPS = [
@@ -65,16 +92,20 @@ export const VOICE_TEST_QUESTIONS = [
   "Now describe what you are trying to do or test.",
   "Finish with any detail that feels blocked, risky, or unclear."
 ];
-export const getVoiceRoutePath = (scenarioId, provider) => {
+export const getVoiceRoutePath = (scenarioId, provider, routing) => {
   const params = new URLSearchParams({
     scenarioId
   });
   if (provider) {
     params.set("provider", provider);
   }
+  if (routing) {
+    params.set("routing", routing);
+  }
   return `${VOICE_ROUTE_PATH}?${params.toString()}`;
 };
 export const getVoiceProviderLabel = (provider) => VOICE_MODEL_PROVIDERS.find((item) => item.id === provider)?.label ?? provider;
+export const getVoiceRoutingLabel = (routing) => VOICE_ROUTING_MODES.find((item) => item.id === routing)?.label ?? routing;
 export const getVoiceProviderStatusLabel = (status) => {
   switch (status) {
     case "healthy":
@@ -109,6 +140,22 @@ export const getInitialVoiceModelProvider = () => {
 export const rememberVoiceModelProvider = (provider) => {
   if (typeof window !== "undefined") {
     window.localStorage.setItem("voiceModelProvider", provider);
+  }
+};
+export const getInitialVoiceRoutingMode = () => {
+  if (typeof window === "undefined") {
+    return "balanced";
+  }
+  const urlRouting = new URLSearchParams(window.location.search).get("routing");
+  if (isVoiceRoutingMode(urlRouting)) {
+    return urlRouting;
+  }
+  const storedRouting = window.localStorage.getItem("voiceRoutingMode");
+  return isVoiceRoutingMode(storedRouting) ? storedRouting : "balanced";
+};
+export const rememberVoiceRoutingMode = (routing) => {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem("voiceRoutingMode", routing);
   }
 };
 export const getVoiceScenarioLabel = (scenarioId) => scenarioId === "guided" ? "Guided test" : "General recording";

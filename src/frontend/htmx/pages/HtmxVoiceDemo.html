@@ -87,6 +87,12 @@
                   >Local</span
                 >
               </div>
+              <div class="voice-metric">
+                <span class="voice-metric-label">Routing</span>
+                <span class="voice-metric-value" id="metric-routing"
+                  >Balanced</span
+                >
+              </div>
               <div id="voice-htmx-metrics">
                 <p class="empty-copy">No active voice session yet.</p>
               </div>
@@ -110,6 +116,18 @@
               <option value="gemini">Google Gemini</option>
             </select>
           </label>
+          <label class="voice-provider-select">
+            <span>STT routing</span>
+            <select id="routing-mode-select">
+              <option value="balanced">Balanced routing</option>
+              <option value="fastest">Fastest realtime</option>
+              <option value="cheapest">Cheapest acceptable</option>
+              <option value="quality">Quality first</option>
+            </select>
+          </label>
+          <p class="voice-footnote" id="routing-mode-copy">
+            Weighted cost, latency, and accuracy for normal production.
+          </p>
         </article>
 
         <absolute-voice-ops-status
@@ -285,19 +303,40 @@
           anthropic: "Anthropic Claude",
           gemini: "Google Gemini",
         };
+        const routingLabels = {
+          balanced: "Balanced routing",
+          fastest: "Fastest realtime",
+          cheapest: "Cheapest acceptable",
+          quality: "Quality first",
+        };
+        const routingCopy = {
+          balanced: "Weighted cost, latency, and accuracy for normal production.",
+          fastest: "Prefer the lowest expected STT latency for live calls.",
+          cheapest: "Prefer lower-cost STT providers when available.",
+          quality: "Prefer the highest profiled transcript quality.",
+        };
         const isProvider = (value) => Object.hasOwn(labels, value);
+        const isRouting = (value) => Object.hasOwn(routingLabels, value);
         const params = new URLSearchParams(window.location.search);
         const provider = isProvider(params.get("provider"))
           ? params.get("provider")
           : isProvider(window.localStorage.getItem("voiceModelProvider"))
             ? window.localStorage.getItem("voiceModelProvider")
             : "deterministic";
+        const routing = isRouting(params.get("routing"))
+          ? params.get("routing")
+          : isRouting(window.localStorage.getItem("voiceRoutingMode"))
+            ? window.localStorage.getItem("voiceRoutingMode")
+            : "balanced";
         const shell = document.querySelector("[data-voice-htmx]");
         const select = document.querySelector("#model-provider-select");
         const metric = document.querySelector("#metric-provider");
+        const routingSelect = document.querySelector("#routing-mode-select");
+        const routingMetric = document.querySelector("#metric-routing");
+        const routingModeCopy = document.querySelector("#routing-mode-copy");
         if (shell) {
-          shell.dataset.voiceGuidedPath = `/voice/intake?scenarioId=guided&provider=${provider}`;
-          shell.dataset.voiceGeneralPath = `/voice/intake?scenarioId=general&provider=${provider}`;
+          shell.dataset.voiceGuidedPath = `/voice/intake?scenarioId=guided&provider=${provider}&routing=${routing}`;
+          shell.dataset.voiceGeneralPath = `/voice/intake?scenarioId=general&provider=${provider}&routing=${routing}`;
         }
         if (select) {
           select.value = provider;
@@ -308,8 +347,23 @@
             window.location.href = nextUrl.toString();
           });
         }
+        if (routingSelect) {
+          routingSelect.value = routing;
+          routingSelect.addEventListener("change", () => {
+            window.localStorage.setItem("voiceRoutingMode", routingSelect.value);
+            const nextUrl = new URL(window.location.href);
+            nextUrl.searchParams.set("routing", routingSelect.value);
+            window.location.href = nextUrl.toString();
+          });
+        }
         if (metric) {
           metric.textContent = labels[provider] ?? provider;
+        }
+        if (routingMetric) {
+          routingMetric.textContent = routingLabels[routing] ?? routing;
+        }
+        if (routingModeCopy) {
+          routingModeCopy.textContent = routingCopy[routing] ?? "";
         }
       })();
     </script>

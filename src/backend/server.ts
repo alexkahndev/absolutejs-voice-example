@@ -39,6 +39,7 @@ import {
   type VoiceAssistantMemoryRecord,
   type VoiceAgentModel,
   type VoiceHandoffDeliveryStore,
+  type VoiceIOProviderRouterEvent,
   type VoiceProviderHealthSummary,
   type VoiceProviderRouterEvent,
   type VoiceOpsTaskStatus,
@@ -91,9 +92,11 @@ import {
 } from "./voiceFlow";
 import {
   isVoiceModelProvider,
+  isVoiceRoutingMode,
   VOICE_ASSISTANT_CONFIG,
   type SavedIntake,
   type VoiceModelProvider,
+  type VoiceRoutingMode,
 } from "../shared/demo";
 
 const { absolutejs, manifest } = await prepare();
@@ -289,6 +292,7 @@ const sttLatencyBudgets = {
   deepgram: readPositiveNumberEnv("VOICE_DEEPGRAM_STT_TIMEOUT_MS", 5_000),
 };
 type VoiceSTTProvider = "deepgram" | "assemblyai";
+const sessionRoutingModes = new Map<string, VoiceRoutingMode>();
 const configuredModelProviders: VoiceModelProvider[] = [
   "deterministic",
   openAIApiKey ? "openai" : undefined,
@@ -499,38 +503,91 @@ const sttProviderAdapters = {
       }
     : {}),
 } satisfies Partial<Record<VoiceSTTProvider, STTAdapter>>;
-const sttAdapter = createVoiceSTTProviderRouter<VoiceSTTProvider>({
-  adapters: sttProviderAdapters,
-  fallback: configuredSTTProviders,
-  onProviderEvent: async (event, input) => {
-    await runtimeStorage.traces.append({
-      at: event.at,
-      payload: {
-        ...event,
-        providerStatus: event.status,
+const traceSTTProviderEvent = async (
+  event: VoiceIOProviderRouterEvent<VoiceSTTProvider>,
+  input: { sessionId: string },
+) => {
+  await runtimeStorage.traces.append({
+    at: event.at,
+    payload: {
+      ...event,
+      providerStatus: event.status,
+    },
+    sessionId: input.sessionId,
+    type: "session.error",
+  });
+};
+const createDemoSTTRouter = (
+  routing: VoiceRoutingMode,
+): STTAdapter =>
+  createVoiceSTTProviderRouter<VoiceSTTProvider>({
+    adapters: sttProviderAdapters,
+    fallback: configuredSTTProviders,
+    onProviderEvent: traceSTTProviderEvent,
+    policy:
+      routing === "fastest"
+        ? "latency-first"
+        : routing === "cheapest"
+          ? "cost-first"
+          : routing === "quality"
+            ? "quality-first"
+            : "balanced",
+    providerHealth: {
+      cooldownMs: 30_000,
+      failureThreshold: 1,
+    },
+    providerProfiles: {
+      deepgram: {
+        cost: 4,
+        latencyMs: 250,
+        priority: 1,
+        quality: 0.94,
+        timeoutMs: sttLatencyBudgets.deepgram,
       },
-      sessionId: input.sessionId,
-      type: "session.error",
-    });
-  },
-  providerHealth: {
-    cooldownMs: 30_000,
-    failureThreshold: 1,
-  },
-  providerProfiles: {
-    deepgram: {
-      latencyMs: 250,
-      priority: 1,
-      timeoutMs: sttLatencyBudgets.deepgram,
+      assemblyai: {
+        cost: 2,
+        latencyMs: 450,
+        priority: 2,
+        quality: 0.88,
+        timeoutMs: sttLatencyBudgets.assemblyai,
+      },
     },
-    assemblyai: {
-      latencyMs: 450,
-      priority: 2,
-      timeoutMs: sttLatencyBudgets.assemblyai,
-    },
+  });
+const sttRouters: Record<VoiceRoutingMode, STTAdapter> = {
+  balanced: createDemoSTTRouter("balanced"),
+  cheapest: createDemoSTTRouter("cheapest"),
+  fastest: createDemoSTTRouter("fastest"),
+  quality: createDemoSTTRouter("quality"),
+};
+const sttAdapter: STTAdapter = {
+  kind: "stt",
+  open: (input) => {
+    const routing = sessionRoutingModes.get(input.sessionId) ?? "balanced";
+    return sttRouters[routing].open(input);
   },
-  selectProvider: () => "deepgram",
-});
+};
+const rememberSessionRoutingMode = (input: {
+  context: unknown;
+  sessionId: string;
+}) => {
+  const query =
+    input.context &&
+    typeof input.context === "object" &&
+    "query" in input.context &&
+    input.context.query &&
+    typeof input.context.query === "object"
+      ? input.context.query
+      : undefined;
+  const routing =
+    query &&
+    "routing" in query &&
+    isVoiceRoutingMode(query.routing)
+      ? query.routing
+      : "balanced";
+
+  sessionRoutingModes.set(input.sessionId, routing);
+  return routing;
+};
 const providerFailureSimulator = createVoiceProviderFailureSimulator({
   allowProviders: () => configuredModelProviders,
   fallback: providerFallbackOrder,
@@ -1149,7 +1206,10 @@ const server = new Elysia()
           : undefined,
       ops: assistant.ops,
       correctTurn: correctDemoTurn,
-      phraseHints: VOICE_DEMO_PHRASE_HINTS,
+      phraseHints: (input) => {
+        rememberSessionRoutingMode(input);
+        return VOICE_DEMO_PHRASE_HINTS;
+      },
       onTurn: contractAwareOnTurn,
       path: "/voice/intake",
       preset: "reliability",

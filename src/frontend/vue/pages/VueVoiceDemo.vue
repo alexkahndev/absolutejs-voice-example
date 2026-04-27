@@ -5,12 +5,15 @@ import {
   FRAMEWORKS,
   FRAMEWORK_DESCRIPTIONS,
   getInitialVoiceModelProvider,
+  getInitialVoiceRoutingMode,
   getVoiceLeadMessage,
   getVoiceModeLabel,
   getVoiceModePrompt,
   getVoiceProviderLabel,
+  getVoiceRoutingLabel,
   getVoiceRoutePath,
   rememberVoiceModelProvider,
+  rememberVoiceRoutingMode,
   VOICE_ASSISTANT_CONFIG,
   VOICE_DEMO_GUIDE_STEPS,
   VOICE_DEMO_GUIDE_TITLE,
@@ -21,8 +24,10 @@ import {
   VOICE_DEMO_STOP_LABEL,
   VOICE_CALL_CONTROL_ACTIONS,
   VOICE_MODEL_PROVIDERS,
+  VOICE_ROUTING_MODES,
   type VoiceDemoMode,
   type VoiceModelProvider,
+  type VoiceRoutingMode,
   type SavedIntake,
 } from "../../../shared/demo";
 import {
@@ -36,11 +41,12 @@ import {
 } from "../../shared/browser";
 
 const modelProvider = ref<VoiceModelProvider>(getInitialVoiceModelProvider());
+const routingMode = ref<VoiceRoutingMode>(getInitialVoiceRoutingMode());
 const guidedVoice = useVoiceStream<SavedIntake>(
-  getVoiceRoutePath("guided", modelProvider.value),
+  getVoiceRoutePath("guided", modelProvider.value, routingMode.value),
 );
 const generalVoice = useVoiceStream<SavedIntake>(
-  getVoiceRoutePath("general", modelProvider.value),
+  getVoiceRoutePath("general", modelProvider.value, routingMode.value),
 );
 const activeMode = ref<VoiceDemoMode | null>(null);
 const isCapturing = ref(false);
@@ -128,10 +134,25 @@ const changeModelProvider = (provider: VoiceModelProvider) => {
   window.location.href = nextUrl.toString();
 };
 
+const changeRoutingMode = (routing: VoiceRoutingMode) => {
+  stopMic();
+  rememberVoiceRoutingMode(routing);
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("routing", routing);
+  window.location.href = nextUrl.toString();
+};
+
 const changeModelProviderFromEvent = (event: Event) => {
   const target = event.target;
   if (target instanceof HTMLSelectElement) {
     changeModelProvider(target.value as VoiceModelProvider);
+  }
+};
+
+const changeRoutingModeFromEvent = (event: Event) => {
+  const target = event.target;
+  if (target instanceof HTMLSelectElement) {
+    changeRoutingMode(target.value as VoiceRoutingMode);
   }
 };
 
@@ -232,6 +253,12 @@ onUnmounted(() => {
                   {{ getVoiceProviderLabel(modelProvider) }}
                 </span>
               </div>
+              <div class="voice-metric">
+                <span class="voice-metric-label">Routing</span>
+                <span class="voice-metric-value">
+                  {{ getVoiceRoutingLabel(routingMode) }}
+                </span>
+              </div>
             </div>
           </div>
         </article>
@@ -258,6 +285,24 @@ onUnmounted(() => {
               </option>
             </select>
           </label>
+          <label class="voice-provider-select">
+            <span>STT routing</span>
+            <select :value="routingMode" @change="changeRoutingModeFromEvent">
+              <option
+                v-for="routing in VOICE_ROUTING_MODES"
+                :key="routing.id"
+                :value="routing.id"
+              >
+                {{ routing.label }}
+              </option>
+            </select>
+          </label>
+          <p class="voice-footnote">
+            {{
+              VOICE_ROUTING_MODES.find((item) => item.id === routingMode)
+                ?.description
+            }}
+          </p>
         </article>
 
         <VoiceOpsStatus

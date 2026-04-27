@@ -16,16 +16,21 @@ import {
   getVoiceModeLabel,
   getVoiceModePrompt,
   getVoiceProviderLabel,
+  getVoiceRoutingLabel,
   getVoiceRoutePath,
   getInitialVoiceModelProvider,
+  getInitialVoiceRoutingMode,
   rememberVoiceModelProvider,
+  rememberVoiceRoutingMode,
   VOICE_DEMO_GENERAL_LABEL,
   VOICE_DEMO_GUIDED_LABEL,
   VOICE_DEMO_MIC_IDLE,
   VOICE_DEMO_MIC_LIVE,
   VOICE_DEMO_STOP_LABEL,
   VOICE_CALL_CONTROL_ACTIONS,
+  VOICE_ROUTING_MODES,
   type VoiceModelProvider,
+  type VoiceRoutingMode,
   type SavedIntake,
   type VoiceDemoMode,
 } from "../../../shared/demo";
@@ -67,6 +72,9 @@ const voiceMonitorCopy = document.querySelector("#voice-monitor-copy");
 const voiceWaveGlow = document.querySelector("#voice-wave-glow");
 const voiceWavePath = document.querySelector("#voice-wave-path");
 const workflowStatusHost = document.querySelector("#workflow-status-card");
+const routingModeCopy = document.querySelector("#routing-mode-copy");
+const routingModeMetric = document.querySelector("#metric-routing");
+const routingModeSelect = document.querySelector("#routing-mode-select");
 
 if (
   !(chatList instanceof HTMLElement) ||
@@ -90,18 +98,23 @@ if (
   !(voiceWaveGlow instanceof SVGPathElement) ||
   !(voiceWavePath instanceof SVGPathElement) ||
   !(workflowStatusHost instanceof HTMLElement) ||
+  !(routingModeCopy instanceof HTMLElement) ||
+  !(routingModeMetric instanceof HTMLElement) ||
+  !(routingModeSelect instanceof HTMLSelectElement) ||
   !(voiceStatus instanceof HTMLElement)
 ) {
   throw new Error("Voice demo page is missing expected elements.");
 }
 
 const modelProvider = getInitialVoiceModelProvider();
+const routingMode = getInitialVoiceRoutingMode();
 modelProviderSelect.value = modelProvider;
+routingModeSelect.value = routingMode;
 const guidedVoice = createVoiceStream<SavedIntake>(
-  getVoiceRoutePath("guided", modelProvider),
+  getVoiceRoutePath("guided", modelProvider, routingMode),
 );
 const generalVoice = createVoiceStream<SavedIntake>(
-  getVoiceRoutePath("general", modelProvider),
+  getVoiceRoutePath("general", modelProvider, routingMode),
 );
 const opsStatus = mountVoiceOpsStatus(workflowStatusHost, "/app-kit/status", {
   intervalMs: 5_000,
@@ -250,6 +263,10 @@ const render = () => {
     ? `${voice.call.disposition} after ${voice.call.events.length} lifecycle event${voice.call.events.length === 1 ? "" : "s"}`
     : (voice.call?.events.at(-1)?.type ?? "Not started");
   modelProviderMetric.textContent = getVoiceProviderLabel(modelProvider);
+  routingModeMetric.textContent = getVoiceRoutingLabel(routingMode);
+  routingModeCopy.textContent =
+    VOICE_ROUTING_MODES.find((item) => item.id === routingMode)?.description ??
+    "";
   sessionMetric.textContent = activeMode
     ? getVoiceModeLabel(activeMode)
     : "Choose one";
@@ -285,6 +302,14 @@ modelProviderSelect.addEventListener("change", () => {
   rememberVoiceModelProvider(modelProviderSelect.value as VoiceModelProvider);
   const nextUrl = new URL(window.location.href);
   nextUrl.searchParams.set("provider", modelProviderSelect.value);
+  window.location.href = nextUrl.toString();
+});
+
+routingModeSelect.addEventListener("change", () => {
+  stopMic();
+  rememberVoiceRoutingMode(routingModeSelect.value as VoiceRoutingMode);
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("routing", routingModeSelect.value);
   window.location.href = nextUrl.toString();
 });
 

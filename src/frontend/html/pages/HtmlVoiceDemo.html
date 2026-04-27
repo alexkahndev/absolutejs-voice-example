@@ -74,6 +74,12 @@
                   >Local</span
                 >
               </div>
+              <div class="voice-metric">
+                <span class="voice-metric-label">Routing</span>
+                <span class="voice-metric-value" id="metric-routing"
+                  >Balanced</span
+                >
+              </div>
             </div>
           </div>
         </article>
@@ -94,6 +100,18 @@
               <option value="gemini">Google Gemini</option>
             </select>
           </label>
+          <label class="voice-provider-select">
+            <span>STT routing</span>
+            <select id="routing-mode-select">
+              <option value="balanced">Balanced routing</option>
+              <option value="fastest">Fastest realtime</option>
+              <option value="cheapest">Cheapest acceptable</option>
+              <option value="quality">Quality first</option>
+            </select>
+          </label>
+          <p class="voice-footnote" id="routing-mode-copy">
+            Weighted cost, latency, and accuracy for normal production.
+          </p>
         </article>
 
         <article

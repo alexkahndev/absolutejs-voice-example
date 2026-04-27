@@ -15,12 +15,15 @@ import {
   FRAMEWORKS,
   FRAMEWORK_DESCRIPTIONS,
   getInitialVoiceModelProvider,
+  getInitialVoiceRoutingMode,
   getVoiceLeadMessage,
   getVoiceModeLabel,
   getVoiceModePrompt,
   getVoiceProviderLabel,
+  getVoiceRoutingLabel,
   getVoiceRoutePath,
   rememberVoiceModelProvider,
+  rememberVoiceRoutingMode,
   VOICE_ASSISTANT_CONFIG,
   VOICE_DEMO_GUIDE_STEPS,
   VOICE_DEMO_GUIDE_TITLE,
@@ -31,8 +34,10 @@ import {
   VOICE_DEMO_STOP_LABEL,
   VOICE_CALL_CONTROL_ACTIONS,
   VOICE_MODEL_PROVIDERS,
+  VOICE_ROUTING_MODES,
   type VoiceDemoMode,
   type VoiceModelProvider,
+  type VoiceRoutingMode,
   type SavedIntake,
 } from "../../../shared/demo";
 
@@ -75,11 +80,18 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
   const [modelProvider, setModelProvider] = useState<VoiceModelProvider>(
     getInitialVoiceModelProvider,
   );
+  const [routingMode, setRoutingMode] = useState<VoiceRoutingMode>(
+    getInitialVoiceRoutingMode,
+  );
   const guidedVoice =
-    useVoiceStream<SavedIntake>(getVoiceRoutePath("guided", modelProvider)) ??
+    useVoiceStream<SavedIntake>(
+      getVoiceRoutePath("guided", modelProvider, routingMode),
+    ) ??
     EMPTY_VOICE;
   const generalVoice =
-    useVoiceStream<SavedIntake>(getVoiceRoutePath("general", modelProvider)) ??
+    useVoiceStream<SavedIntake>(
+      getVoiceRoutePath("general", modelProvider, routingMode),
+    ) ??
     EMPTY_VOICE;
   const [activeMode, setActiveMode] = useState<VoiceDemoMode | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -159,6 +171,14 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
     setActiveMode(null);
     rememberVoiceModelProvider(provider);
     setModelProvider(provider);
+  };
+
+  const changeRoutingMode = (routing: VoiceRoutingMode) => {
+    stopMic();
+    activeModeRef.current = null;
+    setActiveMode(null);
+    rememberVoiceRoutingMode(routing);
+    setRoutingMode(routing);
   };
 
   const startMode = async (mode: VoiceDemoMode) => {
@@ -265,6 +285,12 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                       {getVoiceProviderLabel(modelProvider)}
                     </span>
                   </div>
+                  <div className="voice-metric">
+                    <span className="voice-metric-label">Routing</span>
+                    <span className="voice-metric-value">
+                      {getVoiceRoutingLabel(routingMode)}
+                    </span>
+                  </div>
                 </div>
               </div>
             </article>
@@ -293,6 +319,27 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                   ))}
                 </select>
               </label>
+              <label className="voice-provider-select">
+                <span>STT routing</span>
+                <select
+                  value={routingMode}
+                  onChange={(event) =>
+                    changeRoutingMode(
+                      event.currentTarget.value as VoiceRoutingMode,
+                    )
+                  }
+                >
+                  {VOICE_ROUTING_MODES.map((routing) => (
+                    <option key={routing.id} value={routing.id}>
+                      {routing.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="voice-footnote">
+                {VOICE_ROUTING_MODES.find((item) => item.id === routingMode)
+                  ?.description ?? ""}
+              </p>
             </article>
 
             <VoiceOpsStatus
