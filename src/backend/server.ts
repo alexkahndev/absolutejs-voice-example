@@ -6,6 +6,7 @@ import {
   createAnthropicVoiceAssistantModel,
   createGeminiVoiceAssistantModel,
   createVoiceDiagnosticsRoutes,
+  createVoiceEvalRoutes,
   createVoiceAssistant,
   createVoiceAgentTool,
   createVoiceExperiment,
@@ -1037,6 +1038,7 @@ const server = new Elysia()
         { href: "/ops-console", label: "Ops Console" },
         { href: "/assistant", label: "Assistant" },
         { href: "/quality", label: "Quality" },
+        { href: "/evals", label: "Evals" },
         { href: "/diagnostics", label: "Diagnostics" },
         { href: "/sessions", label: "Sessions" },
         { href: "/handoffs", label: "Handoffs" },
@@ -1072,6 +1074,7 @@ const server = new Elysia()
         { href: "/react", label: "Back to demo" },
         { href: "/ops-console", label: "Ops Console" },
         { href: "/resilience", label: "Resilience" },
+        { href: "/evals", label: "Evals" },
         { href: "/diagnostics", label: "Diagnostics" },
         { href: "/sessions", label: "Sessions" },
         { href: "/handoffs", label: "Handoffs" },
@@ -1083,6 +1086,23 @@ const server = new Elysia()
     }),
   )
   .use(
+    createVoiceEvalRoutes({
+      links: [
+        { href: "/react", label: "Back to demo" },
+        { href: "/ops-console", label: "Ops Console" },
+        { href: "/quality", label: "Quality" },
+        { href: "/resilience", label: "Resilience" },
+        { href: "/diagnostics", label: "Diagnostics" },
+        { href: "/sessions", label: "Sessions" },
+        { href: "/handoffs", label: "Handoffs" },
+        { href: "/tasks", label: "Tasks" },
+        { href: "/integrations", label: "Integrations" },
+      ],
+      store: runtimeStorage.traces,
+      title: "AbsoluteJS Voice Demo Evals",
+    }),
+  )
+  .use(
     createVoiceOpsConsoleRoutes({
       links: [
         {
@@ -1090,6 +1110,13 @@ const server = new Elysia()
           href: "/quality",
           label: "Quality",
           statusHref: "/quality/status",
+        },
+        {
+          description:
+            "Replay stored sessions against quality gates and trend regressions.",
+          href: "/evals",
+          label: "Evals",
+          statusHref: "/evals/status",
         },
         {
           description: "Provider failover, degradation, and simulator controls.",
