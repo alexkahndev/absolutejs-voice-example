@@ -307,6 +307,7 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
             <a href="/reviews">Reviews</a>
             <a href="/traces">Traces</a>
             <a href="/carriers">Carriers</a>
+            <a href="/phone-agent">Phone Agent</a>
           </nav>
         </header>
         <main className="voice-shell">

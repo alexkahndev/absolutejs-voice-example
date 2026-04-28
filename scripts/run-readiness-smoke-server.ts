@@ -8,29 +8,109 @@ const waitTimeoutMs = Number(
   process.env.VOICE_READINESS_SERVER_WAIT_MS ?? 30_000,
 );
 const pollMs = Number(process.env.VOICE_READINESS_SERVER_POLL_MS ?? 500);
+const serverOutputLineLimit = Number(
+  process.env.VOICE_READINESS_SERVER_OUTPUT_LINES ?? 80,
+);
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const textDecoder = new TextDecoder();
+const recentServerOutput: string[] = [];
 
-const waitForServer = async () => {
-  const deadline = Date.now() + waitTimeoutMs;
-  let lastError = "Server did not respond.";
+const rememberServerOutput = (chunk: Uint8Array) => {
+  process.stdout.write(chunk);
+  for (const line of textDecoder.decode(chunk).split(/\r?\n/)) {
+    if (!line.trim()) {
+      continue;
+    }
+    recentServerOutput.push(line);
+    recentServerOutput.splice(0, recentServerOutput.length - serverOutputLineLimit);
+  }
+};
 
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(`${baseUrl}/api/production-readiness`, {
-        headers: {
-          accept: "application/json",
-        },
-      });
-      if (response.ok) {
+const pipeServerOutput = async (stream: ReadableStream<Uint8Array> | null) => {
+  if (!stream) {
+    return;
+  }
+
+  const reader = stream.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
         return;
       }
-      lastError = `Readiness endpoint returned HTTP ${response.status}.`;
+      if (value) {
+        rememberServerOutput(value);
+      }
+    }
+  } catch {
+    // The stream is expected to close when the dev server is killed.
+  }
+};
+const isReadableByteStream = (
+  stream: unknown,
+): stream is ReadableStream<Uint8Array> =>
+  stream instanceof ReadableStream;
+
+const formatRecentServerOutput = () =>
+  recentServerOutput.length > 0
+    ? `\n\nRecent dev server output:\n${recentServerOutput.join("\n")}`
+    : "";
+
+const pingServer = async () => {
+  const response = await fetch(`${baseUrl}/api/production-readiness`, {
+    headers: {
+      accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Readiness endpoint returned HTTP ${response.status}.`);
+  }
+};
+
+const isServerRunning = async () => {
+  try {
+    await pingServer();
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const waitForServer = async (server?: ReturnType<typeof Bun.spawn>) => {
+  const deadline = Date.now() + waitTimeoutMs;
+  let lastError = "Server did not respond.";
+  let serverExitCode: number | undefined;
+  let serverExited = false;
+  if (server) {
+    void server.exited.then((exitCode) => {
+      serverExitCode = exitCode;
+      serverExited = true;
+    });
+  }
+
+  while (Date.now() < deadline) {
+    if (serverExited) {
+      throw new Error(
+        `Dev server exited before readiness check passed with code ${serverExitCode ?? "unknown"}: ${lastError}`,
+      );
+    }
+
+    try {
+      await pingServer();
+      return;
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
     }
 
-    await sleep(pollMs);
+    await Promise.race([
+      sleep(pollMs),
+      server?.exited.then((exitCode) => {
+        serverExitCode = exitCode;
+        serverExited = true;
+      }),
+    ]);
   }
 
   throw new Error(
@@ -38,19 +118,30 @@ const waitForServer = async () => {
   );
 };
 
-const server = Bun.spawn(["bun", "run", "dev"], {
-  env: {
-    ...process.env,
-    PORT: process.env.PORT ?? "3004",
-  },
-  stderr: "inherit",
-  stdout: "inherit",
-});
-
 let exitCode = 0;
+let server: ReturnType<typeof Bun.spawn> | undefined;
 
 try {
-  await waitForServer();
+  if (await isServerRunning()) {
+    console.log(`Reusing running demo server at ${baseUrl}.`);
+  } else {
+    server = Bun.spawn(["bun", "run", "dev"], {
+      env: {
+        ...process.env,
+        PORT: process.env.PORT ?? "3004",
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    void pipeServerOutput(
+      isReadableByteStream(server.stdout) ? server.stdout : null,
+    );
+    void pipeServerOutput(
+      isReadableByteStream(server.stderr) ? server.stderr : null,
+    );
+  }
+
+  await waitForServer(server);
 
   const smoke = Bun.spawn(["bun", "run", "smoke:readiness"], {
     env: {
@@ -68,10 +159,14 @@ try {
   }
 } catch (error) {
   exitCode = 1;
-  console.error(error instanceof Error ? error.message : String(error));
+  console.error(
+    `${error instanceof Error ? error.message : String(error)}${formatRecentServerOutput()}`,
+  );
 } finally {
-  server.kill();
-  await Promise.race([server.exited, sleep(2_000)]);
+  if (server) {
+    server.kill();
+    await Promise.race([server.exited, sleep(2_000)]);
+  }
 }
 
 process.exit(exitCode);

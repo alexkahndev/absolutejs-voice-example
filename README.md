@@ -167,29 +167,35 @@ bun run smoke:readiness
 
 The smoke runner checks the readiness, carrier, provider capability, handoff, and app-kit status endpoints in parallel. Local development can still report `readinessStatus: "fail"` when production-only gates are missing, such as a public carrier webhook URL or live carrier credentials. The default smoke passes when the control-plane endpoints are reachable and returning valid JSON.
 
+If your machine is busy or another agent is compiling at the same time, increase `VOICE_READINESS_SERVER_WAIT_MS` in `.env` to give `absolute dev` more time to start. `VOICE_READINESS_SERVER_POLL_MS`, `VOICE_READINESS_SERVER_OUTPUT_LINES`, and `VOICE_READINESS_SMOKE_TIMEOUT_MS` are also available for local tuning.
+
+Carrier checks default to `VOICE_DEMO_CARRIER_READINESS=local`, which proves the self-hosted phone-agent routes with localhost URLs. Set `VOICE_DEMO_CARRIER_READINESS=production` when using a public HTTPS/WSS URL and real carrier signing credentials.
+
 For production-like environments where every readiness gate should pass:
 
 ```bash
-VOICE_READINESS_SMOKE_STRICT=true bun run smoke:readiness
+VOICE_DEMO_CARRIER_READINESS=production VOICE_READINESS_SMOKE_STRICT=true bun run smoke:readiness
 ```
 
 ## What To Demo
 
 A good end-to-end demo flow is:
 
-1. Open any framework page.
-2. Complete a guided or general voice flow.
-3. Say one of the lifecycle phrases if you want a non-default outcome:
+1. Open `/demo-checklist` for the canonical presentation path.
+2. Open any framework page.
+3. Complete a guided or general voice flow.
+4. Say one of the lifecycle phrases if you want a non-default outcome:
    - `transfer me to billing`
    - `escalate this`
    - `send it to voicemail`
    - `no answer`
-4. Open `/reviews` to inspect the call artifact.
-5. Open `/traces` to inspect the per-call provider timeline.
-6. Open `/barge-in` to inspect interruption latency evidence.
-7. Open `/assistant` to inspect assistant variants, outcomes, guardrails, and tools.
-8. Open `/tasks` to see the generated follow-up work.
-9. Open `/integrations` to inspect the portable outbound event payloads.
+5. Open `/production-readiness` to show the pass/fail control-plane report.
+6. Open `/phone-agent`, `/carriers`, and `/telephony-webhook-decisions` to show self-hosted carrier readiness.
+7. Open `/reviews` to inspect the call artifact.
+8. Open `/traces` to inspect the per-call provider timeline.
+9. Open `/barge-in` to inspect interruption latency evidence.
+10. Open `/voice/simulations` to show pre-production proof across sessions, scenarios, fixtures, tools, and outcomes.
+11. Open `/assistant`, `/tasks`, and `/integrations` for deeper assistant, follow-up work, and outbound event details.
 
 The demo uses the support-triage recipe, so completed calls create triage review tasks, escalations route to `support-escalations`, transfers create handoff checks, and voicemail/no-answer outcomes create callback work.
 

@@ -11,11 +11,14 @@ import {
   createVoiceFileEvalBaselineStore,
   createVoiceFileScenarioFixtureStore,
   createVoiceAssistant,
+  createVoiceAgent,
+  createVoiceAgentSquad,
   createVoiceAgentTool,
   createVoiceCampaignRoutes,
   createVoiceExperiment,
   createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
+  createVoiceMemoryTraceEventStore,
   createVoiceSQLiteCampaignStore,
   createOpenAIVoiceAssistantModel,
   createOpenAIVoiceTTS,
@@ -40,6 +43,7 @@ import {
   createVoiceOutcomeContractRoutes,
   createVoiceWebhookHandoffAdapter,
   deliverVoiceIntegrationEventToSinks,
+  recordVoiceRuntimeOps,
   reopenVoiceOpsTask,
   renderVoiceHandoffHealthHTML,
   renderVoiceSessionsHTML,
@@ -47,6 +51,8 @@ import {
   getVoiceCampaignDialerProofStatus,
   runVoiceCampaignDialerProof,
   runVoiceCampaignProof,
+  runVoiceAgentSquadContract,
+  runVoiceProviderRoutingContract,
   startVoiceOpsTask,
   summarizeVoiceAssistantRuns,
   summarizeVoiceHandoffDeliveries,
@@ -74,7 +80,9 @@ import {
   type VoiceTelephonySmokeReport,
   type VoiceToolContractDefinition,
   type VoiceOpsWebhookEnvelope,
+  type StoredVoiceTraceEvent,
   type VoiceTraceEvent,
+  type VoiceTraceEventStore,
   type VoiceTurnCorrectionHandler,
   type VoiceTurnRecord,
   type VoiceSessionRecord,
@@ -140,6 +148,8 @@ const escapeHtml = (value: string) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+const stringifyForHtml = (value: unknown) =>
+  escapeHtml(JSON.stringify(value, null, 2) ?? "");
 
 const createJsonHandoffDeliveryStore = <
   TDelivery extends StoredVoiceHandoffDelivery,
@@ -293,6 +303,74 @@ const runtimeStorage = createVoiceFileRuntimeStorage<
 >({
   directory: runtimeDirectory,
 });
+const hiddenTraceTimelineSessionPattern =
+  /^(latency-proof-|phone-|provider-sim-|quality-routing-proof$|stt-contract-|stt-sim-|tts-contract-|tts-sim-)/;
+const filterDemoTraceTimelineEvents = (
+  events: StoredVoiceTraceEvent[],
+): StoredVoiceTraceEvent[] => {
+  const eventsBySession = new Map<string, StoredVoiceTraceEvent[]>();
+  for (const event of events) {
+    eventsBySession.set(event.sessionId, [
+      ...(eventsBySession.get(event.sessionId) ?? []),
+      event,
+    ]);
+  }
+
+  const visibleSessionIds = new Set(
+    [...eventsBySession.entries()]
+      .filter(([sessionId, sessionEvents]) => {
+        if (
+          sessionId === "live-session-now" ||
+          hiddenTraceTimelineSessionPattern.test(sessionId)
+        ) {
+          return false;
+        }
+
+        return sessionEvents.some(
+          (event) =>
+            event.type === "call.lifecycle" ||
+            event.type === "turn.assistant" ||
+            event.type === "turn.committed" ||
+            event.type === "turn.transcript",
+        );
+      })
+      .map(([sessionId]) => sessionId),
+  );
+
+  return events.filter((event) => visibleSessionIds.has(event.sessionId));
+};
+const traceTimelineStore: VoiceTraceEventStore = {
+  append: (event) => runtimeStorage.traces.append(event),
+  get: (id) => runtimeStorage.traces.get(id),
+  list: async (filter) =>
+    filterDemoTraceTimelineEvents(await runtimeStorage.traces.list(filter)),
+  remove: (id) => runtimeStorage.traces.remove(id),
+};
+type TelephonyWebhookDecisionSnapshot = {
+  action: string;
+  at: number;
+  campaignOutcome: unknown;
+  disposition?: string;
+  provider: VoiceTelephonyProvider;
+  source?: string;
+};
+const telephonyWebhookDecisionSnapshots: TelephonyWebhookDecisionSnapshot[] = [];
+const recordTelephonyWebhookDecision = async (
+  provider: VoiceTelephonyProvider,
+  input: Parameters<typeof recordCampaignTelephonyOutcome>[0],
+) => {
+  const { decision } = input;
+  const campaignOutcome = await recordCampaignTelephonyOutcome(input);
+  telephonyWebhookDecisionSnapshots.unshift({
+    action: decision.action,
+    at: Date.now(),
+    campaignOutcome,
+    disposition: decision.disposition,
+    provider,
+    source: decision.source,
+  });
+  telephonyWebhookDecisionSnapshots.splice(20);
+};
 const handoffDeliveryStore = createJsonHandoffDeliveryStore<
   StoredVoiceHandoffDelivery<unknown, VoiceSessionRecord, SavedIntake>
 >(resolve(runtimeDirectory, "handoff-deliveries.json"));
@@ -305,6 +383,12 @@ const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
 const geminiApiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
 const openAIApiKey = process.env.OPENAI_API_KEY;
 const publicBaseUrl = process.env.VOICE_DEMO_PUBLIC_BASE_URL;
+const carrierReadinessMode =
+  process.env.VOICE_DEMO_CARRIER_READINESS === "production"
+    ? "production"
+    : "local";
+const requireProductionCarrierReadiness =
+  carrierReadinessMode === "production";
 const handoffWebhookUrl = process.env.VOICE_DEMO_HANDOFF_WEBHOOK_URL;
 const telephonyWebhookSigningSecret =
   process.env.VOICE_DEMO_TELEPHONY_WEBHOOK_SECRET;
@@ -421,6 +505,14 @@ const openAITelephonyTTS = openAIApiKey
       voice: process.env.OPENAI_TTS_VOICE ?? "marin",
     })
   : undefined;
+const configuredTTSProviders: VoiceTTSProvider[] = [
+  openAITelephonyTTS ? "openai" : undefined,
+  "emergency",
+].filter(Boolean) as VoiceTTSProvider[];
+const ttsLatencyBudgets = {
+  emergency: 500,
+  openai: readPositiveNumberEnv("VOICE_OPENAI_TTS_TIMEOUT_MS", 6_000),
+} satisfies Record<VoiceTTSProvider, number>;
 const telephonyTTS = createVoiceTTSProviderRouter<VoiceTTSProvider>({
   adapters: {
     ...(openAITelephonyTTS ? { openai: openAITelephonyTTS } : {}),
@@ -772,6 +864,87 @@ const providerFailureSimulator = createVoiceProviderFailureSimulator({
           : "Deterministic",
   providers: configuredModelProviders,
 });
+const runDemoProviderRoutingContract = async () => {
+  const events: StoredVoiceTraceEvent[] = [];
+  const requestedProvider: VoiceModelProvider = configuredModelProviders.includes(
+    "openai",
+  )
+    ? "openai"
+    : configuredModelProviders[0] ?? "deterministic";
+  const fallbackProvider = providerFallbackOrder(requestedProvider).find(
+    (provider) => provider !== requestedProvider,
+  );
+  const simulator = createVoiceProviderFailureSimulator({
+    allowProviders: () => configuredModelProviders,
+    fallback: providerFallbackOrder,
+    isProviderError: (error, provider) =>
+      provider !== "deterministic" && isAssistantProviderError(error),
+    onProviderEvent: async (event, input) => {
+      events.push({
+        at: event.at,
+        id: `${input.session.id}:${input.turn.id}:${event.provider}:${event.status}:${event.at}`,
+        payload: {
+          ...event,
+          providerStatus: event.status,
+        },
+        scenarioId: "provider-routing-contract",
+        sessionId: input.session.id,
+        turnId: input.turn.id,
+        type: "session.error",
+      });
+    },
+    providerLabel: (provider) =>
+      provider === "openai"
+        ? "OpenAI"
+        : provider === "anthropic"
+          ? "Anthropic"
+          : provider === "gemini"
+            ? "Gemini"
+            : "Deterministic",
+    providers: configuredModelProviders,
+    replayHref: false,
+  });
+
+  await simulator.run(
+    requestedProvider,
+    fallbackProvider ? "failure" : "recovery",
+  );
+
+  return runVoiceProviderRoutingContract({
+    contract: {
+      expect: fallbackProvider
+        ? [
+            {
+              fallbackProvider,
+              kind: "llm",
+              provider: requestedProvider,
+              selectedProvider: requestedProvider,
+              status: "error",
+            },
+            {
+              kind: "llm",
+              provider: fallbackProvider,
+              selectedProvider: requestedProvider,
+              status: "fallback",
+            },
+          ]
+        : [
+            {
+              kind: "llm",
+              provider: requestedProvider,
+              selectedProvider: requestedProvider,
+              status: "success",
+            },
+          ],
+      id: fallbackProvider
+        ? `${requestedProvider}-to-${fallbackProvider}-fallback`
+        : `${requestedProvider}-success`,
+      label: "Demo LLM provider fallback",
+      scenarioId: "provider-routing-contract",
+    },
+    events,
+  });
+};
 const intakeClassifierTool = createVoiceAgentTool<
   unknown,
   VoiceSessionRecord,
@@ -816,6 +989,212 @@ const reviewTaskRecorderTool = createVoiceAgentTool<
   }),
   name: "review_task_recorder",
 });
+const runDemoAgentSquadContract = async () => {
+  const trace = createVoiceMemoryTraceEventStore();
+  const supportAgent = createVoiceAgent<
+    unknown,
+    VoiceSessionRecord,
+    { queue: string }
+  >({
+    id: "support",
+    model: {
+      generate: ({ turn }) =>
+        turn.text.toLowerCase().includes("billing")
+          ? {
+              handoff: {
+                metadata: { queue: "billing" },
+                reason: "Billing question detected.",
+                targetAgentId: "billing",
+              },
+            }
+          : turn.text.toLowerCase().includes("legal")
+            ? {
+                handoff: {
+                  metadata: { queue: "legal" },
+                  reason: "Legal question detected.",
+                  targetAgentId: "legal",
+                },
+              }
+          : {
+              assistantText: "Support can help with this request.",
+              result: { queue: "support" },
+            },
+    },
+    system: "Route callers to the correct demo specialist.",
+    trace,
+  });
+  const billingAgent = createVoiceAgent<
+    unknown,
+    VoiceSessionRecord,
+    { queue: string }
+  >({
+    id: "billing",
+    model: {
+      generate: () => ({
+        assistantText: "Billing can help with your invoice.",
+        complete: true,
+        result: { queue: "billing" },
+      }),
+    },
+    system: "Handle invoice and billing questions.",
+    trace,
+  });
+  const squad = createVoiceAgentSquad<
+    unknown,
+    VoiceSessionRecord,
+    { queue: string }
+  >({
+    agents: [supportAgent, billingAgent],
+    defaultAgentId: "support",
+    handoffPolicy: ({ handoff }) =>
+      handoff.targetAgentId === "billing"
+        ? {
+            metadata: { certifiedRoute: "support-to-billing" },
+            summary: "Certified billing route.",
+          }
+        : {
+            allow: false,
+            escalate: {
+              metadata: {
+                requestedSpecialist: handoff.targetAgentId,
+              },
+              reason: "unsupported-specialist",
+            },
+            reason: `No certified route for ${handoff.targetAgentId}.`,
+          },
+    id: "demo-front-desk",
+    trace,
+  });
+
+  return runVoiceAgentSquadContract({
+    context: {},
+    contract: {
+      description:
+        "Proves the demo front desk routes billing callers to the billing specialist.",
+      id: "demo-billing-route",
+      label: "Demo billing squad route",
+      scenarioId: "demo-billing-route",
+      turns: [
+        {
+          expect: {
+            assistantIncludes: ["invoice"],
+            finalAgentId: "billing",
+            handoffs: [
+              {
+                fromAgentId: "support",
+                status: "allowed",
+                targetAgentId: "billing",
+              },
+            ],
+            outcome: "complete",
+            result: ({ result }) =>
+              result?.queue === "billing"
+                ? []
+                : [
+                    {
+                      code: "demo_billing_route.queue_mismatch",
+                      message: "Expected billing queue result.",
+                    },
+                  ],
+          },
+          id: "billing-question",
+          text: "I have a billing question about my invoice.",
+        },
+        {
+          expect: {
+            finalAgentId: "support",
+            handoffs: [
+              {
+                fromAgentId: "support",
+                status: "blocked",
+                targetAgentId: "legal",
+              },
+            ],
+            outcome: "escalate",
+            result: ({ routeResult }) =>
+              routeResult.escalate?.reason === "unsupported-specialist"
+                ? []
+                : [
+                    {
+                      code: "demo_unsupported_route.escalation_missing",
+                      message:
+                        "Expected unsupported specialist route to escalate.",
+                    },
+                  ],
+          },
+          id: "unsupported-legal-question",
+          text: "I have a legal question about this invoice.",
+        },
+      ],
+    },
+    squad,
+    trace,
+  });
+};
+const renderAgentSquadContractHTML = async () => {
+  const report = await runDemoAgentSquadContract();
+  const issueRows = report.issues.length
+    ? report.issues
+        .map(
+          (issue) => `<li><code>${escapeHtml(issue.code)}</code> ${escapeHtml(
+            issue.message,
+          )}</li>`,
+        )
+        .join("")
+    : "<li>No routing issues.</li>";
+  const turnRows = report.turns
+    .map(
+      (turn) => `<tr>
+        <td><code>${escapeHtml(turn.turnId)}</code></td>
+        <td>${escapeHtml(turn.agentId)}</td>
+        <td>${escapeHtml(turn.outcome ?? "none")}</td>
+        <td>${turn.handoffs
+          .map(
+            (handoff) =>
+              `${escapeHtml(handoff.fromAgentId ?? "?")} -> ${escapeHtml(
+                handoff.targetAgentId ?? "?",
+              )} (${escapeHtml(handoff.status ?? "unknown")})`,
+          )
+          .join("<br>")}</td>
+        <td>${turn.pass ? "Pass" : "Fail"}</td>
+      </tr>`,
+    )
+    .join("");
+
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <title>Agent squad contract</title>
+      <style>
+        body{background:#080b12;color:#e5eefb;font-family:Inter,ui-sans-serif,system-ui,sans-serif;margin:0}
+        main{max-width:1040px;margin:auto;padding:32px}
+        a{color:#93c5fd}
+        .pill{border-radius:999px;display:inline-block;font-weight:800;padding:8px 12px;background:${report.pass ? "#14532d" : "#7f1d1d"}}
+        .muted{color:#9ca3af}
+        table{width:100%;border-collapse:collapse;background:#111827;border-radius:18px;overflow:hidden}
+        th,td{border-bottom:1px solid #263244;padding:14px;text-align:left;vertical-align:top}
+        code{color:#bfdbfe}
+      </style>
+    </head>
+    <body>
+      <main>
+        <p><a href="/app-kit">Back to App Kit</a> · <a href="/api/agent-squad-contract">JSON</a></p>
+        <p class="muted">Self-hosted specialist routing proof</p>
+        <h1>Agent squad contract</h1>
+        <p class="pill">${report.pass ? "Pass" : "Fail"}</p>
+        <p class="muted">This page runs <code>runVoiceAgentSquadContract</code> against a deterministic support-to-billing squad. It proves the route graph before live traffic.</p>
+        <h2>Turns</h2>
+        <table>
+          <thead><tr><th>Turn</th><th>Final agent</th><th>Outcome</th><th>Handoffs</th><th>Status</th></tr></thead>
+          <tbody>${turnRows}</tbody>
+        </table>
+        <h2>Issues</h2>
+        <ul>${issueRows}</ul>
+      </main>
+    </body>
+  </html>`;
+};
 const createContractTurn = (
   id: string,
   text: string,
@@ -1262,8 +1641,161 @@ const renderTelephonyOutcomePreviewHTML = () => {
   </html>`;
 };
 
+const renderTelephonyWebhookDecisionsHTML = () => {
+  const rows = telephonyWebhookDecisionSnapshots.length
+    ? telephonyWebhookDecisionSnapshots
+        .map(
+          (decision) => `<tr>
+            <td><strong>${escapeHtml(decision.provider)}</strong><br /><span class="muted">${escapeHtml(new Date(decision.at).toLocaleString("en-US", {
+              dateStyle: "medium",
+              timeStyle: "medium",
+            }))}</span></td>
+            <td><strong>${escapeHtml(decision.action)}</strong><br /><span class="muted">${escapeHtml(decision.source ?? "unknown")} / ${escapeHtml(decision.disposition ?? "none")}</span></td>
+            <td><pre>${stringifyForHtml(decision.campaignOutcome)}</pre></td>
+          </tr>`,
+        )
+        .join("")
+    : `<tr><td colspan="3">No webhook decisions recorded yet. Run carrier smoke or campaign dialer proof to populate this view.</td></tr>`;
+
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Telephony Webhook Decisions</title>
+      <style>
+        body{font-family:ui-sans-serif,system-ui,sans-serif;background:#0b1020;color:#f8fafc;margin:0}
+        main{max-width:1120px;margin:auto;padding:32px}
+        a{color:#67e8f9}
+        .hero{background:linear-gradient(135deg,rgba(8,145,178,.24),rgba(245,158,11,.14));border:1px solid #263449;border-radius:28px;padding:26px}
+        .muted{color:#9ca3af}
+        table{width:100%;border-collapse:collapse;background:#111827;border-radius:18px;overflow:hidden;margin-top:20px}
+        th,td{border-bottom:1px solid #263449;padding:14px;text-align:left;vertical-align:top}
+        pre{background:#0f172a;border:1px solid #263449;border-radius:14px;color:#bae6fd;margin:0;max-width:620px;overflow:auto;padding:12px;white-space:pre-wrap}
+      </style>
+    </head>
+    <body>
+      <main>
+        <p><a href="/app-kit">Back to App Kit</a> · <a href="/telephony-outcomes">Outcome policy</a> · <a href="/carriers">Carrier matrix</a> · <a href="/api/telephony-webhook-decisions">JSON</a></p>
+        <section class="hero">
+          <p class="muted">Carrier webhook telemetry</p>
+          <h1>Latest normalized webhook decisions</h1>
+          <p class="muted">This view shows what Twilio, Telnyx, and Plivo webhook payloads became after normalization: no-answer, voicemail, transfer, ignored, and campaign outcome application.</p>
+        </section>
+        <table>
+          <thead><tr><th>Provider</th><th>Decision</th><th>Campaign Outcome</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </main>
+    </body>
+  </html>`;
+};
+
+const demoChecklistItems = [
+  {
+    description:
+      "Start with any framework page and complete one guided or general microphone flow.",
+    href: "/react",
+    label: "Run a framework demo",
+  },
+  {
+    description:
+      "Show the single pass/fail control-plane report before talking features.",
+    href: "/production-readiness",
+    label: "Verify production readiness",
+  },
+  {
+    description:
+      "Open the phone-agent and carrier matrix to prove Twilio, Telnyx, and Plivo setup parity.",
+    href: "/phone-agent",
+    label: "Inspect phone-agent readiness",
+  },
+  {
+    description:
+      "Show normalized carrier outcomes from recent webhook smoke checks.",
+    href: "/telephony-webhook-decisions",
+    label: "Review webhook decisions",
+  },
+  {
+    description:
+      "Use traces to show clean per-call timelines with zero warnings or failed sessions.",
+    href: "/traces",
+    label: "Inspect call traces",
+  },
+  {
+    description:
+      "Open saved call artifacts, summaries, tasks, and handoff evidence.",
+    href: "/reviews",
+    label: "Review call artifacts",
+  },
+  {
+    description:
+      "Close with provider fallback contracts and the simulation suite as proof this is more than a demo.",
+    href: "/voice/simulations",
+    label: "Show simulation proof",
+  },
+] satisfies Array<{
+  description: string;
+  href: string;
+  label: string;
+}>;
+
+const renderDemoChecklistHTML = () => {
+  const rows = demoChecklistItems
+    .map(
+      (item, index) => `<article>
+        <span>${String(index + 1).padStart(2, "0")}</span>
+        <div>
+          <h2><a href="${escapeHtml(item.href)}">${escapeHtml(item.label)}</a></h2>
+          <p>${escapeHtml(item.description)}</p>
+        </div>
+      </article>`,
+    )
+    .join("");
+
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>AbsoluteJS Voice Demo Checklist</title>
+      <style>
+        body{background:#10140f;color:#f7f3e8;font-family:ui-sans-serif,system-ui,sans-serif;margin:0}
+        main{max-width:1040px;margin:auto;padding:32px}
+        a{color:#bef264}
+        .hero{background:linear-gradient(135deg,rgba(190,242,100,.2),rgba(14,165,233,.15));border:1px solid #334155;border-radius:30px;margin-bottom:18px;padding:28px}
+        .muted{color:#a7b18f}
+        .grid{display:grid;gap:14px}
+        article{align-items:flex-start;background:#171c15;border:1px solid #2d3727;border-radius:22px;display:grid;gap:16px;grid-template-columns:auto 1fr;padding:18px}
+        article span{background:#bef264;border-radius:999px;color:#1a2e05;font-weight:900;padding:8px 10px}
+        h1{font-size:clamp(2.3rem,6vw,4.7rem);line-height:.9;margin:.2rem 0 1rem}
+        h2{margin:0 0 6px}
+        p{line-height:1.6}
+      </style>
+    </head>
+    <body>
+      <main>
+        <p><a href="/app-kit">Back to App Kit</a> · <a href="/api/production-readiness">Readiness JSON</a></p>
+        <section class="hero">
+          <p class="muted">Presentation path</p>
+          <h1>Demo AbsoluteJS Voice without hunting for tabs</h1>
+          <p class="muted">Run this order when showing self-hosted voice primitives: framework UX, production proof, carrier readiness, webhook normalization, traces, reviews, and simulations.</p>
+        </section>
+        <section class="grid">${rows}</section>
+      </main>
+    </body>
+  </html>`;
+};
+
 const appKitLinks = [
   { href: "/react", label: "Back to demo" },
+  {
+    description:
+      "Step-by-step route through the strongest demo proof surfaces.",
+    href: "/demo-checklist",
+    label: "Demo Checklist",
+    statusHref: "/api/production-readiness",
+  },
   {
     description: "Integrated voice operations console.",
     href: "/ops-console",
@@ -1304,6 +1836,13 @@ const appKitLinks = [
   },
   {
     description:
+      "Code-owned specialist routing proof for the support-to-billing squad path.",
+    href: "/agent-squad-contract",
+    label: "Agent Squad Contract",
+    statusHref: "/api/agent-squad-contract",
+  },
+  {
+    description:
       "Seeded certification fixtures that prove workflows pass before live traffic.",
     href: "/evals/fixtures",
     label: "Fixture Evals",
@@ -1316,10 +1855,38 @@ const appKitLinks = [
   },
   {
     description:
+      "Code-owned LLM provider fallback proof for the configured model router.",
+    href: "/api/provider-routing-contract",
+    label: "Provider Routing Contract",
+    statusHref: "/api/provider-routing-contract",
+  },
+  {
+    description:
+      "Code-owned realtime STT fallback proof for the Deepgram to AssemblyAI route.",
+    href: "/api/stt-provider-routing-contract",
+    label: "STT Routing Contract",
+    statusHref: "/api/stt-provider-routing-contract",
+  },
+  {
+    description:
+      "Code-owned TTS fallback proof for the OpenAI to emergency audio route.",
+    href: "/api/tts-provider-routing-contract",
+    label: "TTS Routing Contract",
+    statusHref: "/api/tts-provider-routing-contract",
+  },
+  {
+    description:
       "Single pass/warn/fail report for quality, providers, routing evidence, handoffs, sessions, and carriers.",
     href: "/production-readiness",
     label: "Production Readiness",
     statusHref: "/api/production-readiness",
+  },
+  {
+    description:
+      "One phone-agent entrypoint for carrier setup, smoke checks, lifecycle stages, and readiness.",
+    href: "/phone-agent",
+    label: "Phone Agent",
+    statusHref: "/api/voice/phone/setup",
   },
   {
     description:
@@ -1369,6 +1936,13 @@ const appKitLinks = [
     href: "/telephony-outcomes",
     label: "Telephony Outcomes",
     statusHref: "/api/telephony-outcomes",
+  },
+  {
+    description:
+      "Latest Twilio, Telnyx, and Plivo webhook decisions after outcome normalization.",
+    href: "/telephony-webhook-decisions",
+    label: "Webhook Decisions",
+    statusHref: "/api/telephony-webhook-decisions",
   },
   {
     description:
@@ -1449,14 +2023,46 @@ const resolveCarrierOrigin = (request: Request) =>
   publicBaseUrl?.replace(/\/$/, "") ?? resolveRequestOrigin(request);
 
 const resolveCarrierStreamUrl = (request: Request, path: string) => {
+  if (!requireProductionCarrierReadiness) {
+    return joinUrlPath(`wss://${new URL(request.url).host}`, path);
+  }
+
   const origin = resolveCarrierOrigin(request);
   const wsOrigin = origin.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
   return joinUrlPath(wsOrigin, path);
 };
+const resolvePhoneAgentStreamUrl = ({
+  request,
+  streamPath,
+}: {
+  query: Record<string, unknown>;
+  request: Request;
+  streamPath: string;
+}) => {
+  if (requireProductionCarrierReadiness) {
+    return resolveCarrierStreamUrl(request, streamPath);
+  }
+
+  return joinUrlPath(`wss://${new URL(request.url).host}`, streamPath);
+};
+const localCarrierWebhookVerification = requireProductionCarrierReadiness
+  ? undefined
+  : () => ({ ok: true }) as const;
+const productionOnlyEnv = (env: Record<string, string | undefined>) =>
+  requireProductionCarrierReadiness ? env : {};
+const resolveTelephonyWebhookVerificationUrl =
+  (path: string) =>
+  ({ request }: { query: Record<string, unknown>; request: Request }) =>
+    publicBaseUrl
+      ? joinUrlPath(publicBaseUrl, path)
+      : joinUrlPath(new URL(request.url).origin, path);
 
 const createCarrierSmoke = <TProvider extends VoiceTelephonyProvider>(
   setup: VoiceTelephonySetupStatus<TProvider>,
 ): VoiceTelephonySmokeReport<TProvider> => {
+  const streamIsProductionSecure = setup.urls.stream.startsWith("wss://");
+  const signingIsConfigured =
+    setup.signing.configured || !requireProductionCarrierReadiness;
   const checks: VoiceTelephonySmokeReport<TProvider>["checks"] = [
     {
       message: setup.urls.stream
@@ -1466,11 +2072,16 @@ const createCarrierSmoke = <TProvider extends VoiceTelephonyProvider>(
       status: setup.urls.stream ? "pass" : "fail",
     },
     {
-      message: setup.urls.stream.startsWith("wss://")
+      message: streamIsProductionSecure
         ? "Carrier stream URL uses wss://."
-        : "Carrier stream URL should use wss:// for production.",
+        : requireProductionCarrierReadiness
+          ? "Carrier stream URL should use wss:// for production."
+          : "Local carrier proof accepts ws://; use production mode to require wss://.",
       name: "wss-stream",
-      status: setup.urls.stream.startsWith("wss://") ? "pass" : "fail",
+      status:
+        streamIsProductionSecure || !requireProductionCarrierReadiness
+          ? "pass"
+          : "fail",
     },
     {
       message: setup.urls.webhook
@@ -1480,15 +2091,15 @@ const createCarrierSmoke = <TProvider extends VoiceTelephonyProvider>(
       status: setup.urls.webhook ? "pass" : "fail",
     },
     {
-      message: setup.signing.configured
+      message: signingIsConfigured
         ? `Webhook signing is configured with ${setup.signing.mode}.`
         : "Webhook signing is not configured.",
       name: "signed-webhook",
-      status: setup.signing.configured ? "pass" : "fail",
+      status: signingIsConfigured ? "pass" : "fail",
     },
   ];
 
-  for (const missing of setup.missing) {
+  for (const missing of requireProductionCarrierReadiness ? setup.missing : []) {
     checks.push({
       message: `${missing} is missing.`,
       name: "missing-env",
@@ -1533,26 +2144,34 @@ const createCarrierSetup = <TProvider extends VoiceTelephonyProvider>(input: {
   const origin = resolveCarrierOrigin(input.request);
   const stream = resolveCarrierStreamUrl(input.request, input.streamPath);
   const webhook = joinUrlPath(origin, input.webhookPath);
+  const streamIsProductionSecure = stream.startsWith("wss://");
+  const signingConfigured =
+    input.signingConfigured || !requireProductionCarrierReadiness;
   const warnings = [
-    ...(stream.startsWith("wss://")
+    ...(streamIsProductionSecure || !requireProductionCarrierReadiness
       ? []
       : ["Carrier streams should use wss:// in production."]),
-    ...(input.signingConfigured
+    ...(signingConfigured
       ? []
       : ["Webhook signature verification is not configured."]),
   ];
+  const missing = requireProductionCarrierReadiness ? input.missing : [];
 
   return {
     generatedAt: Date.now(),
-    missing: input.missing,
+    missing,
     provider: input.provider,
     ready:
-      input.missing.length === 0 &&
-      input.signingConfigured &&
+      missing.length === 0 &&
+      signingConfigured &&
       warnings.length === 0,
     signing: {
-      configured: input.signingConfigured,
-      mode: input.signingConfigured ? input.signingMode : "none",
+      configured: signingConfigured,
+      mode: input.signingConfigured
+        ? input.signingMode
+        : requireProductionCarrierReadiness
+          ? "none"
+          : "custom",
       verificationUrl: webhook,
     },
     urls: {
@@ -1793,6 +2412,394 @@ const seedTurnLatencyProof = async () => {
   return { ok: true, sessionId, turnId };
 };
 
+const appendProofTrace = async (event: VoiceTraceEvent) => {
+  await runtimeStorage.traces.append(event);
+};
+
+type ProofCallDisposition = Exclude<
+  NonNullable<VoiceSessionRecord["call"]>["disposition"],
+  undefined
+>;
+
+const createProofSession = (input: {
+  assistantText: string;
+  disposition: ProofCallDisposition;
+  reason?: string;
+  scenarioId: string;
+  sessionId: string;
+  target?: string;
+  turns: readonly string[];
+}): VoiceSessionRecord => {
+  const startedAt = Date.now() - 3_000;
+  const turnRecords = input.turns.map((text, index) => {
+    const committedAt = startedAt + 600 + index * 500;
+    const transcript = {
+      confidence: 0.98,
+      endedAtMs: committedAt - 120,
+      id: `${input.sessionId}:transcript:${index}`,
+      isFinal: true,
+      startedAtMs: committedAt - 320,
+      text,
+      vendor: "absolutejs-proof",
+    };
+
+    return {
+      assistantText:
+        index === input.turns.length - 1 ? input.assistantText : "Captured.",
+      committedAt,
+      id: `${input.sessionId}:turn:${index}`,
+      text,
+      transcripts: [transcript],
+    };
+  });
+  const transcripts = turnRecords.flatMap((turn) => turn.transcripts);
+  const lifecycleType =
+    input.disposition === "transferred"
+      ? "transfer"
+      : input.disposition === "escalated"
+        ? "escalation"
+        : input.disposition === "voicemail"
+          ? "voicemail"
+          : input.disposition === "no-answer"
+            ? "no-answer"
+            : "end";
+  const endedAt = startedAt + 600 + input.turns.length * 500;
+
+  return {
+    call: {
+      disposition: input.disposition,
+      endedAt,
+      events: [
+        {
+          at: startedAt,
+          type: "start",
+        },
+        {
+          at: endedAt,
+          disposition: input.disposition,
+          reason: input.reason,
+          target: input.target,
+          type: lifecycleType,
+        },
+      ],
+      lastEventAt: endedAt,
+      startedAt,
+    },
+    committedTurnIds: turnRecords.map((turn) => turn.id),
+    createdAt: startedAt,
+    currentTurn: {
+      finalText: "",
+      partialText: "",
+      transcripts: [],
+    },
+    id: input.sessionId,
+    lastActivityAt: endedAt,
+    lastCommittedTurn: {
+      committedAt: turnRecords.at(-1)?.committedAt ?? endedAt,
+      signature: input.turns.at(-1) ?? "",
+      text: input.turns.at(-1) ?? "",
+      transcriptIds: [transcripts.at(-1)?.id ?? ""].filter(Boolean),
+    },
+    reconnect: {
+      attempts: 0,
+    },
+    scenarioId: input.scenarioId,
+    status: "completed",
+    transcripts,
+    turns: turnRecords,
+  };
+};
+
+const seedDemoOutcomeProof = async () => {
+  for (const sessionId of [
+    "proof-guided-completed",
+    "proof-general-completed",
+    "proof-transfer-billing",
+    "proof-escalated",
+    "proof-voicemail",
+    "proof-no-answer",
+  ]) {
+    const traces = await runtimeStorage.traces.list({ sessionId });
+    await Promise.all(traces.map((trace) => runtimeStorage.traces.remove(trace.id)));
+  }
+
+  const proofSessions: Array<{
+    assistantText: string;
+    disposition: ProofCallDisposition;
+    mode: "general" | "guided";
+    reason?: string;
+    scenarioId: string;
+    sessionId: string;
+    target?: string;
+    turns: readonly string[];
+  }> = [
+    {
+      assistantText: "Thanks Alex. Your voice test is saved.",
+      disposition: "completed",
+      mode: "guided",
+      scenarioId: "guided",
+      sessionId: "proof-guided-completed",
+      turns: [
+        "My name is Alex and I need help with the AbsoluteJS voice integration.",
+        "The integration issue is around provider routing and meeting recorder follow up.",
+        "Please follow up with the integration checklist and next steps.",
+      ],
+    },
+    {
+      assistantText: "Received.",
+      disposition: "completed",
+      mode: "general",
+      scenarioId: "general",
+      sessionId: "proof-general-completed",
+      turns: [
+        "General recording for a customer call with clear follow up notes.",
+      ],
+    },
+    {
+      assistantText: "Transferring this call to billing.",
+      disposition: "transferred",
+      mode: "guided",
+      reason: "caller-requested-transfer",
+      scenarioId: "transfer",
+      sessionId: "proof-transfer-billing",
+      target: "billing",
+      turns: ["Please transfer this billing issue to billing support."],
+    },
+    {
+      assistantText: "Escalating this call for human follow-up.",
+      disposition: "escalated",
+      mode: "guided",
+      reason: "caller-requested-escalation",
+      scenarioId: "outcome-escalated",
+      sessionId: "proof-escalated",
+      turns: ["I need a human supervisor to review this support issue."],
+    },
+    {
+      assistantText: "Marking this call as voicemail.",
+      disposition: "voicemail",
+      mode: "general",
+      scenarioId: "outcome-voicemail",
+      sessionId: "proof-voicemail",
+      turns: ["Please leave this as a voicemail for callback."],
+    },
+    {
+      assistantText: "Marking this call as no answer.",
+      disposition: "no-answer",
+      mode: "general",
+      scenarioId: "outcome-no-answer",
+      sessionId: "proof-no-answer",
+      turns: ["No answer from the caller, retry this later."],
+    },
+  ];
+
+  for (const proof of proofSessions) {
+    const session = createProofSession(proof);
+    const mode = proof.mode;
+    const result = buildSavedIntake(session, mode);
+    session.turns = session.turns.map((turn, index) =>
+      index === session.turns.length - 1 ? { ...turn, result } : turn,
+    );
+
+    await runtimeStorage.session.set(session.id, session);
+    await recordVoiceRuntimeOps({
+      api: {} as never,
+      config: {
+        buildReview: ({ result: runtimeResult, session: reviewSession }) =>
+          buildSavedVoiceReview({
+            phraseHints: VOICE_DEMO_PHRASE_HINTS,
+            result:
+              (runtimeResult as SavedIntake | undefined) ??
+              buildSavedIntake(reviewSession, mode),
+            session: reviewSession,
+          }),
+        events: runtimeStorage.events,
+        onEvent: async ({ event }) => {
+          await deliverIntegrationEvent(event as SavedVoiceIntegrationEvent);
+        },
+        reviews: runtimeStorage.reviews as unknown as VoiceCallReviewStore,
+        tasks: runtimeStorage.tasks as unknown as VoiceOpsTaskStore,
+      },
+      context: {},
+      disposition: proof.disposition,
+      reason: proof.reason,
+      session,
+      target: proof.target,
+    });
+
+    for (const turn of session.turns) {
+      const finalTranscript = turn.transcripts.find(
+        (transcript) => transcript.isFinal,
+      );
+      if (finalTranscript) {
+        await appendProofTrace({
+          at: (turn.committedAt ?? Date.now()) - 120,
+          payload: {
+            confidence: finalTranscript.confidence,
+            isFinal: true,
+            text: finalTranscript.text,
+            vendor: finalTranscript.vendor,
+          },
+          scenarioId: proof.scenarioId,
+          sessionId: session.id,
+          turnId: turn.id,
+          type: "turn.transcript",
+        });
+      }
+      await appendProofTrace({
+        at: turn.committedAt ?? Date.now(),
+        payload: {
+          text: turn.text,
+        },
+        scenarioId: proof.scenarioId,
+        sessionId: session.id,
+        turnId: turn.id,
+        type: "turn.committed",
+      });
+      if (turn.assistantText) {
+        await appendProofTrace({
+          at: (turn.committedAt ?? Date.now()) + 80,
+          payload: {
+            text: turn.assistantText,
+          },
+          scenarioId: proof.scenarioId,
+          sessionId: session.id,
+          turnId: turn.id,
+          type: "turn.assistant",
+        });
+      }
+    }
+
+    await appendProofTrace({
+      at: session.call?.endedAt ?? Date.now(),
+      payload: {
+        disposition: proof.disposition,
+        reason: proof.reason,
+        target: proof.target,
+        type:
+          proof.disposition === "transferred"
+            ? "transfer"
+            : proof.disposition === "escalated"
+              ? "escalation"
+              : proof.disposition === "voicemail"
+                ? "voicemail"
+                : proof.disposition === "no-answer"
+                  ? "no-answer"
+                  : "end",
+      },
+      scenarioId: proof.scenarioId,
+      sessionId: session.id,
+      type: "call.lifecycle",
+    });
+
+    const contractId =
+      proof.scenarioId === "transfer"
+        ? "transfer-handoff-delivered"
+        : proof.scenarioId === "general"
+          ? "general-recording-completes"
+          : proof.scenarioId === "guided"
+            ? "guided-demo-completes"
+            : undefined;
+    if (contractId) {
+      await appendProofTrace({
+        at: (session.call?.endedAt ?? Date.now()) + 20,
+        payload: {
+          contractId,
+          status: "pass",
+        },
+        scenarioId: proof.scenarioId,
+        sessionId: session.id,
+        type: "workflow.contract",
+      });
+    }
+  }
+
+  const transferSession = createProofSession({
+    assistantText: "Transferring this call to billing.",
+    disposition: "transferred",
+    reason: "caller-requested-transfer",
+    scenarioId: "transfer",
+    sessionId: "proof-transfer-billing",
+    target: "billing",
+    turns: ["Please transfer this billing issue to billing support."],
+  });
+  await handoffDeliveryStore.set("proof-transfer-billing:handoff", {
+    action: "transfer",
+    context: {},
+    createdAt: transferSession.call?.endedAt ?? Date.now(),
+    deliveredAt: transferSession.call?.endedAt ?? Date.now(),
+    deliveryAttempts: 1,
+    deliveryStatus: "delivered",
+    id: "proof-transfer-billing:handoff",
+    reason: "caller-requested-transfer",
+    session: transferSession,
+    sessionId: transferSession.id,
+    target: "billing",
+    updatedAt: transferSession.call?.endedAt ?? Date.now(),
+  });
+  await appendProofTrace({
+    at: transferSession.call?.endedAt ?? Date.now(),
+    payload: {
+      action: "transfer",
+      deliveries: {
+        "proof-transfer-adapter": {
+          adapterId: "proof-transfer-adapter",
+          deliveredAt: transferSession.call?.endedAt ?? Date.now(),
+          deliveredTo: "billing",
+          status: "delivered",
+        },
+      },
+      status: "delivered",
+      target: "billing",
+    },
+    scenarioId: "transfer",
+    sessionId: transferSession.id,
+    type: "call.handoff",
+  });
+
+  return {
+    ok: true,
+    sessions: proofSessions.length,
+  };
+};
+
+const cleanupDemoQualityNoise = async () => {
+  const traces = await runtimeStorage.traces.list();
+  const staleSyntheticProviderErrors = traces.filter(
+    (trace) =>
+      trace.type === "session.error" &&
+      trace.payload.providerStatus === "error" &&
+      /^(phone-|provider-sim-|stt-sim-|tts-sim-)/.test(trace.sessionId),
+  );
+
+  await Promise.all(
+    staleSyntheticProviderErrors.map((trace) =>
+      runtimeStorage.traces.remove(trace.id),
+    ),
+  );
+
+  const existingRoutingProof = traces.filter(
+    (trace) => trace.sessionId === "quality-routing-proof",
+  );
+  await Promise.all(
+    existingRoutingProof.map((trace) => runtimeStorage.traces.remove(trace.id)),
+  );
+
+  await runtimeStorage.traces.append({
+    at: Date.now(),
+    payload: {
+      elapsedMs: 35,
+      kind: "llm",
+      provider: modelProvider,
+      providerStatus: "success",
+      selectedProvider: modelProvider,
+      status: "success",
+    },
+    scenarioId: "quality-routing-proof",
+    sessionId: "quality-routing-proof",
+    type: "session.error",
+  });
+};
+
 const toNumber = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value) ? value : undefined;
 
@@ -1882,6 +2889,173 @@ const sttProviderFailureSimulator =
     },
     sessionId: ({ now }) => `stt-sim-${now}`,
   });
+const runDemoSTTProviderRoutingContract = async () => {
+  const events: StoredVoiceTraceEvent[] = [];
+  const requestedProvider: VoiceSTTProvider = configuredSTTProviders.includes(
+    "deepgram",
+  )
+    ? "deepgram"
+    : configuredSTTProviders[0] ?? "deepgram";
+  const fallbackProvider = configuredSTTProviders.find(
+    (provider) => provider !== requestedProvider,
+  );
+  const simulator = createVoiceIOProviderFailureSimulator<VoiceSTTProvider>({
+    failureElapsedMs: 12,
+    failureMessage: ({ provider }) =>
+      `Simulated ${provider} websocket open failure.`,
+    fallback: (provider) =>
+      configuredSTTProviders.filter((candidate) => candidate !== provider),
+    kind: "stt",
+    latencyBudgets: sttLatencyBudgets,
+    onProviderEvent: async (event, input) => {
+      events.push({
+        at: event.at,
+        id: `${input.sessionId}:${event.provider}:${event.status}:${event.at}`,
+        payload: {
+          ...event,
+          providerStatus: event.status,
+        },
+        scenarioId: "stt-provider-routing-contract",
+        sessionId: input.sessionId,
+        type: "session.error",
+      });
+    },
+    providers: configuredSTTProviders,
+    recoveryElapsedMs: {
+      assemblyai: 28,
+      deepgram: 18,
+    },
+    sessionId: ({ now }) => `stt-contract-${now}`,
+  });
+
+  await simulator.run(
+    requestedProvider,
+    fallbackProvider ? "failure" : "recovery",
+  );
+
+  return runVoiceProviderRoutingContract({
+    contract: {
+      expect: fallbackProvider
+        ? [
+            {
+              fallbackProvider,
+              kind: "stt",
+              operation: "open",
+              provider: requestedProvider,
+              selectedProvider: requestedProvider,
+              status: "error",
+            },
+            {
+              fallbackProvider,
+              kind: "stt",
+              operation: "open",
+              provider: fallbackProvider,
+              selectedProvider: requestedProvider,
+              status: "fallback",
+            },
+          ]
+        : [
+            {
+              kind: "stt",
+              operation: "open",
+              provider: requestedProvider,
+              selectedProvider: requestedProvider,
+              status: "success",
+            },
+          ],
+      id: fallbackProvider
+        ? `${requestedProvider}-to-${fallbackProvider}-stt-fallback`
+        : `${requestedProvider}-stt-success`,
+      label: "Demo STT provider fallback",
+      scenarioId: "stt-provider-routing-contract",
+    },
+    events,
+  });
+};
+
+const runDemoTTSProviderRoutingContract = async () => {
+  const events: StoredVoiceTraceEvent[] = [];
+  const requestedProvider: VoiceTTSProvider = configuredTTSProviders.includes(
+    "openai",
+  )
+    ? "openai"
+    : configuredTTSProviders[0] ?? "emergency";
+  const fallbackProvider = configuredTTSProviders.find(
+    (provider) => provider !== requestedProvider,
+  );
+  const simulator = createVoiceIOProviderFailureSimulator<VoiceTTSProvider>({
+    failureElapsedMs: 18,
+    failureMessage: ({ provider }) =>
+      `Simulated ${provider} speech synthesis open failure.`,
+    fallback: (provider) =>
+      configuredTTSProviders.filter((candidate) => candidate !== provider),
+    kind: "tts",
+    latencyBudgets: ttsLatencyBudgets,
+    onProviderEvent: async (event, input) => {
+      events.push({
+        at: event.at,
+        id: `${input.sessionId}:${event.provider}:${event.status}:${event.at}`,
+        payload: {
+          ...event,
+          providerStatus: event.status,
+        },
+        scenarioId: "tts-provider-routing-contract",
+        sessionId: input.sessionId,
+        type: "session.error",
+      });
+    },
+    providers: configuredTTSProviders,
+    recoveryElapsedMs: {
+      emergency: 8,
+      openai: 45,
+    },
+    sessionId: ({ now }) => `tts-contract-${now}`,
+  });
+
+  await simulator.run(
+    requestedProvider,
+    fallbackProvider ? "failure" : "recovery",
+  );
+
+  return runVoiceProviderRoutingContract({
+    contract: {
+      expect: fallbackProvider
+        ? [
+            {
+              fallbackProvider,
+              kind: "tts",
+              operation: "open",
+              provider: requestedProvider,
+              selectedProvider: requestedProvider,
+              status: "error",
+            },
+            {
+              fallbackProvider,
+              kind: "tts",
+              operation: "open",
+              provider: fallbackProvider,
+              selectedProvider: requestedProvider,
+              status: "fallback",
+            },
+          ]
+        : [
+            {
+              kind: "tts",
+              operation: "open",
+              provider: requestedProvider,
+              selectedProvider: requestedProvider,
+              status: "success",
+            },
+          ],
+      id: fallbackProvider
+        ? `${requestedProvider}-to-${fallbackProvider}-tts-fallback`
+        : `${requestedProvider}-tts-success`,
+      label: "Demo TTS provider fallback",
+      scenarioId: "tts-provider-routing-contract",
+    },
+    events,
+  });
+};
 
 const listAssistantMemory = async (): Promise<VoiceAssistantMemoryRecord[]> =>
   memoryStore.list({
@@ -2094,6 +3268,9 @@ const createTelephonyBridgeConfig = () => ({
   tts: telephonyTTS,
 });
 
+await cleanupDemoQualityNoise();
+await seedDemoOutcomeProof();
+
 const server = new Elysia()
   .use(absolutejs)
   .use(pagesPlugin(manifest))
@@ -2193,14 +3370,22 @@ const server = new Elysia()
       },
       providerHealth: {},
       productionReadiness: {
+        agentSquadContracts: async () => [await runDemoAgentSquadContract()],
         carriers: loadCarrierMatrixInputs,
         links: {
+          agentSquadContracts: "/agent-squad-contract",
           carriers: "/carriers",
           handoffs: "/handoffs",
+          providerRoutingContracts: "/api/provider-routing-contract",
           quality: "/quality",
           resilience: "/resilience",
           sessions: "/sessions",
         },
+        providerRoutingContracts: async () => [
+          await runDemoProviderRoutingContract(),
+          await runDemoSTTProviderRoutingContract(),
+          await runDemoTTSProviderRoutingContract(),
+        ],
       },
       resilience: {
         sttSimulation: {
@@ -2221,6 +3406,9 @@ const server = new Elysia()
       store: runtimeStorage.traces,
       sttProviders: configuredSTTProviders,
       title: "AbsoluteJS Voice Demo Ops Console",
+      traceTimeline: {
+        store: traceTimelineStore,
+      },
     }).routes,
   )
   .use(
@@ -2259,6 +3447,18 @@ const server = new Elysia()
       title: "AbsoluteJS Voice Demo Simulation Suite",
     }),
   )
+  .get("/api/agent-squad-contract", () => runDemoAgentSquadContract())
+  .get("/api/provider-routing-contract", () => runDemoProviderRoutingContract())
+  .get("/api/stt-provider-routing-contract", () =>
+    runDemoSTTProviderRoutingContract(),
+  )
+  .get("/api/tts-provider-routing-contract", () =>
+    runDemoTTSProviderRoutingContract(),
+  )
+  .get("/agent-squad-contract", async ({ set }) => {
+    set.headers["content-type"] = "text/html; charset=utf-8";
+    return renderAgentSquadContractHTML();
+  })
   .post("/api/turn-latency/proof", () => seedTurnLatencyProof())
   .post("/api/live-turn-latency", ({ body }) => storeLiveTurnLatencyTrace(body))
   .use(
@@ -2305,6 +3505,10 @@ const server = new Elysia()
         path: "/api/carriers",
         title: "AbsoluteJS Voice Demo Carrier Matrix",
       },
+      setup: {
+        path: "/api/voice/phone/setup",
+        title: "AbsoluteJS Voice Demo Phone Agent",
+      },
       carriers: [
         {
           provider: "telnyx",
@@ -2314,10 +3518,10 @@ const server = new Elysia()
             outcomePolicy: telephonyOutcomePolicy,
             setup: {
               path: "/api/telnyx/setup",
-              requiredEnv: {
+              requiredEnv: productionOnlyEnv({
                 TELNYX_PUBLIC_KEY: telnyxPublicKey,
                 VOICE_DEMO_PUBLIC_BASE_URL: publicBaseUrl,
-              },
+              }),
               title: "AbsoluteJS Voice Demo Telnyx Setup",
             },
             smoke: {
@@ -2332,24 +3536,18 @@ const server = new Elysia()
                 streamName: "absolutejs-voice-demo",
                 track: "inbound_track",
               },
+              streamUrl: resolvePhoneAgentStreamUrl,
             },
             webhook: {
               idempotency: {
                 store: telephonyWebhookIdempotencyStore,
               },
               onDecision: async (input) => {
-                const { decision } = input;
-                const campaignOutcome =
-                  await recordCampaignTelephonyOutcome(input);
-                console.info("telnyx telephony outcome webhook", {
-                  action: decision.action,
-                  campaignOutcome,
-                  disposition: decision.disposition,
-                  source: decision.source,
-                });
+                await recordTelephonyWebhookDecision("telnyx", input);
               },
               path: "/api/telnyx/webhook",
               publicKey: telnyxPublicKey,
+              verify: localCarrierWebhookVerification,
             },
           },
         },
@@ -2361,10 +3559,10 @@ const server = new Elysia()
             outcomePolicy: telephonyOutcomePolicy,
             setup: {
               path: "/api/plivo/setup",
-              requiredEnv: {
+              requiredEnv: productionOnlyEnv({
                 PLIVO_AUTH_TOKEN: plivoAuthToken,
                 VOICE_DEMO_PUBLIC_BASE_URL: publicBaseUrl,
-              },
+              }),
               title: "AbsoluteJS Voice Demo Plivo Setup",
             },
             smoke: {
@@ -2380,6 +3578,7 @@ const server = new Elysia()
                 contentType: "audio/x-mulaw;rate=8000",
                 keepCallAlive: true,
               },
+              streamUrl: resolvePhoneAgentStreamUrl,
             },
             webhook: {
               authToken: plivoAuthToken,
@@ -2387,20 +3586,13 @@ const server = new Elysia()
                 store: telephonyWebhookIdempotencyStore,
               },
               onDecision: async (input) => {
-                const { decision } = input;
-                const campaignOutcome =
-                  await recordCampaignTelephonyOutcome(input);
-                console.info("plivo telephony outcome webhook", {
-                  action: decision.action,
-                  campaignOutcome,
-                  disposition: decision.disposition,
-                  source: decision.source,
-                });
+                await recordTelephonyWebhookDecision("plivo", input);
               },
               path: "/api/plivo/webhook",
               verificationUrl: publicBaseUrl
                 ? `${publicBaseUrl.replace(/\/$/, "")}/api/plivo/webhook`
                 : undefined,
+              verify: localCarrierWebhookVerification,
             },
           },
         },
@@ -2412,11 +3604,11 @@ const server = new Elysia()
             outcomePolicy: telephonyOutcomePolicy,
             setup: {
               path: "/api/twilio/setup",
-              requiredEnv: {
+              requiredEnv: productionOnlyEnv({
                 VOICE_DEMO_PUBLIC_BASE_URL: publicBaseUrl,
                 VOICE_DEMO_TELEPHONY_WEBHOOK_SECRET:
                   telephonyWebhookSigningSecret,
-              },
+              }),
               title: "AbsoluteJS Voice Demo Twilio Setup",
             },
             smoke: {
@@ -2437,27 +3629,21 @@ const server = new Elysia()
               }),
               path: "/api/twilio/voice",
               streamName: "absolutejs-voice-demo",
+              streamUrl: resolvePhoneAgentStreamUrl,
             },
             webhook: {
               idempotency: {
                 store: telephonyWebhookIdempotencyStore,
               },
               onDecision: async (input) => {
-                const { decision } = input;
-                const campaignOutcome =
-                  await recordCampaignTelephonyOutcome(input);
-                console.info("telephony outcome webhook", {
-                  action: decision.action,
-                  campaignOutcome,
-                  disposition: decision.disposition,
-                  source: decision.source,
-                });
+                await recordTelephonyWebhookDecision("twilio", input);
               },
               path: "/api/telephony-webhook",
               signingSecret: telephonyWebhookSigningSecret,
-              verificationUrl: publicBaseUrl
-                ? `${publicBaseUrl.replace(/\/$/, "")}/api/telephony-webhook`
-                : undefined,
+              verificationUrl: resolveTelephonyWebhookVerificationUrl(
+                "/api/telephony-webhook",
+              ),
+              verify: localCarrierWebhookVerification,
             },
           },
         },
@@ -2511,11 +3697,33 @@ const server = new Elysia()
     policy: telephonyOutcomePolicy,
     previews: listTelephonyOutcomePreviews(),
   }))
+  .get("/api/telephony-webhook-decisions", () => ({
+    decisions: telephonyWebhookDecisionSnapshots,
+    generatedAt: Date.now(),
+    total: telephonyWebhookDecisionSnapshots.length,
+  }))
+  .get("/phone-agent", ({ redirect }) =>
+    redirect("/api/voice/phone/setup?format=html"),
+  )
   .get("/carriers", ({ redirect }) => redirect("/api/carriers?format=html"))
   .get(
     "/telephony-outcomes",
     () =>
       new Response(renderTelephonyOutcomePreviewHTML(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+  )
+  .get(
+    "/telephony-webhook-decisions",
+    () =>
+      new Response(renderTelephonyWebhookDecisionsHTML(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+  )
+  .get(
+    "/demo-checklist",
+    () =>
+      new Response(renderDemoChecklistHTML(), {
         headers: { "content-type": "text/html; charset=utf-8" },
       }),
   )

@@ -1,6 +1,7 @@
 export {};
 
 type EndpointName =
+  | "agentSquadContract"
   | "appKit"
   | "bargeIn"
   | "campaignProof"
@@ -8,9 +9,14 @@ type EndpointName =
   | "carriers"
   | "handoffs"
   | "liveLatency"
+  | "phoneAgent"
   | "productionReadiness"
   | "providerCapabilities"
+  | "providerRoutingContract"
   | "simulationSuite"
+  | "sttProviderRoutingContract"
+  | "telephonyWebhookDecisions"
+  | "ttsProviderRoutingContract"
   | "turnLatency"
   | "voiceTraces";
 
@@ -43,9 +49,11 @@ const endpoints: Array<{
       const report = body as {
         status?: unknown;
         summary?: {
+          agentSquadContracts?: unknown;
           carriers?: unknown;
           handoffs?: unknown;
           liveLatency?: unknown;
+          providerRoutingContracts?: unknown;
           providers?: unknown;
           quality?: unknown;
           routing?: unknown;
@@ -53,9 +61,11 @@ const endpoints: Array<{
         };
       };
       return {
+        agentSquadContracts: report.summary?.agentSquadContracts,
         carriers: report.summary?.carriers,
         handoffs: report.summary?.handoffs,
         liveLatency: report.summary?.liveLatency,
+        providerRoutingContracts: report.summary?.providerRoutingContracts,
         providers: report.summary?.providers,
         quality: report.summary?.quality,
         readinessStatus: report.status,
@@ -79,6 +89,119 @@ const endpoints: Array<{
     },
   },
   {
+    name: "phoneAgent",
+    path: "/api/voice/phone/setup",
+    summarize: (body) => {
+      const report = body as {
+        lifecycleStages?: unknown[];
+        matrix?: {
+          pass?: unknown;
+          summary?: unknown;
+        };
+        ready?: unknown;
+      };
+      return {
+        lifecycleStages: Array.isArray(report.lifecycleStages)
+          ? report.lifecycleStages.length
+          : undefined,
+        phoneAgentReady: report.ready,
+        phoneAgentMatrixPass: report.matrix?.pass,
+        phoneAgentMatrixSummary: report.matrix?.summary,
+      };
+    },
+  },
+  {
+    name: "agentSquadContract",
+    path: "/api/agent-squad-contract",
+    summarize: (body) => {
+      const report = body as {
+        issues?: unknown[];
+        pass?: unknown;
+        turns?: Array<{
+          agentId?: unknown;
+          handoffs?: unknown[];
+          outcome?: unknown;
+          pass?: unknown;
+        }>;
+      };
+      const firstTurn = report.turns?.[0];
+      const handoffs = report.turns?.flatMap((turn) =>
+        Array.isArray(turn.handoffs) ? turn.handoffs : [],
+      );
+      return {
+        agentSquadContractPass: report.pass,
+        blockedHandoffs: handoffs?.filter(
+          (handoff) =>
+            handoff &&
+            typeof handoff === "object" &&
+            "status" in handoff &&
+            handoff.status === "blocked",
+        ).length,
+        finalAgentId: firstTurn?.agentId,
+        firstTurnHandoffs: Array.isArray(firstTurn?.handoffs)
+          ? firstTurn.handoffs.length
+          : undefined,
+        firstTurnOutcome: firstTurn?.outcome,
+        issueCount: Array.isArray(report.issues) ? report.issues.length : 0,
+        turnCount: Array.isArray(report.turns) ? report.turns.length : 0,
+      };
+    },
+  },
+  {
+    name: "providerRoutingContract",
+    path: "/api/provider-routing-contract",
+    summarize: (body) => {
+      const report = body as {
+        contractId?: unknown;
+        events?: unknown[];
+        issues?: unknown[];
+        pass?: unknown;
+      };
+      return {
+        contractId: report.contractId,
+        eventCount: Array.isArray(report.events) ? report.events.length : 0,
+        issueCount: Array.isArray(report.issues) ? report.issues.length : 0,
+        providerRoutingContractPass: report.pass,
+      };
+    },
+  },
+  {
+    name: "sttProviderRoutingContract",
+    path: "/api/stt-provider-routing-contract",
+    summarize: (body) => {
+      const report = body as {
+        contractId?: unknown;
+        events?: unknown[];
+        issues?: unknown[];
+        pass?: unknown;
+      };
+      return {
+        contractId: report.contractId,
+        eventCount: Array.isArray(report.events) ? report.events.length : 0,
+        issueCount: Array.isArray(report.issues) ? report.issues.length : 0,
+        sttProviderRoutingContractPass: report.pass,
+      };
+    },
+  },
+  {
+    name: "ttsProviderRoutingContract",
+    path: "/api/tts-provider-routing-contract",
+    summarize: (body) => {
+      const report = body as {
+        contractId?: unknown;
+        events?: unknown[];
+        issues?: unknown[];
+        pass?: unknown;
+      };
+      return {
+        contractId: report.contractId,
+        eventCount: Array.isArray(report.events) ? report.events.length : 0,
+        issueCount: Array.isArray(report.issues) ? report.issues.length : 0,
+        ttsProviderRoutingContractPass: report.pass,
+      };
+    },
+  },
+  {
     name: "campaigns",
     path: "/api/voice/campaigns",
     summarize: (body) => {
@@ -96,6 +219,35 @@ const endpoints: Array<{
           ? report.campaigns.length
           : report.summary?.campaigns?.total,
         recipients: report.summary?.recipients?.total,
+      };
+    },
+  },
+  {
+    name: "telephonyWebhookDecisions",
+    path: "/api/telephony-webhook-decisions",
+    summarize: (body) => {
+      const report = body as {
+        decisions?: Array<{
+          action?: unknown;
+          provider?: unknown;
+        }>;
+        total?: unknown;
+      };
+      const actions = new Set<string>();
+      const providers = new Set<string>();
+      for (const decision of report.decisions ?? []) {
+        if (typeof decision.action === "string") {
+          actions.add(decision.action);
+        }
+        if (typeof decision.provider === "string") {
+          providers.add(decision.provider);
+        }
+      }
+
+      return {
+        actions: [...actions].sort(),
+        providers: [...providers].sort(),
+        total: report.total,
       };
     },
   },
