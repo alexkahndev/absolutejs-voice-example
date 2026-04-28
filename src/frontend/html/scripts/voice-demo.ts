@@ -1,5 +1,6 @@
 import {
   createVoiceStream,
+  createVoiceCampaignDialerProofStore,
   mountVoiceOpsStatus,
   mountVoiceProviderCapabilities,
   mountVoiceProviderSimulationControls,
@@ -87,6 +88,9 @@ const providerCapabilitiesHost = document.querySelector(
   "#provider-capabilities-card",
 );
 const providerStatusHost = document.querySelector("#provider-status-card");
+const campaignDialerProofHost = document.querySelector(
+  "#campaign-dialer-proof-card",
+);
 const providerSimulationHost = document.querySelector(
   "#provider-simulation-card",
 );
@@ -122,6 +126,7 @@ if (
   !(workflowStatusHost instanceof HTMLElement) ||
   !(providerCapabilitiesHost instanceof HTMLElement) ||
   !(providerStatusHost instanceof HTMLElement) ||
+  !(campaignDialerProofHost instanceof HTMLElement) ||
   !(providerSimulationHost instanceof HTMLElement) ||
   !(routingModeCopy instanceof HTMLElement) ||
   !(routingDecisionRoot instanceof HTMLElement) ||
@@ -175,6 +180,9 @@ const providerSimulation = mountVoiceProviderSimulationControls(
     providers: [{ provider: "deepgram" }, { provider: "assemblyai" }],
   },
 );
+const campaignDialerProof = createVoiceCampaignDialerProofStore(
+  "/api/voice/campaigns/dialer-proof",
+);
 const routingStatus = mountVoiceRoutingStatus(
   routingDecisionRoot,
   "/api/routing/latest",
@@ -185,6 +193,44 @@ const routingStatus = mountVoiceRoutingStatus(
 const turnQuality = mountVoiceTurnQuality(turnQualityHost, "/api/turn-quality", {
   intervalMs: 5_000,
 });
+const renderCampaignDialerProof = () => {
+  const snapshot = campaignDialerProof.getSnapshot();
+  const providers =
+    snapshot.report?.providers.map((provider) => ({
+      label: provider.provider,
+      passed: provider.outcomes.every((outcome) => outcome.applied),
+      requests: provider.carrierRequests.length,
+    })) ?? [];
+  campaignDialerProofHost.innerHTML = `<span class="voice-framework-pill">Campaign Dialer Proof</span>
+    <h2>Carrier dialer dry-run</h2>
+    <p class="voice-footnote">Twilio, Telnyx, and Plivo campaign dials run through the shared browser store, attach campaign metadata, and resolve synthetic webhook outcomes.</p>
+    <button class="absolute-voice-turn-latency__proof" type="button" ${snapshot.isLoading ? "disabled" : ""} id="campaign-dialer-proof-run">${snapshot.isLoading ? "Running proof" : "Run campaign dialer proof"}</button>
+    ${
+      providers.length
+        ? `<div class="voice-provider-health-list">${providers
+            .map(
+              (provider) => `<div class="voice-provider-health-item">
+        <strong>${escapeHtml(provider.label)}</strong>
+        <span>${provider.passed ? "passed" : "needs attention"}</span>
+        <small>${provider.requests} dry-run carrier request${provider.requests === 1 ? "" : "s"}</small>
+      </div>`,
+            )
+            .join("")}</div>`
+        : `<p class="empty-copy">Ready for ${escapeHtml((snapshot.status?.providers ?? ["twilio", "telnyx", "plivo"]).join(", "))}.</p>`
+    }
+    ${snapshot.error ? `<p class="voice-footnote">${escapeHtml(snapshot.error)}</p>` : ""}
+    <p class="voice-footnote"><a href="/voice/campaigns/dialer-proof">Open full proof</a></p>`;
+  campaignDialerProofHost
+    .querySelector("#campaign-dialer-proof-run")
+    ?.addEventListener("click", () => {
+      void campaignDialerProof.runProof().catch(() => {});
+    });
+};
+const unsubscribeCampaignDialerProof = campaignDialerProof.subscribe(
+  renderCampaignDialerProof,
+);
+renderCampaignDialerProof();
+void campaignDialerProof.refresh().catch(() => {});
 const bargeInProof = mountDemoBargeInProof(bargeInProofHost);
 let activeMode: VoiceDemoMode | null = null;
 let hasStartedModes: Record<VoiceDemoMode, boolean> = {
@@ -462,6 +508,8 @@ void renderSavedIntakes();
 window.addEventListener("beforeunload", () => {
   opsStatus.close();
   providerCapabilities.close();
+  campaignDialerProof.close();
+  unsubscribeCampaignDialerProof();
   providerSimulation.close();
   providerStatus.close();
   routingStatus.close();

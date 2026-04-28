@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { VoiceTurnRecord } from "@absolutejs/voice";
 import {
   useVoiceStream,
+  useVoiceCampaignDialerProof,
   VoiceOpsStatus,
   VoiceProviderCapabilities,
   VoiceProviderSimulationControls,
@@ -118,6 +119,9 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
     ) ??
     EMPTY_VOICE;
   voicesRef.current = { general: generalVoice, guided: guidedVoice };
+  const campaignDialerProof = useVoiceCampaignDialerProof(
+    "/api/voice/campaigns/dialer-proof",
+  );
   const [activeMode, setActiveMode] = useState<VoiceDemoMode | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [hasStartedModes, setHasStartedModes] = useState<
@@ -443,6 +447,62 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
               proofLabel="Run latency proof"
               proofPath="/api/turn-latency/proof"
             />
+
+            <article className="voice-card voice-provider-health-card">
+              <span className="voice-framework-pill">Campaign Dialer Proof</span>
+              <h2>Carrier dialer dry-run</h2>
+              <p className="voice-footnote">
+                Twilio, Telnyx, and Plivo campaign dials run through the shared
+                React hook, attach campaign metadata, and resolve synthetic
+                webhook outcomes.
+              </p>
+              <button
+                className="absolute-voice-turn-latency__proof"
+                disabled={campaignDialerProof.isLoading}
+                onClick={() => {
+                  void campaignDialerProof.runProof().catch(() => {});
+                }}
+                type="button"
+              >
+                {campaignDialerProof.isLoading
+                  ? "Running proof"
+                  : "Run campaign dialer proof"}
+              </button>
+              <div className="voice-provider-health-list">
+                {(campaignDialerProof.report?.providers ?? []).map((provider) => (
+                  <div
+                    className="voice-provider-health-item"
+                    key={provider.provider}
+                  >
+                    <strong>{provider.provider}</strong>
+                    <span>
+                      {provider.outcomes.every((outcome) => outcome.applied)
+                        ? "passed"
+                        : "needs attention"}
+                    </span>
+                    <small>
+                      {provider.carrierRequests.length} dry-run carrier request
+                      {provider.carrierRequests.length === 1 ? "" : "s"}
+                    </small>
+                  </div>
+                ))}
+              </div>
+              {campaignDialerProof.error ? (
+                <p className="voice-footnote">{campaignDialerProof.error}</p>
+              ) : null}
+              {!campaignDialerProof.report ? (
+                <p className="empty-copy">
+                  Ready for {(campaignDialerProof.status?.providers ?? [
+                    "twilio",
+                    "telnyx",
+                    "plivo",
+                  ]).join(", ")}.
+                </p>
+              ) : null}
+              <p className="voice-footnote">
+                <a href="/voice/campaigns/dialer-proof">Open full proof</a>
+              </p>
+            </article>
 
             <VoiceOpsStatus
               className="voice-card voice-workflow-card"

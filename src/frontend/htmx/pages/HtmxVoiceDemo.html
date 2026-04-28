@@ -170,6 +170,28 @@
           proof-path="/api/turn-latency/proof"
         ></absolute-voice-turn-latency>
 
+        <article class="voice-card voice-provider-health-card">
+          <span class="voice-framework-pill">Campaign Dialer Proof</span>
+          <h2>Carrier dialer dry-run</h2>
+          <p class="voice-footnote">
+            HTMX can trigger the same self-hosted proof endpoint without a
+            framework runtime.
+          </p>
+          <button
+            class="absolute-voice-turn-latency__proof"
+            type="button"
+            onclick="runCampaignDialerProof(this)"
+          >
+            Run campaign dialer proof
+          </button>
+          <p class="empty-copy" id="campaign-dialer-proof-result">
+            Ready for Twilio, Telnyx, and Plivo.
+          </p>
+          <p class="voice-footnote">
+            <a href="/voice/campaigns/dialer-proof">Open full proof</a>
+          </p>
+        </article>
+
         <absolute-voice-ops-status
           class="voice-card voice-workflow-card"
           interval-ms="5000"
@@ -416,6 +438,31 @@
         if (routingModeCopy) {
           routingModeCopy.textContent = routingCopy[routing] ?? "";
         }
+        window.runCampaignDialerProof = async (button) => {
+          const result = document.querySelector("#campaign-dialer-proof-result");
+          button.disabled = true;
+          if (result) {
+            result.textContent = "Running campaign dialer proof...";
+          }
+          try {
+            const response = await fetch("/api/voice/campaigns/dialer-proof", {
+              method: "POST",
+            });
+            const payload = await response.json();
+            if (result) {
+              result.textContent = payload.ok
+                ? `Passed for ${payload.providers.map((item) => item.provider).join(", ")}.`
+                : "Campaign dialer proof needs attention.";
+            }
+          } catch (error) {
+            if (result) {
+              result.textContent =
+                error instanceof Error ? error.message : String(error);
+            }
+          } finally {
+            button.disabled = false;
+          }
+        };
       })();
     </script>
     <script src="../../html/scripts/voice-ops-status.ts" type="module"></script>

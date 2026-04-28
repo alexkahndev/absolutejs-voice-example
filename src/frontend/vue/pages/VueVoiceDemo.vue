@@ -66,6 +66,71 @@ const generalVoice = useVoiceStream<SavedIntake>(
 const traceTimeline = useVoiceTraceTimeline("/api/voice-traces", {
   intervalMs: 5_000,
 });
+type CampaignDialerProofSnapshot = {
+  error: string | null;
+  isLoading: boolean;
+  report?: {
+    providers: Array<{
+      carrierRequests: unknown[];
+      outcomes: Array<{ applied: boolean }>;
+      provider: string;
+    }>;
+  };
+  status?: {
+    providers: string[];
+  };
+};
+const campaignDialerProof = ref<CampaignDialerProofSnapshot>({
+  error: null,
+  isLoading: false,
+});
+const campaignDialerProofReadyProviders = computed(() =>
+  (
+    campaignDialerProof.value.status?.providers ?? [
+      "twilio",
+      "telnyx",
+      "plivo",
+    ]
+  ).join(", "),
+);
+const refreshCampaignDialerProof = async () => {
+  const response = await fetch("/api/voice/campaigns/dialer-proof");
+  if (!response.ok) {
+    throw new Error(`Campaign dialer proof status failed: ${response.status}`);
+  }
+  campaignDialerProof.value = {
+    ...campaignDialerProof.value,
+    error: null,
+    status: await response.json(),
+  };
+};
+const runCampaignDialerProof = async () => {
+  campaignDialerProof.value = {
+    ...campaignDialerProof.value,
+    error: null,
+    isLoading: true,
+  };
+  try {
+    const response = await fetch("/api/voice/campaigns/dialer-proof", {
+      method: "POST",
+    });
+    if (!response.ok) {
+      throw new Error(`Campaign dialer proof failed: ${response.status}`);
+    }
+    campaignDialerProof.value = {
+      ...campaignDialerProof.value,
+      error: null,
+      isLoading: false,
+      report: await response.json(),
+    };
+  } catch (error) {
+    campaignDialerProof.value = {
+      ...campaignDialerProof.value,
+      error: formatErrorMessage(error),
+      isLoading: false,
+    };
+  }
+};
 const activeMode = ref<VoiceDemoMode | null>(null);
 const isCapturing = ref(false);
 const hasStartedModes = ref<Record<VoiceDemoMode, boolean>>({
@@ -242,6 +307,12 @@ onMounted(() => {
     bargeInProof = mountDemoBargeInProof(bargeInProofEl.value);
   }
   void refreshIntakes();
+  void refreshCampaignDialerProof().catch((error) => {
+    campaignDialerProof.value = {
+      ...campaignDialerProof.value,
+      error: formatErrorMessage(error),
+    };
+  });
   refreshTimer = setInterval(() => {
     void refreshIntakes();
   }, 4_000);
@@ -412,6 +483,59 @@ onUnmounted(() => {
           proof-label="Run latency proof"
           proof-path="/api/turn-latency/proof"
         />
+
+        <article class="voice-card voice-provider-health-card">
+          <span class="voice-framework-pill">Campaign Dialer Proof</span>
+          <h2>Carrier dialer dry-run</h2>
+          <p class="voice-footnote">
+            Twilio, Telnyx, and Plivo campaign dials run through the shared Vue
+            composable, attach campaign metadata, and resolve synthetic webhook
+            outcomes.
+          </p>
+          <button
+            class="absolute-voice-turn-latency__proof"
+            type="button"
+            :disabled="campaignDialerProof.isLoading"
+            @click="runCampaignDialerProof"
+          >
+            {{
+              campaignDialerProof.isLoading
+                ? "Running proof"
+                : "Run campaign dialer proof"
+            }}
+          </button>
+          <div
+            v-if="campaignDialerProof.report?.providers?.length"
+            class="voice-provider-health-list"
+          >
+            <div
+              v-for="provider in campaignDialerProof.report.providers"
+              :key="provider.provider"
+              class="voice-provider-health-item"
+            >
+              <strong>{{ provider.provider }}</strong>
+              <span>{{
+                provider.outcomes.every((outcome) => outcome.applied)
+                  ? "passed"
+                  : "needs attention"
+              }}</span>
+              <small>
+                {{ provider.carrierRequests.length }} dry-run carrier request{{
+                  provider.carrierRequests.length === 1 ? "" : "s"
+                }}
+              </small>
+            </div>
+          </div>
+          <p v-else class="empty-copy">
+            Ready for {{ campaignDialerProofReadyProviders }}.
+          </p>
+          <p v-if="campaignDialerProof.error" class="voice-footnote">
+            {{ campaignDialerProof.error }}
+          </p>
+          <p class="voice-footnote">
+            <a href="/voice/campaigns/dialer-proof">Open full proof</a>
+          </p>
+        </article>
 
         <VoiceOpsStatus
           class="voice-card voice-workflow-card"
