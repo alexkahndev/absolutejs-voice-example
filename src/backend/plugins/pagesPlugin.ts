@@ -6,12 +6,15 @@ import {
   generateHeadElement,
   handleHTMLPageRequest,
   handleHTMXPageRequest,
-  handleReactPageRequest,
 } from "@absolutejs/absolute";
 import { handleAngularPageRequest } from "@absolutejs/absolute/angular";
+import { handleReactPageRequest } from "@absolutejs/absolute/react";
 import { handleSveltePageRequest } from "@absolutejs/absolute/svelte";
 import { handleVuePageRequest } from "@absolutejs/absolute/vue";
 import { ReactVoiceDemo } from "../../frontend/react/pages/ReactVoiceDemo";
+import type * as AngularVoiceDemoPage from "../../frontend/angular/pages/angular-voice-demo";
+import type SvelteVoiceDemo from "../../frontend/svelte/pages/SvelteVoiceDemo.svelte";
+import type VueVoiceDemo from "../../frontend/vue/pages/VueVoiceDemo.vue";
 import { FRAMEWORKS } from "../../shared/demo";
 
 export const pagesPlugin = (manifest: Record<string, string>) =>
@@ -102,51 +105,44 @@ export const pagesPlugin = (manifest: Record<string, string>) =>
         ),
     )
     .get("/react", () =>
-      handleReactPageRequest(
-        ReactVoiceDemo,
-        asset(manifest, "ReactVoiceDemoIndex"),
-        {
+      handleReactPageRequest({
+        Page: ReactVoiceDemo,
+        index: asset(manifest, "ReactVoiceDemoIndex"),
+        props: {
           cssPath: asset(manifest, "VoiceDemoCSS"),
         },
-      ),
+      }),
     )
     .get("/svelte", async () => {
-      const SvelteVoiceDemo = (
-        await import("../../frontend/svelte/pages/SvelteVoiceDemo.svelte")
-      ).default;
-
-      return handleSveltePageRequest(
-        SvelteVoiceDemo,
-        asset(manifest, "SvelteVoiceDemo"),
-        asset(manifest, "SvelteVoiceDemoIndex"),
-        {
+      return handleSveltePageRequest<typeof SvelteVoiceDemo>({
+        pagePath: asset(manifest, "SvelteVoiceDemo"),
+        indexPath: asset(manifest, "SvelteVoiceDemoIndex"),
+        props: {
           cssPath: asset(manifest, "VoiceDemoCSS"),
         },
-      );
+      });
     })
     .get("/vue", async () => {
-      const { VueVoiceDemo } = (await import("../vueImporter")).vueImports;
-
-      return handleVuePageRequest(
-        VueVoiceDemo,
-        asset(manifest, "VueVoiceDemo"),
-        asset(manifest, "VueVoiceDemoIndex"),
-        generateHeadElement({
+      return handleVuePageRequest<typeof VueVoiceDemo>({
+        pagePath: asset(manifest, "VueVoiceDemo"),
+        indexPath: asset(manifest, "VueVoiceDemoIndex"),
+        props: {},
+        headTag: generateHeadElement({
           cssPath: asset(manifest, "VoiceDemoCSS"),
           title: "AbsoluteJS Voice Intake - Vue",
         }),
-      );
+      });
     })
     .get("/html", () => handleHTMLPageRequest(asset(manifest, "HtmlVoiceDemo")))
     .get("/htmx", () => handleHTMXPageRequest(asset(manifest, "HtmxVoiceDemo")))
     .get("/angular", async () =>
-      handleAngularPageRequest(
-        () => import("../../frontend/angular/pages/angular-voice-demo"),
-        asset(manifest, "AngularVoiceDemo"),
-        asset(manifest, "AngularVoiceDemoIndex"),
-        generateHeadElement({
+      handleAngularPageRequest<typeof AngularVoiceDemoPage>({
+        pagePath: asset(manifest, "AngularVoiceDemo"),
+        indexPath: asset(manifest, "AngularVoiceDemoIndex"),
+        props: {},
+        headTag: generateHeadElement({
           cssPath: asset(manifest, "VoiceDemoCSS"),
           title: "AbsoluteJS Voice Intake - Angular",
         }),
-      ),
+      }),
     );
