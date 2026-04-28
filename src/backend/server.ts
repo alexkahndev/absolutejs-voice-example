@@ -12,11 +12,15 @@ import {
   createVoiceFileScenarioFixtureStore,
   createVoiceAssistant,
   createVoiceAgentTool,
+  createVoiceCampaign,
+  createVoicePlivoCampaignDialer,
   createVoiceCampaignRoutes,
   createVoiceExperiment,
   createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
   createVoiceSQLiteCampaignStore,
+  createVoiceTelnyxCampaignDialer,
+  createVoiceTwilioCampaignDialer,
   createOpenAIVoiceAssistantModel,
   createOpenAIVoiceTTS,
   createVoiceHandoffDeliveryWorker,
@@ -57,6 +61,7 @@ import {
   type TTSAdapterSession,
   type VoiceCallReviewStore,
   type VoiceAssistantMemoryRecord,
+  type VoiceCampaignDialer,
   type VoiceAgentModel,
   type VoiceHandoffDeliveryStore,
   type VoiceIOProviderRouterEvent,
@@ -1116,6 +1121,252 @@ const recordCampaignTelephonyOutcome = (input: {
     },
   );
 
+const campaignDialerProofProviders = ["twilio", "telnyx", "plivo"] as const;
+
+type CampaignDialerProofProvider =
+  (typeof campaignDialerProofProviders)[number];
+
+type DryRunCarrierRequest = {
+  body: unknown;
+  method: string;
+  provider: CampaignDialerProofProvider;
+  url: string;
+};
+
+const serializeDryRunRequestBody = (body: RequestInit["body"]) => {
+  if (body instanceof URLSearchParams) {
+    return Object.fromEntries(body.entries());
+  }
+  if (typeof body === "string") {
+    try {
+      return JSON.parse(body) as unknown;
+    } catch {
+      return body;
+    }
+  }
+  return body ? String(body) : undefined;
+};
+
+const createDryRunCarrierFetch = (
+  provider: CampaignDialerProofProvider,
+  requests: DryRunCarrierRequest[],
+) => {
+  let sequence = 0;
+
+  return async (url: string | URL | Request, init?: RequestInit) => {
+    sequence += 1;
+    requests.push({
+      body: serializeDryRunRequestBody(init?.body),
+      method: init?.method ?? "GET",
+      provider,
+      url: String(url),
+    });
+
+    const externalCallId = `dry-run-${provider}-${sequence}`;
+    const payload =
+      provider === "twilio"
+        ? { sid: externalCallId }
+        : provider === "telnyx"
+          ? { data: { call_control_id: externalCallId } }
+          : { request_uuid: externalCallId };
+
+    return Response.json(payload);
+  };
+};
+
+const createDryRunCampaignDialer = (
+  provider: CampaignDialerProofProvider,
+  request: Request,
+  requests: DryRunCarrierRequest[],
+): VoiceCampaignDialer => {
+  const origin = resolveCarrierOrigin(request);
+  const fetch = createDryRunCarrierFetch(provider, requests);
+
+  if (provider === "twilio") {
+    return createVoiceTwilioCampaignDialer({
+      accountSid: "AC_dry_run",
+      answerUrl: joinUrlPath(origin, "/api/twilio/voice"),
+      apiBaseUrl: "https://twilio.dry-run.absolutejs.local",
+      authToken: "dry-run-token",
+      fetch,
+      from: "+15550009999",
+      statusCallbackEvents: ["answered", "completed"],
+      statusCallbackUrl: joinUrlPath(origin, "/api/telephony-webhook"),
+    });
+  }
+
+  if (provider === "telnyx") {
+    return createVoiceTelnyxCampaignDialer({
+      apiBaseUrl: "https://telnyx.dry-run.absolutejs.local",
+      apiKey: "dry-run-token",
+      connectionId: "dry-run-connection",
+      fetch,
+      from: "+15550009999",
+      webhookUrl: joinUrlPath(origin, "/api/telnyx/webhook"),
+    });
+  }
+
+  return createVoicePlivoCampaignDialer({
+    answerUrl: joinUrlPath(origin, "/api/plivo/voice"),
+    apiBaseUrl: "https://plivo.dry-run.absolutejs.local",
+    authId: "dry-run-auth-id",
+    authToken: "dry-run-token",
+    callbackUrl: joinUrlPath(origin, "/api/plivo/webhook"),
+    fetch,
+    from: "+15550009999",
+  });
+};
+
+const runCampaignDialerProofForProvider = async (
+  provider: CampaignDialerProofProvider,
+  request: Request,
+) => {
+  const carrierRequests: DryRunCarrierRequest[] = [];
+  const runtime = createVoiceCampaign({
+    dialer: createDryRunCampaignDialer(provider, request, carrierRequests),
+    store: campaignStore,
+  });
+  const proof = await runVoiceCampaignProof({
+    campaign: {
+      description:
+        "Dry-run carrier dialer proof with campaign metadata and webhook outcome resolution.",
+      id: `campaign-dialer-proof-${provider}-${crypto.randomUUID()}`,
+      metadata: {
+        mode: "dry-run",
+        provider,
+      },
+      name: `AbsoluteJS Voice ${provider} Campaign Dialer Proof`,
+    },
+    completeAttempts: false,
+    recipients: [
+      {
+        id: `dialer-proof-${provider}-recipient`,
+        metadata: {
+          provider,
+          source: "campaign-dialer-proof",
+        },
+        name: `${provider} dry-run recipient`,
+        phone: "+15550001001",
+      },
+    ],
+    runtime,
+  });
+  const outcomes = await Promise.all(
+    proof.tick.started.map((attempt) =>
+      applyVoiceCampaignTelephonyOutcome(
+        {
+          decision: {
+            action: "complete",
+            confidence: "high",
+            disposition: "completed",
+            source: "status",
+          },
+          event: {
+            metadata: {
+              attemptId: attempt.id,
+              campaignId: attempt.campaignId,
+              externalCallId: attempt.externalCallId,
+              voiceCampaignAttemptId: attempt.id,
+              voiceCampaignId: attempt.campaignId,
+            },
+            provider,
+            status: "completed",
+          },
+        },
+        {
+          runtime,
+        },
+      ),
+    ),
+  );
+  const final = await runtime.get(proof.campaign.campaign.id);
+
+  return {
+    campaignId: proof.campaign.campaign.id,
+    carrierRequests,
+    final,
+    outcomes,
+    provider,
+    tick: proof.tick,
+  };
+};
+
+const runCampaignDialerProof = async (request: Request) => {
+  const providers = campaignDialerProofProviders;
+  const results = await Promise.all(
+    providers.map((provider) =>
+      runCampaignDialerProofForProvider(provider, request),
+    ),
+  );
+
+  return {
+    generatedAt: Date.now(),
+    mode: "dry-run",
+    ok: results.every(
+      (result) =>
+        result.carrierRequests.length > 0 &&
+        result.outcomes.every((outcome) => outcome.applied),
+    ),
+    providers: results,
+  };
+};
+
+const getCampaignDialerProofStatus = () => ({
+  generatedAt: Date.now(),
+  mode: "dry-run",
+  ok: true,
+  providers: [...campaignDialerProofProviders],
+  runPath: "/api/voice/campaigns/dialer-proof",
+  safe: true,
+});
+
+const renderCampaignDialerProofHTML = () => `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Campaign Dialer Proof</title>
+      <style>
+        body{font-family:ui-sans-serif,system-ui,sans-serif;background:#0b1220;color:#f8fafc;margin:0}
+        main{max-width:1080px;margin:auto;padding:32px}
+        a{color:#5eead4}
+        button{background:#5eead4;border:0;border-radius:999px;color:#042f2e;cursor:pointer;font-weight:900;padding:12px 18px}
+        button:disabled{cursor:wait;opacity:.6}
+        pre{background:#111c2f;border:1px solid #334155;border-radius:18px;overflow:auto;padding:18px}
+        .hero{background:linear-gradient(135deg,rgba(20,184,166,.22),rgba(251,146,60,.16));border:1px solid #334155;border-radius:28px;padding:28px}
+        .muted{color:#9fb0c5}
+      </style>
+      <script>
+        async function runDialerProof(button) {
+          button.disabled = true;
+          const output = document.getElementById("campaign-dialer-proof-output");
+          output.textContent = "Running Twilio, Telnyx, and Plivo dry-run campaign proofs...";
+          try {
+            const response = await fetch("/api/voice/campaigns/dialer-proof", { method: "POST" });
+            const payload = await response.json();
+            output.textContent = JSON.stringify(payload, null, 2);
+          } catch (error) {
+            output.textContent = error instanceof Error ? error.message : String(error);
+          } finally {
+            button.disabled = false;
+          }
+        }
+      </script>
+    </head>
+    <body>
+      <main>
+        <p><a href="/app-kit">Back to App Kit</a> · <a href="/voice/campaigns/observability">Campaign observability</a></p>
+        <section class="hero">
+          <p class="muted">Self-hosted campaign carrier proof</p>
+          <h1>Queue to carrier dial to webhook outcome, without making a real call</h1>
+          <p class="muted">This runs the same Twilio, Telnyx, and Plivo campaign dialer primitives with an intercepted fetch, proves campaign metadata is attached, and applies a synthetic completed webhook outcome back into the campaign store.</p>
+          <button type="button" onclick="runDialerProof(this)">Run dry-run dialer proof</button>
+        </section>
+        <pre id="campaign-dialer-proof-output">No proof run yet.</pre>
+      </main>
+    </body>
+  </html>`;
+
 const telephonyOutcomeSamples = [
   {
     label: "Carrier no-answer",
@@ -1327,6 +1578,13 @@ const appKitLinks = [
     href: "/voice/campaigns/observability",
     label: "Campaign Observability",
     statusHref: "/api/voice/campaigns/observability",
+  },
+  {
+    description:
+      "Dry-run Twilio, Telnyx, and Plivo campaign dialing from queue to webhook outcome.",
+    href: "/voice/campaigns/dialer-proof",
+    label: "Campaign Dialer Proof",
+    statusHref: "/api/voice/campaigns/dialer-proof",
   },
   {
     description:
@@ -2418,6 +2676,19 @@ const server = new Elysia()
   )
   .post("/api/voice/campaigns/proof", () =>
     runVoiceCampaignProof({ store: campaignStore }),
+  )
+  .get("/api/voice/campaigns/dialer-proof", () =>
+    getCampaignDialerProofStatus(),
+  )
+  .post("/api/voice/campaigns/dialer-proof", ({ request }) =>
+    runCampaignDialerProof(request),
+  )
+  .get(
+    "/voice/campaigns/dialer-proof",
+    () =>
+      new Response(renderCampaignDialerProofHTML(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
   )
   .use(
     createVoiceOpsWebhookReceiverRoutes({
