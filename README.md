@@ -165,7 +165,7 @@ That starts the demo on `PORT=3004` when `PORT` is not already set, waits for `/
 bun run smoke:readiness
 ```
 
-The smoke runner checks the readiness, carrier, provider capability, handoff, and app-kit status endpoints in parallel. Local development can still report `readinessStatus: "fail"` when production-only gates are missing, such as a public carrier webhook URL or live carrier credentials. The default smoke passes when the control-plane endpoints are reachable and returning valid JSON.
+The smoke runner checks the readiness, carrier, provider capability, handoff, and ops status endpoints in parallel. Local development can still report `readinessStatus: "fail"` when production-only gates are missing, such as a public carrier webhook URL or live carrier credentials. The default smoke passes when the control-plane endpoints are reachable and returning valid JSON.
 
 If your machine is busy or another agent is compiling at the same time, increase `VOICE_READINESS_SERVER_WAIT_MS` in `.env` to give `absolute dev` more time to start. `VOICE_READINESS_SERVER_POLL_MS`, `VOICE_READINESS_SERVER_OUTPUT_LINES`, and `VOICE_READINESS_SMOKE_TIMEOUT_MS` are also available for local tuning.
 

@@ -8,7 +8,7 @@ import {
 } from "@angular/core";
 import { defineVoiceProviderSimulationControlsElement } from "@absolutejs/voice/client";
 import {
-  VoiceAppKitStatusService,
+  VoiceOpsStatusService,
   VoiceCampaignDialerProofService,
   VoiceProviderCapabilitiesService,
   VoiceProviderStatusService,
@@ -54,7 +54,7 @@ import {
   createDemoMicrophone,
   fetchBargeInReport,
   fetchSavedIntakes,
-  getAppKitStatusLabel,
+  getOpsStatusLabel,
   formatErrorMessage,
   formatDateTime,
   renderDemoBargeInProofHTML,
@@ -437,27 +437,27 @@ import {
 
           <article
             class="voice-card voice-workflow-card"
-            [class.is-failing]="appKitStatus.report()?.status === 'fail'"
+            [class.is-failing]="opsStatus.report()?.status === 'fail'"
           >
-            <span class="voice-framework-pill">Voice App Kit</span>
-            <h2>{{ getAppKitStatusLabel(appKitStatus.report()) }}</h2>
+            <span class="voice-framework-pill">Voice Ops Status</span>
+            <h2>{{ getOpsStatusLabel(opsStatus.report()) }}</h2>
             <p class="voice-footnote">
               One embedded readiness check for certified workflows, provider
               health, and handoffs.
             </p>
             <div class="voice-workflow-summary">
               <span class="pill"
-                >{{ appKitStatus.report()?.passed ?? 0 }} passing</span
+                >{{ opsStatus.report()?.passed ?? 0 }} passing</span
               >
               <span class="pill"
-                >{{ appKitStatus.report()?.failed ?? 0 }} failing</span
+                >{{ opsStatus.report()?.failed ?? 0 }} failing</span
               >
               <span class="pill"
-                >{{ appKitStatus.report()?.total ?? 0 }} checks</span
+                >{{ opsStatus.report()?.total ?? 0 }} checks</span
               >
             </div>
             <p class="voice-footnote">
-              <a href="/app-kit/status">Open app-kit status</a> ·
+              <a href="/api/voice/ops-status">Open ops status</a> ·
               <a href="/evals/fixtures">Open certified fixtures</a>
             </p>
           </article>
@@ -770,7 +770,7 @@ export class AngularVoiceDemoComponent {
   callControlActions = VOICE_CALL_CONTROL_ACTIONS;
   getVoiceProviderLabel = getVoiceProviderLabel;
   getVoiceRoutingLabel = getVoiceRoutingLabel;
-  getAppKitStatusLabel = getAppKitStatusLabel;
+  getOpsStatusLabel = getOpsStatusLabel;
   hasStartedModes = signal<Record<VoiceDemoMode, boolean>>({
     general: false,
     guided: false,
@@ -792,7 +792,7 @@ export class AngularVoiceDemoComponent {
   generalVoice = inject(VoiceStreamService).connect<SavedIntake>(
     getVoiceRoutePath("general", this.modelProvider(), this.routingMode()),
   );
-  appKitStatus = inject(VoiceAppKitStatusService).connect("/app-kit/status", {
+  opsStatus = inject(VoiceOpsStatusService).connect("/api/voice/ops-status", {
     intervalMs: 5_000,
   });
   providerStatus = inject(VoiceProviderStatusService).connect(
@@ -1024,7 +1024,7 @@ export class AngularVoiceDemoComponent {
     this.stopMic();
     this.guidedVoice.close();
     this.generalVoice.close();
-    this.appKitStatus.close();
+    this.opsStatus.close();
     this.providerCapabilities.close();
     this.providerStatus.close();
     this.campaignDialerProof.close();

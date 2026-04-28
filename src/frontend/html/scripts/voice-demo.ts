@@ -150,7 +150,7 @@ const guidedVoice = createVoiceStream<SavedIntake>(
 const generalVoice = createVoiceStream<SavedIntake>(
   getVoiceRoutePath("general", modelProvider, routingMode),
 );
-const opsStatus = mountVoiceOpsStatus(workflowStatusHost, "/app-kit/status", {
+const opsStatus = mountVoiceOpsStatus(workflowStatusHost, "/api/voice/ops-status", {
   intervalMs: 5_000,
 });
 const providerStatus = mountVoiceProviderStatus(

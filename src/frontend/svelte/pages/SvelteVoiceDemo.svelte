@@ -113,7 +113,7 @@
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
   let guidedVoice: VoiceStream<SavedIntake> | null = null;
   let generalVoice: VoiceStream<SavedIntake> | null = null;
-  const opsStatus = createVoiceOpsStatus("/app-kit/status", {
+  const opsStatus = createVoiceOpsStatus("/api/voice/ops-status", {
     intervalMs: 5_000,
   });
   const providerStatus = createVoiceProviderStatus("/api/provider-status", {

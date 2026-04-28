@@ -2,7 +2,7 @@ export {};
 
 type EndpointName =
   | "agentSquadContract"
-  | "appKit"
+  | "opsStatus"
   | "bargeIn"
   | "campaignProof"
   | "campaigns"
@@ -381,8 +381,8 @@ const endpoints: Array<{
     },
   },
   {
-    name: "appKit",
-    path: "/app-kit/status",
+    name: "opsStatus",
+    path: "/api/voice/ops-status",
     summarize: (body) => {
       const status = body as {
         failed?: unknown;
@@ -391,7 +391,7 @@ const endpoints: Array<{
         total?: unknown;
       };
       return {
-        appKitStatus: status.status,
+        opsStatus: status.status,
         failed: status.failed,
         passed: status.passed,
         total: status.total,

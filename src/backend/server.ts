@@ -7,28 +7,41 @@ import {
   createVoiceSQLiteTelephonyWebhookIdempotencyStore,
   createAnthropicVoiceAssistantModel,
   createGeminiVoiceAssistantModel,
-  createVoiceAppKitRoutes,
+  createVoiceDiagnosticsRoutes,
+  createVoiceEvalRoutes,
   createVoiceFileEvalBaselineStore,
   createVoiceFileScenarioFixtureStore,
   createVoiceAssistant,
   createVoiceAgent,
   createVoiceAgentSquad,
   createVoiceAgentTool,
+  createVoiceAssistantHealthRoutes,
+  createVoiceBargeInRoutes,
   createVoiceCampaignRoutes,
   createVoiceExperiment,
   createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
   createVoiceMemoryTraceEventStore,
+  createVoiceOpsConsoleRoutes,
+  createVoiceOpsStatusRoutes,
   createVoiceSQLiteCampaignStore,
   createOpenAIVoiceAssistantModel,
   createOpenAIVoiceTTS,
   createVoiceHandoffDeliveryWorker,
+  createVoiceProviderCapabilityRoutes,
+  createVoiceProviderHealthRoutes,
   createVoiceProviderRouter,
+  createVoiceProductionReadinessRoutes,
+  createVoiceQualityRoutes,
+  createVoiceResilienceRoutes,
   createVoiceRoutingDecisionSummary,
   createVoiceSTTProviderRouter,
+  createVoiceSessionListRoutes,
+  createVoiceSessionReplayRoutes,
   createVoiceSimulationSuiteRoutes,
   createVoiceTTSProviderRouter,
   createVoiceTaskUpdatedEvent,
+  createVoiceTraceTimelineRoutes,
   createVoiceTelephonyOutcomePolicy,
   createVoicePhoneAgent,
   createVoiceToolContractRoutes,
@@ -38,6 +51,7 @@ import {
   createVoiceTurnQualityRoutes,
   createVoiceWorkflowContractHandler,
   createVoiceWorkflowContractPreset,
+  createVoiceHandoffHealthRoutes,
   createVoiceOpsWebhookReceiverRoutes,
   createVoiceOpsWebhookSink,
   createVoiceOutcomeContractRoutes,
@@ -1179,7 +1193,7 @@ const renderAgentSquadContractHTML = async () => {
     </head>
     <body>
       <main>
-        <p><a href="/app-kit">Back to App Kit</a> · <a href="/api/agent-squad-contract">JSON</a></p>
+        <p><a href="/ops-console">Back to Ops Console</a> · <a href="/api/agent-squad-contract">JSON</a></p>
         <p class="muted">Self-hosted specialist routing proof</p>
         <h1>Agent squad contract</h1>
         <p class="pill">${report.pass ? "Pass" : "Fail"}</p>
@@ -1532,7 +1546,7 @@ const renderCampaignDialerProofHTML = () => `<!doctype html>
     </head>
     <body>
       <main>
-        <p><a href="/app-kit">Back to App Kit</a> · <a href="/voice/campaigns/observability">Campaign observability</a></p>
+        <p><a href="/ops-console">Back to Ops Console</a> · <a href="/voice/campaigns/observability">Campaign observability</a></p>
         <section class="hero">
           <p class="muted">Self-hosted campaign carrier proof</p>
           <h1>Queue to carrier dial to webhook outcome, without making a real call</h1>
@@ -1626,7 +1640,7 @@ const renderTelephonyOutcomePreviewHTML = () => {
     </head>
     <body>
       <main>
-        <p><a href="/app-kit">Back to App Kit</a></p>
+        <p><a href="/ops-console">Back to Ops Console</a></p>
         <p class="muted">Telephony primitive preview</p>
         <h1>Carrier events become AbsoluteJS lifecycle outcomes</h1>
         <p class="muted">Use <code>resolveVoiceTelephonyOutcome</code>, <code>voiceTelephonyOutcomeToRouteResult</code>, or <code>applyVoiceTelephonyOutcome</code> in carrier webhooks to keep transfer, voicemail, and no-answer behavior deterministic.</p>
@@ -1676,7 +1690,7 @@ const renderTelephonyWebhookDecisionsHTML = () => {
     </head>
     <body>
       <main>
-        <p><a href="/app-kit">Back to App Kit</a> · <a href="/telephony-outcomes">Outcome policy</a> · <a href="/carriers">Carrier matrix</a> · <a href="/api/telephony-webhook-decisions">JSON</a></p>
+        <p><a href="/ops-console">Back to Ops Console</a> · <a href="/telephony-outcomes">Outcome policy</a> · <a href="/carriers">Carrier matrix</a> · <a href="/api/telephony-webhook-decisions">JSON</a></p>
         <section class="hero">
           <p class="muted">Carrier webhook telemetry</p>
           <h1>Latest normalized webhook decisions</h1>
@@ -1775,7 +1789,7 @@ const renderDemoChecklistHTML = () => {
     </head>
     <body>
       <main>
-        <p><a href="/app-kit">Back to App Kit</a> · <a href="/api/production-readiness">Readiness JSON</a></p>
+        <p><a href="/ops-console">Back to Ops Console</a> · <a href="/api/production-readiness">Readiness JSON</a></p>
         <section class="hero">
           <p class="muted">Presentation path</p>
           <h1>Demo AbsoluteJS Voice without hunting for tabs</h1>
@@ -1787,7 +1801,7 @@ const renderDemoChecklistHTML = () => {
   </html>`;
 };
 
-const appKitLinks = [
+const opsSurfaceLinks = [
   { href: "/react", label: "Back to demo" },
   {
     description:
@@ -3335,81 +3349,163 @@ const server = new Elysia()
     }),
   )
   .use(
-    createVoiceAppKitRoutes({
-      appStatus: {
-        include: {
-          quality: false,
-          sessions: false,
-        },
-        preferFixtureWorkflows: true,
+    createVoiceOpsStatusRoutes({
+      include: {
+        quality: false,
+        sessions: false,
       },
-      assistantHealth: {},
-      diagnostics: {
-        title: "AbsoluteJS Voice Demo Diagnostics",
-      },
-      evals: {
-        baselineStore: createVoiceFileEvalBaselineStore(
-          resolve(runtimeDirectory, "eval-baseline.json"),
-        ),
-        fixtureStore: createVoiceFileScenarioFixtureStore(
-          resolve(import.meta.dir, "fixtures", "voice-scenario-fixtures.json"),
-        ),
-        scenarios: workflowScenarios,
-        title: "AbsoluteJS Voice Demo Evals",
-      },
-      handoffs: {},
-      links: appKitLinks,
+      links: opsSurfaceLinks,
       llmProviders: configuredModelProviders,
-      providerCapabilities: {
-        features: voiceProviderFeatures,
-        models: voiceProviderModels,
-        selected: {
-          llm: modelProvider,
-          stt: selectedSTTProvider,
-        },
-      },
-      providerHealth: {},
-      productionReadiness: {
-        agentSquadContracts: async () => [await runDemoAgentSquadContract()],
-        carriers: loadCarrierMatrixInputs,
-        links: {
-          agentSquadContracts: "/agent-squad-contract",
-          carriers: "/carriers",
-          handoffs: "/handoffs",
-          providerRoutingContracts: "/api/provider-routing-contract",
-          quality: "/quality",
-          resilience: "/resilience",
-          sessions: "/sessions",
-        },
-        providerRoutingContracts: async () => [
-          await runDemoProviderRoutingContract(),
-          await runDemoSTTProviderRoutingContract(),
-          await runDemoTTSProviderRoutingContract(),
-        ],
-      },
-      resilience: {
-        sttSimulation: {
-          failureMessage:
-            "Simulate Deepgram failure to prove the realtime route falls back to AssemblyAI without changing provider credentials.",
-          failureProviders: ["deepgram"],
-          fallbackRequiredMessage:
-            "Add ASSEMBLYAI_API_KEY to enable the real fallback provider.",
-          fallbackRequiredProvider: "assemblyai",
-          providers: sttProviderSimulationStatus(),
-          run: (provider, mode) =>
-            sttProviderFailureSimulator.run(provider as VoiceSTTProvider, mode),
-        },
-      },
-      sessions: {
-        htmlPath: false,
-      },
+      preferFixtureWorkflows: true,
+      sttProviders: configuredSTTProviders,
+      store: runtimeStorage.traces,
+    }),
+  )
+  .use(
+    createVoiceOpsConsoleRoutes({
+      links: opsSurfaceLinks,
+      llmProviders: configuredModelProviders,
+      path: "/ops-console",
       store: runtimeStorage.traces,
       sttProviders: configuredSTTProviders,
       title: "AbsoluteJS Voice Demo Ops Console",
-      traceTimeline: {
-        store: traceTimelineStore,
+      ttsProviders: configuredTTSProviders,
+    }),
+  )
+  .use(
+    createVoiceQualityRoutes({
+      links: opsSurfaceLinks,
+      path: "/quality",
+      store: runtimeStorage.traces,
+    }),
+  )
+  .use(
+    createVoiceEvalRoutes({
+      baselineStore: createVoiceFileEvalBaselineStore(
+        resolve(runtimeDirectory, "eval-baseline.json"),
+      ),
+      fixtureStore: createVoiceFileScenarioFixtureStore(
+        resolve(import.meta.dir, "fixtures", "voice-scenario-fixtures.json"),
+      ),
+      links: opsSurfaceLinks,
+      path: "/evals",
+      scenarios: workflowScenarios,
+      store: runtimeStorage.traces,
+      title: "AbsoluteJS Voice Demo Evals",
+    }),
+  )
+  .use(
+    createVoiceProviderHealthRoutes({
+      providers: configuredModelProviders,
+      store: runtimeStorage.traces,
+    }),
+  )
+  .use(
+    createVoiceProviderCapabilityRoutes({
+      features: voiceProviderFeatures,
+      htmlPath: "/provider-capabilities",
+      llmProviders: configuredModelProviders,
+      models: voiceProviderModels,
+      selected: {
+        llm: modelProvider,
+        stt: selectedSTTProvider,
       },
-    }).routes,
+      store: runtimeStorage.traces,
+      sttProviders: configuredSTTProviders,
+    }),
+  )
+  .use(
+    createVoiceAssistantHealthRoutes({
+      htmlPath: "/assistant-health",
+      providers: configuredModelProviders,
+      store: runtimeStorage.traces,
+    }),
+  )
+  .use(
+    createVoiceHandoffHealthRoutes({
+      htmlPath: "/handoffs",
+      path: "/api/voice-handoffs",
+      store: runtimeStorage.traces,
+    }),
+  )
+  .use(
+    createVoiceSessionListRoutes({
+      htmlPath: "/sessions",
+      path: "/api/voice-sessions",
+      replayHref: (session) => "/sessions/" + session.sessionId,
+      store: runtimeStorage.traces,
+    }),
+  )
+  .use(
+    createVoiceSessionReplayRoutes({
+      htmlPath: "/sessions/:sessionId",
+      path: "/api/voice-sessions/:sessionId/replay",
+      store: runtimeStorage.traces,
+    }),
+  )
+  .use(
+    createVoiceResilienceRoutes({
+      llmProviders: configuredModelProviders,
+      path: "/resilience",
+      store: runtimeStorage.traces,
+      sttProviders: configuredSTTProviders,
+      sttSimulation: {
+        failureMessage:
+          "Simulate Deepgram failure to prove the realtime route falls back to AssemblyAI without changing provider credentials.",
+        failureProviders: ["deepgram"],
+        fallbackRequiredMessage:
+          "Add ASSEMBLYAI_API_KEY to enable the real fallback provider.",
+        fallbackRequiredProvider: "assemblyai",
+        providers: sttProviderSimulationStatus(),
+        run: (provider, mode) =>
+          sttProviderFailureSimulator.run(provider as VoiceSTTProvider, mode),
+      },
+      ttsProviders: configuredTTSProviders,
+    }),
+  )
+  .use(
+    createVoiceProductionReadinessRoutes({
+      agentSquadContracts: async () => [await runDemoAgentSquadContract()],
+      carriers: loadCarrierMatrixInputs,
+      htmlPath: "/production-readiness",
+      links: {
+        agentSquadContracts: "/agent-squad-contract",
+        carriers: "/carriers",
+        handoffs: "/handoffs",
+        providerRoutingContracts: "/api/provider-routing-contract",
+        quality: "/quality",
+        resilience: "/resilience",
+        sessions: "/sessions",
+      },
+      path: "/api/production-readiness",
+      providerRoutingContracts: async () => [
+        await runDemoProviderRoutingContract(),
+        await runDemoSTTProviderRoutingContract(),
+        await runDemoTTSProviderRoutingContract(),
+      ],
+      store: runtimeStorage.traces,
+    }),
+  )
+  .use(
+    createVoiceDiagnosticsRoutes({
+      path: "/diagnostics",
+      store: runtimeStorage.traces,
+      title: "AbsoluteJS Voice Demo Diagnostics",
+    }),
+  )
+  .use(
+    createVoiceTraceTimelineRoutes({
+      htmlPath: "/traces",
+      path: "/api/voice-traces",
+      store: traceTimelineStore,
+    }),
+  )
+  .use(
+    createVoiceBargeInRoutes({
+      htmlPath: "/barge-in",
+      path: "/api/voice-barge-in",
+      store: runtimeStorage.traces,
+    }),
   )
   .use(
     createVoiceToolContractRoutes({

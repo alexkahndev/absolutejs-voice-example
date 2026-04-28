@@ -10,7 +10,7 @@ import type {
   VoiceAudioPlayer,
   VoiceBargeInMonitor,
   VoiceBargeInReport,
-  VoiceAppKitStatusReport,
+  VoiceOpsStatusReport,
   VoiceRoutingDecisionSummary,
   VoiceStreamState,
 } from "@absolutejs/voice";
@@ -102,8 +102,8 @@ export const fetchBargeInReport = async () => {
   return (await response.json()) as VoiceBargeInReport;
 };
 
-export const getAppKitStatusLabel = (
-  report?: VoiceAppKitStatusReport | null,
+export const getOpsStatusLabel = (
+  report?: VoiceOpsStatusReport | null,
 ) => {
   if (!report) {
     return "Checking";
