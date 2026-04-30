@@ -73,6 +73,7 @@ import {
   createVoiceProviderOrchestrationRoutes,
   createVoiceProviderDecisionTraceEvent,
   createVoiceMediaFrame,
+  createVoiceMediaProcessorGraph,
   createVoiceMediaTransport,
   createVoiceProviderDecisionTraceRoutes,
   createVoiceProviderSloRoutes,
@@ -5978,6 +5979,53 @@ const buildDemoMediaPipelineReportOptions = async () => {
       await transport.send(frame);
     }
   }
+  const processorGraph = createVoiceMediaProcessorGraph({
+    name: "absolutejs-realtime-media-graph",
+    nodes: [
+      {
+        kind: "filter",
+        name: "speech-and-assistant-audio",
+        process: (frame) =>
+          frame.kind === "input-audio" ||
+          frame.kind === "assistant-audio" ||
+          frame.kind === "interruption" ||
+          frame.kind === "turn-commit",
+      },
+      {
+        kind: "branch",
+        name: "transcript-alignment-branch",
+        process: (frame) =>
+          frame.kind === "input-audio"
+            ? [
+                frame,
+                createVoiceMediaFrame({
+                  ...frame,
+                  id: `${frame.id}:transcript-alignment`,
+                  kind: "transcript",
+                  metadata: {
+                    ...frame.metadata,
+                    graphGenerated: true,
+                    processor: "transcript-alignment-branch",
+                  },
+                  source: "voice-runtime",
+                }),
+              ]
+            : frame,
+      },
+      {
+        kind: "processor",
+        name: "provider-stage-marker",
+        process: (frame) => ({
+          ...frame,
+          metadata: {
+            ...frame.metadata,
+            mediaProcessorGraph: "absolutejs-realtime-media-graph",
+          },
+        }),
+      },
+    ],
+  });
+  await processorGraph.processMany(frames);
 
   return {
     expectedInputFormat: realtimeChannelFormat,
@@ -5990,6 +6038,7 @@ const buildDemoMediaPipelineReportOptions = async () => {
     outputFormat: realtimeChannelFormat,
     requireInterruptionFrame: true,
     requireTraceEvidence: true,
+    processorGraph: processorGraph.report(),
     surface: "direct-realtime-media-pipeline",
     transport: transport.report(),
     maxSilenceFrames: 1,
