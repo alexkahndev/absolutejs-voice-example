@@ -113,9 +113,81 @@
               <option value="quality">Quality first</option>
             </select>
           </label>
+          <label class="voice-provider-select">
+            <span>Speech engine</span>
+            <select id="speech-engine-select">
+              <option value="cascaded">Cascaded STT + LLM + TTS</option>
+              <option value="openai-realtime">OpenAI Realtime</option>
+            </select>
+          </label>
           <p class="voice-footnote" id="routing-mode-copy">
             Weighted cost, latency, and accuracy for normal production.
           </p>
+        </article>
+
+        <article class="voice-card voice-proof-dashboard-card">
+          <span class="voice-framework-pill">Proof dashboards</span>
+          <h2>Open the production evidence</h2>
+          <p class="voice-footnote">
+            The same trace-backed package routes work in every framework:
+            interruption, live timing, turn waterfalls, readiness, and provider
+            contracts.
+          </p>
+          <div class="voice-proof-links">
+            <a href="/demo-proof">
+              <strong>Run full proof</strong>
+              <span>One action runs the suite and links every surface.</span>
+            </a>
+            <a href="/barge-in">
+              <strong>Barge-in</strong>
+              <span>Interruption stop latency from browser events.</span>
+            </a>
+            <a href="/live-latency">
+              <strong>Live latency</strong>
+              <span>Speech-to-assistant timing from live browser traces.</span>
+            </a>
+            <a href="/turn-latency">
+              <strong>Turn waterfall</strong>
+              <span>Speech detection through first audio.</span>
+            </a>
+            <a href="/voice/proof-trends">
+              <strong>Sustained trends</strong>
+              <span>Repeated provider, turn, live-latency, recovery, and readiness trends.</span>
+            </a>
+            <a href="/traces">
+              <strong>Trace timelines</strong>
+              <span>Session timelines across providers and recovery.</span>
+            </a>
+            <a href="/production-readiness">
+              <strong>Readiness</strong>
+              <span>Deploy gate for runtime, providers, sinks, and proof.</span>
+            </a>
+            <a href="/provider-contracts">
+              <strong>Provider contracts</strong>
+              <span>Configured capability and fallback matrix.</span>
+            </a>
+          </div>
+        </article>
+
+        <article
+          class="voice-card voice-provider-health-card"
+          id="platform-coverage-card"
+        >
+          <p class="empty-copy">Checking Vapi replacement coverage.</p>
+        </article>
+
+        <article
+          class="voice-card voice-provider-health-card"
+          id="proof-trends-card"
+        >
+          <p class="empty-copy">Checking sustained proof trends.</p>
+        </article>
+
+        <article
+          class="voice-card voice-provider-health-card"
+          id="readiness-failures-card"
+        >
+          <p class="empty-copy">Checking readiness gate explanations.</p>
         </article>
 
         <article class="voice-card voice-routing-card">
@@ -131,6 +203,39 @@
           </div>
         </article>
 
+        <article class="voice-card voice-agent-squad-card" id="agent-squad-card">
+          <span class="voice-framework-pill">Agent Squad</span>
+          <h2>Specialist routing is live</h2>
+          <p class="voice-footnote">
+            Say “I have a billing question about my invoice” to route from the
+            front desk to billing with a compact context policy.
+          </p>
+          <div class="voice-routing-grid">
+            <div>
+              <span>Current specialist</span>
+              <strong>front-desk</strong>
+            </div>
+            <div>
+              <span>Context policy</span>
+              <strong>handoff-summary-current-turn</strong>
+            </div>
+            <div>
+              <span>Handoffs</span>
+              <strong>0</strong>
+            </div>
+            <div>
+              <span>Messages sent</span>
+              <strong>ready</strong>
+            </div>
+          </div>
+          <p class="voice-footnote">
+            No specialist handoff in this session yet.
+          </p>
+          <p class="voice-footnote">
+            <a href="/agent-squad-contract">Open squad contract proof</a>
+          </p>
+        </article>
+
         <article
           class="voice-card voice-provider-health-card"
           id="provider-status-card"
@@ -143,6 +248,13 @@
           id="provider-capabilities-card"
         >
           <p class="empty-copy">Checking provider capabilities.</p>
+        </article>
+
+        <article
+          class="voice-card voice-provider-health-card"
+          id="provider-contracts-card"
+        >
+          <p class="empty-copy">Checking provider contracts.</p>
         </article>
 
         <article
@@ -193,10 +305,29 @@
           </p>
         </article>
 
+        <absolute-voice-delivery-runtime
+          class="voice-card voice-workflow-card"
+          interval-ms="5000"
+        ></absolute-voice-delivery-runtime>
+
+        <div
+          class="voice-card voice-workflow-card"
+          data-voice-ops-action-center
+        ></div>
+
+        <div
+          class="voice-card voice-workflow-card"
+          data-voice-ops-action-history
+        ></div>
+
+        <div id="live-ops-panel"></div>
+
         <absolute-voice-trace-timeline
           class="voice-card voice-provider-health-card"
+          incident-bundle-base-path="/voice-incidents"
           interval-ms="5000"
           limit="2"
+          operations-record-base-path="/voice-operations"
         ></absolute-voice-trace-timeline>
 
         <div id="barge-in-proof-card"></div>
@@ -269,6 +400,10 @@
             <div class="status-row">
               <span class="label">Voice status</span>
               <span class="value" id="status-voice">idle</span>
+            </div>
+            <div class="status-row">
+              <span class="label">Reconnect</span>
+              <span class="value" id="status-reconnect">idle</span>
             </div>
             <div class="status-row">
               <span class="label">Current prompt</span>

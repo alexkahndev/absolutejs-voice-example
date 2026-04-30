@@ -87,6 +87,9 @@ const getStatusClassName = (status: VoiceReviewStatus) => `status-${status}`;
 const getReplayHref = (sessionId: string) =>
   `/api/voice-sessions/${encodeURIComponent(sessionId)}/replay/htmx`;
 
+const getOperationsRecordHref = (sessionId: string) =>
+  `/voice-operations/${encodeURIComponent(sessionId)}`;
+
 const includesText = (value: string | undefined, search: string) =>
   typeof value === "string" && value.toLowerCase().includes(search);
 
@@ -544,7 +547,8 @@ export const renderVoiceReviewIndexPage = (
   ${review.postCall ? `<p class="saved-summary"><strong>${escapeHtml(review.postCall.summary)}</strong> Recommended action: ${escapeHtml(review.postCall.recommendedAction)}</p>` : ""}
   ${derived.warnings.length > 0 ? `<div class="review-warning-list">${renderWarnings(derived.warnings)}</div>` : ""}
   <p>
-    <a href="/reviews/${encodeURIComponent(review.id)}">Open review</a>
+    <a href="${getOperationsRecordHref(review.sessionId)}">Open operations record</a>
+    · <a href="/reviews/${encodeURIComponent(review.id)}">Open review</a>
     · <a href="${getReplayHref(review.sessionId)}">Open replay</a>
     ${compareTarget ? ` · <a href="/reviews/compare?left=${encodeURIComponent(review.id)}&right=${encodeURIComponent(compareTarget)}">Compare with latest</a>` : ""}
   </p>
@@ -738,6 +742,7 @@ export const renderVoiceReviewPage = (
         <a href="/handoffs">Handoffs</a>
         <a href="/tasks">Open task queue</a>
         <a href="/integrations">Integration events</a>
+        <a href="${getOperationsRecordHref(artifact.sessionId)}">Open operations record</a>
         <a href="${getReplayHref(artifact.sessionId)}">Open session replay</a>
         <a href="/reviews/compare?left=${encodeURIComponent(artifact.id)}">Compare this review</a>
       </div>

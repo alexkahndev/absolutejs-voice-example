@@ -1,13 +1,18 @@
 import {
   createVoiceStream,
   createVoiceCampaignDialerProofStore,
+  createVoicePlatformCoverageStore,
   mountVoiceOpsStatus,
+  mountVoiceProofTrends,
   mountVoiceProviderCapabilities,
+  mountVoiceProviderContracts,
   mountVoiceProviderSimulationControls,
   mountVoiceProviderStatus,
+  mountVoiceReadinessFailures,
   mountVoiceRoutingStatus,
   defineVoiceTurnLatencyElement,
   mountVoiceTurnQuality,
+  renderVoicePlatformCoverageHTML,
 } from "@absolutejs/voice/client";
 import {
   createInitialVoiceWaveLevels,
@@ -15,10 +20,13 @@ import {
   createDemoBargeInEvidence,
   createDemoLiveTurnLatencyEvidence,
   createDemoMicrophone,
+  fetchAgentSquadDemoStatus,
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
+  formatReconnectState,
   mountDemoBargeInProof,
+  mountVoiceLiveOpsPanel,
   pushVoiceWaveLevel,
   renderDemoLiveTurnLatencyHTML,
 } from "../../shared/browser";
@@ -29,10 +37,13 @@ import {
   getVoiceProviderLabel,
   getVoiceRoutingLabel,
   getVoiceRoutePath,
+  getVoiceSpeechEngineSampleRate,
   getInitialVoiceModelProvider,
   getInitialVoiceRoutingMode,
+  getInitialVoiceSpeechEngine,
   rememberVoiceModelProvider,
   rememberVoiceRoutingMode,
+  rememberVoiceSpeechEngine,
   VOICE_DEMO_GENERAL_LABEL,
   VOICE_DEMO_GUIDED_LABEL,
   VOICE_DEMO_MIC_IDLE,
@@ -42,6 +53,7 @@ import {
   VOICE_ROUTING_MODES,
   type VoiceModelProvider,
   type VoiceRoutingMode,
+  type VoiceSpeechEngine,
   type SavedIntake,
   type VoiceDemoMode,
 } from "../../../shared/demo";
@@ -69,6 +81,7 @@ const intakesMetric = document.querySelector("#metric-intakes");
 const microphoneStatus = document.querySelector("#status-mic");
 const modelProviderMetric = document.querySelector("#metric-provider");
 const modelProviderSelect = document.querySelector("#model-provider-select");
+const speechEngineSelect = document.querySelector("#speech-engine-select");
 const partialStatus = document.querySelector("#status-partial");
 const promptStatus = document.querySelector("#status-prompt");
 const savedIntakesRoot = document.querySelector("#saved-intakes");
@@ -78,15 +91,20 @@ const startGeneralButton = document.querySelector("#start-general");
 const stopButton = document.querySelector("#stop-mic");
 const callControlRoot = document.querySelector("#call-control-actions");
 const callLifecycleStatus = document.querySelector("#status-call-lifecycle");
+const reconnectStatus = document.querySelector("#status-reconnect");
 const voiceStatus = document.querySelector("#status-voice");
 const voiceMonitor = document.querySelector("#voice-monitor");
 const voiceMonitorCopy = document.querySelector("#voice-monitor-copy");
 const voiceWaveGlow = document.querySelector("#voice-wave-glow");
 const voiceWavePath = document.querySelector("#voice-wave-path");
 const workflowStatusHost = document.querySelector("#workflow-status-card");
+const platformCoverageHost = document.querySelector("#platform-coverage-card");
+const proofTrendsHost = document.querySelector("#proof-trends-card");
+const readinessFailuresHost = document.querySelector("#readiness-failures-card");
 const providerCapabilitiesHost = document.querySelector(
   "#provider-capabilities-card",
 );
+const providerContractsHost = document.querySelector("#provider-contracts-card");
 const providerStatusHost = document.querySelector("#provider-status-card");
 const campaignDialerProofHost = document.querySelector(
   "#campaign-dialer-proof-card",
@@ -96,8 +114,10 @@ const providerSimulationHost = document.querySelector(
 );
 const routingModeCopy = document.querySelector("#routing-mode-copy");
 const routingDecisionRoot = document.querySelector("#routing-decision");
+const agentSquadRoot = document.querySelector("#agent-squad-card");
 const bargeInProofHost = document.querySelector("#barge-in-proof-card");
 const liveLatencyProofHost = document.querySelector("#live-latency-proof-card");
+const liveOpsPanelHost = document.querySelector("#live-ops-panel");
 const turnQualityHost = document.querySelector("#turn-quality-card");
 const routingModeMetric = document.querySelector("#metric-routing");
 const routingModeSelect = document.querySelector("#routing-mode-select");
@@ -110,6 +130,7 @@ if (
   !(microphoneStatus instanceof HTMLElement) ||
   !(modelProviderMetric instanceof HTMLElement) ||
   !(modelProviderSelect instanceof HTMLSelectElement) ||
+  !(speechEngineSelect instanceof HTMLSelectElement) ||
   !(partialStatus instanceof HTMLElement) ||
   !(promptStatus instanceof HTMLElement) ||
   !(savedIntakesRoot instanceof HTMLElement) ||
@@ -119,19 +140,26 @@ if (
   !(stopButton instanceof HTMLButtonElement) ||
   !(callControlRoot instanceof HTMLElement) ||
   !(callLifecycleStatus instanceof HTMLElement) ||
+  !(reconnectStatus instanceof HTMLElement) ||
   !(voiceMonitor instanceof HTMLElement) ||
   !(voiceMonitorCopy instanceof HTMLElement) ||
   !(voiceWaveGlow instanceof SVGPathElement) ||
   !(voiceWavePath instanceof SVGPathElement) ||
   !(workflowStatusHost instanceof HTMLElement) ||
+  !(platformCoverageHost instanceof HTMLElement) ||
+  !(proofTrendsHost instanceof HTMLElement) ||
+  !(readinessFailuresHost instanceof HTMLElement) ||
   !(providerCapabilitiesHost instanceof HTMLElement) ||
+  !(providerContractsHost instanceof HTMLElement) ||
   !(providerStatusHost instanceof HTMLElement) ||
   !(campaignDialerProofHost instanceof HTMLElement) ||
   !(providerSimulationHost instanceof HTMLElement) ||
   !(routingModeCopy instanceof HTMLElement) ||
   !(routingDecisionRoot instanceof HTMLElement) ||
+  !(agentSquadRoot instanceof HTMLElement) ||
   !(bargeInProofHost instanceof HTMLElement) ||
   !(liveLatencyProofHost instanceof HTMLElement) ||
+  !(liveOpsPanelHost instanceof HTMLElement) ||
   !(turnQualityHost instanceof HTMLElement) ||
   !(routingModeMetric instanceof HTMLElement) ||
   !(routingModeSelect instanceof HTMLSelectElement) ||
@@ -142,17 +170,45 @@ if (
 
 const modelProvider = getInitialVoiceModelProvider();
 const routingMode = getInitialVoiceRoutingMode();
+let speechEngine = getInitialVoiceSpeechEngine();
 modelProviderSelect.value = modelProvider;
 routingModeSelect.value = routingMode;
+speechEngineSelect.value = speechEngine;
 const guidedVoice = createVoiceStream<SavedIntake>(
-  getVoiceRoutePath("guided", modelProvider, routingMode),
+  getVoiceRoutePath("guided", modelProvider, routingMode, speechEngine),
+  { reconnectReportPath: "/api/voice/reconnect-traces" },
 );
 const generalVoice = createVoiceStream<SavedIntake>(
-  getVoiceRoutePath("general", modelProvider, routingMode),
+  getVoiceRoutePath("general", modelProvider, routingMode, speechEngine),
+  { reconnectReportPath: "/api/voice/reconnect-traces" },
 );
 const opsStatus = mountVoiceOpsStatus(workflowStatusHost, "/api/voice/ops-status", {
   intervalMs: 5_000,
 });
+const proofTrends = mountVoiceProofTrends(
+  proofTrendsHost,
+  "/api/voice/proof-trends",
+  {
+    description: `${framework.toUpperCase()} renders sustained proof freshness and p95 metrics from the package proof-trends widget.`,
+    intervalMs: 10_000,
+    title: "Sustained Proof Trends",
+  },
+);
+const readinessFailures = mountVoiceReadinessFailures(
+  readinessFailuresHost,
+  "/api/production-readiness",
+  {
+    description: `${framework.toUpperCase()} renders structured deploy-gate explanations from production readiness JSON when calibrated gates warn or fail.`,
+    intervalMs: 10_000,
+    title: "Readiness Gate Explanations",
+  },
+);
+const platformCoverage = createVoicePlatformCoverageStore(
+  "/api/voice/vapi-coverage",
+  {
+    intervalMs: 10_000,
+  },
+);
 const providerStatus = mountVoiceProviderStatus(
   providerStatusHost,
   "/api/provider-status",
@@ -163,6 +219,13 @@ const providerStatus = mountVoiceProviderStatus(
 const providerCapabilities = mountVoiceProviderCapabilities(
   providerCapabilitiesHost,
   "/api/provider-capabilities",
+  {
+    intervalMs: 5_000,
+  },
+);
+const providerContracts = mountVoiceProviderContracts(
+  providerContractsHost,
+  "/api/provider-contracts",
   {
     intervalMs: 5_000,
   },
@@ -193,6 +256,21 @@ const routingStatus = mountVoiceRoutingStatus(
 const turnQuality = mountVoiceTurnQuality(turnQualityHost, "/api/turn-quality", {
   intervalMs: 5_000,
 });
+const renderPlatformCoverage = () => {
+  platformCoverageHost.innerHTML = renderVoicePlatformCoverageHTML(
+    platformCoverage.getSnapshot(),
+    {
+      description: `${framework.toUpperCase()} renders the package coverage widget against the same proof-backed route used by the server.`,
+      limit: 4,
+      title: "Vapi Replacement Coverage",
+    },
+  );
+};
+const unsubscribePlatformCoverage = platformCoverage.subscribe(
+  renderPlatformCoverage,
+);
+renderPlatformCoverage();
+void platformCoverage.refresh().catch(() => {});
 const renderCampaignDialerProof = () => {
   const snapshot = campaignDialerProof.getSnapshot();
   const providers =
@@ -239,6 +317,32 @@ let hasStartedModes: Record<VoiceDemoMode, boolean> = {
 };
 const currentVoice = () =>
   activeMode === "general" ? generalVoice : guidedVoice;
+const liveOpsPanel = mountVoiceLiveOpsPanel(liveOpsPanelHost, {
+  getSessionId: () => currentVoice().sessionId,
+  onControl: ({ action, detail, tag }) => {
+    if (action === "force-handoff") {
+      currentVoice().callControl({
+        action: "transfer",
+        metadata: { source: "live-ops" },
+        reason: detail,
+        target: tag,
+      });
+      stopMic();
+    } else if (action === "escalate" || action === "operator-takeover") {
+      currentVoice().callControl({
+        action: "escalate",
+        metadata: {
+          source: "live-ops",
+          takeover: action === "operator-takeover",
+        },
+        reason: detail,
+      });
+      stopMic();
+    } else if (action === "pause-assistant") {
+      stopMic();
+    }
+  },
+});
 const bargeInEvidence = createDemoBargeInEvidence(() => currentVoice());
 const liveLatencyEvidence = createDemoLiveTurnLatencyEvidence(() =>
   currentVoice(),
@@ -254,6 +358,9 @@ const microphone = createDemoMicrophone(
   (level) => {
     waveLevels = pushVoiceWaveLevel(waveLevels, level);
     renderWave();
+  },
+  {
+    sampleRateHz: getVoiceSpeechEngineSampleRate(speechEngine),
   },
 );
 let isCapturing = false;
@@ -360,6 +467,28 @@ const renderSavedIntakes = async () => {
     .join("");
 };
 
+const renderAgentSquadStatus = async () => {
+  const status = await fetchAgentSquadDemoStatus(
+    currentVoice().sessionId ?? undefined,
+  );
+  const handoff = status?.lastHandoff;
+  agentSquadRoot.innerHTML = `<span class="voice-framework-pill">Agent Squad</span>
+<h2>Specialist routing is live</h2>
+<p class="voice-footnote">Say “I have a billing question about my invoice” to route from the front desk to billing with a compact context policy.</p>
+<div class="voice-routing-grid">
+  <div><span>Current specialist</span><strong>${escapeHtml(status?.currentAgentId ?? "front-desk")}</strong></div>
+  <div><span>Context policy</span><strong>${escapeHtml(status?.contextPolicy ?? "handoff-summary-current-turn")}</strong></div>
+  <div><span>Handoffs</span><strong>${status?.handoffCount ?? 0}</strong></div>
+  <div><span>Messages sent</span><strong>${escapeHtml(String(status?.messageCount ?? "ready"))}</strong></div>
+</div>
+<p class="voice-footnote">${
+    handoff
+      ? `${escapeHtml(handoff.fromAgentId ?? "?")} → ${escapeHtml(handoff.targetAgentId ?? "?")}: ${escapeHtml(handoff.summary ?? handoff.reason ?? "handoff applied")}`
+      : "No specialist handoff in this session yet."
+  }</p>
+<p class="voice-footnote"><a href="/agent-squad-contract">Open squad contract proof</a></p>`;
+};
+
 const render = () => {
   const voice = currentVoice();
   connectionMetric.textContent = voice.isConnected ? "Connected" : "Waiting";
@@ -394,6 +523,7 @@ const render = () => {
     ? getVoiceModeLabel(activeMode)
     : "Choose one";
   voiceStatus.textContent = voice.status;
+  reconnectStatus.textContent = formatReconnectState(voice.reconnect);
   renderWave();
   renderChat();
   liveLatencyProofHost.innerHTML = renderDemoLiveTurnLatencyHTML(
@@ -439,6 +569,15 @@ routingModeSelect.addEventListener("change", () => {
   window.location.href = nextUrl.toString();
 });
 
+speechEngineSelect.addEventListener("change", () => {
+  stopMic();
+  speechEngine = speechEngineSelect.value as VoiceSpeechEngine;
+  rememberVoiceSpeechEngine(speechEngine);
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("engine", speechEngine);
+  window.location.href = nextUrl.toString();
+});
+
 const stopMic = () => {
   microphone.stop();
   isCapturing = false;
@@ -471,6 +610,7 @@ guidedVoice.subscribe(() => {
   bargeInEvidence.syncAssistantOutput();
   liveLatencyEvidence.syncAssistantOutput();
   render();
+  void renderAgentSquadStatus();
   if (guidedVoice.status === "completed") {
     void renderSavedIntakes();
   }
@@ -480,6 +620,7 @@ generalVoice.subscribe(() => {
   bargeInEvidence.syncAssistantOutput();
   liveLatencyEvidence.syncAssistantOutput();
   render();
+  void renderAgentSquadStatus();
   if (generalVoice.status === "completed") {
     void renderSavedIntakes();
   }
@@ -505,9 +646,19 @@ window.addEventListener("beforeunload", () => {
 
 render();
 void renderSavedIntakes();
+void renderAgentSquadStatus();
+const agentSquadRefreshTimer = window.setInterval(() => {
+  void renderAgentSquadStatus();
+}, 3_000);
 window.addEventListener("beforeunload", () => {
+  window.clearInterval(agentSquadRefreshTimer);
   opsStatus.close();
+  proofTrends.close();
+  readinessFailures.close();
+  platformCoverage.close();
+  unsubscribePlatformCoverage();
   providerCapabilities.close();
+  providerContracts.close();
   campaignDialerProof.close();
   unsubscribeCampaignDialerProof();
   providerSimulation.close();

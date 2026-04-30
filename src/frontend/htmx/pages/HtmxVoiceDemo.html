@@ -55,6 +55,8 @@
       data-voice-monitor="#voice-monitor"
       data-voice-monitor-copy="#voice-monitor-copy"
       data-voice-prompt="#status-prompt"
+      data-voice-reconnect="#status-reconnect"
+      data-voice-reconnect-report-path="/api/voice/reconnect-traces"
       data-voice-start-general="#start-general"
       data-voice-start-guided="#start-guided"
       data-voice-stop="#stop-mic"
@@ -129,15 +131,120 @@
               <option value="quality">Quality first</option>
             </select>
           </label>
+          <label class="voice-provider-select">
+            <span>Speech engine</span>
+            <select id="speech-engine-select">
+              <option value="cascaded">Cascaded STT + LLM + TTS</option>
+              <option value="openai-realtime">OpenAI Realtime</option>
+            </select>
+          </label>
           <p class="voice-footnote" id="routing-mode-copy">
             Weighted cost, latency, and accuracy for normal production.
           </p>
+        </article>
+
+        <article class="voice-card voice-proof-dashboard-card">
+          <span class="voice-framework-pill">Proof dashboards</span>
+          <h2>Open the production evidence</h2>
+          <p class="voice-footnote">
+            The same trace-backed package routes work in every framework:
+            interruption, live timing, turn waterfalls, readiness, and provider
+            contracts.
+          </p>
+          <div class="voice-proof-links">
+            <a href="/demo-proof">
+              <strong>Run full proof</strong>
+              <span>One action runs the suite and links every surface.</span>
+            </a>
+            <a href="/barge-in">
+              <strong>Barge-in</strong>
+              <span>Interruption stop latency from browser events.</span>
+            </a>
+            <a href="/live-latency">
+              <strong>Live latency</strong>
+              <span>Speech-to-assistant timing from live browser traces.</span>
+            </a>
+            <a href="/turn-latency">
+              <strong>Turn waterfall</strong>
+              <span>Speech detection through first audio.</span>
+            </a>
+            <a href="/voice/proof-trends">
+              <strong>Sustained trends</strong>
+              <span>Repeated provider, turn, live-latency, recovery, and readiness trends.</span>
+            </a>
+            <a href="/traces">
+              <strong>Trace timelines</strong>
+              <span>Session timelines across providers and recovery.</span>
+            </a>
+            <a href="/production-readiness">
+              <strong>Readiness</strong>
+              <span>Deploy gate for runtime, providers, sinks, and proof.</span>
+            </a>
+            <a href="/provider-contracts">
+              <strong>Provider contracts</strong>
+              <span>Configured capability and fallback matrix.</span>
+            </a>
+          </div>
+        </article>
+
+        <article
+          class="voice-card voice-provider-health-card"
+          id="platform-coverage-card"
+        >
+          <p class="empty-copy">Checking Vapi replacement coverage.</p>
+        </article>
+
+        <article
+          class="voice-card voice-provider-health-card"
+          id="proof-trends-card"
+        >
+          <p class="empty-copy">Checking sustained proof trends.</p>
+        </article>
+
+        <article
+          class="voice-card voice-provider-health-card"
+          id="readiness-failures-card"
+        >
+          <p class="empty-copy">Checking readiness gate explanations.</p>
         </article>
 
         <absolute-voice-routing-status
           class="voice-card voice-routing-card"
           interval-ms="4000"
         ></absolute-voice-routing-status>
+
+        <article class="voice-card voice-agent-squad-card" id="agent-squad-card">
+          <span class="voice-framework-pill">Agent Squad</span>
+          <h2>Specialist routing is live</h2>
+          <p class="voice-footnote">
+            Say “I have a billing question about my invoice” to route from the
+            front desk to billing with a compact context policy.
+          </p>
+          <div class="voice-routing-grid">
+            <div>
+              <span>Current specialist</span>
+              <strong>front-desk</strong>
+            </div>
+            <div>
+              <span>Context policy</span>
+              <strong>handoff-summary-current-turn</strong>
+            </div>
+            <div>
+              <span>Handoffs</span>
+              <strong>0</strong>
+            </div>
+            <div>
+              <span>Messages sent</span>
+              <strong>ready</strong>
+            </div>
+          </div>
+          <p class="voice-footnote">
+            No specialist handoff in this session yet.
+          </p>
+          <p class="voice-footnote">
+            <a href="/agent-squad-contract">Open squad contract proof</a>
+          </p>
+        </article>
 
         <absolute-voice-provider-status
           class="voice-card voice-provider-health-card"
@@ -148,6 +255,11 @@
           class="voice-card voice-provider-health-card"
           interval-ms="5000"
         ></absolute-voice-provider-capabilities>
+
+        <absolute-voice-provider-contracts
+          class="voice-card voice-provider-health-card"
+          interval-ms="5000"
+        ></absolute-voice-provider-contracts>
 
         <absolute-voice-provider-simulation
           class="voice-card voice-provider-simulation-card"
@@ -198,10 +310,29 @@
           interval-ms="5000"
         ></absolute-voice-ops-status>
 
+        <absolute-voice-delivery-runtime
+          class="voice-card voice-workflow-card"
+          interval-ms="5000"
+        ></absolute-voice-delivery-runtime>
+
+        <div
+          class="voice-card voice-workflow-card"
+          data-voice-ops-action-center
+        ></div>
+
+        <div
+          class="voice-card voice-workflow-card"
+          data-voice-ops-action-history
+        ></div>
+
+        <div id="live-ops-panel"></div>
+
         <absolute-voice-trace-timeline
           class="voice-card voice-provider-health-card"
+          incident-bundle-base-path="/voice-incidents"
           interval-ms="5000"
           limit="2"
+          operations-record-base-path="/voice-operations"
         ></absolute-voice-trace-timeline>
 
         <div id="barge-in-proof-card"></div>
@@ -273,6 +404,10 @@
           <div class="voice-status-list">
             <div id="voice-htmx-status">
               <p class="empty-copy">Voice session is idle.</p>
+            </div>
+            <div class="status-row">
+              <span class="label">Reconnect</span>
+              <span class="value" id="status-reconnect">idle</span>
             </div>
             <div class="status-row">
               <span class="label">Current prompt</span>
@@ -389,8 +524,19 @@
           cheapest: "Prefer lower-cost STT providers when available.",
           quality: "Prefer the highest profiled transcript quality.",
         };
+        const engineLabels = {
+          cascaded: "Cascaded STT + LLM + TTS",
+          "openai-realtime": "OpenAI Realtime",
+        };
+        const engineCopy = {
+          cascaded:
+            "Deepgram or AssemblyAI STT, routed LLM, and OpenAI/emergency TTS.",
+          "openai-realtime":
+            "Direct OpenAI Realtime speech-to-speech route with 24kHz PCM.",
+        };
         const isProvider = (value) => Object.hasOwn(labels, value);
         const isRouting = (value) => Object.hasOwn(routingLabels, value);
+        const isEngine = (value) => Object.hasOwn(engineLabels, value);
         const params = new URLSearchParams(window.location.search);
         const provider = isProvider(params.get("provider"))
           ? params.get("provider")
@@ -402,15 +548,23 @@
           : isRouting(window.localStorage.getItem("voiceRoutingMode"))
             ? window.localStorage.getItem("voiceRoutingMode")
             : "balanced";
+        const engine = isEngine(params.get("engine"))
+          ? params.get("engine")
+          : isEngine(window.localStorage.getItem("voiceSpeechEngine"))
+            ? window.localStorage.getItem("voiceSpeechEngine")
+            : "cascaded";
+        const voicePath =
+          engine === "openai-realtime" ? "/voice/realtime" : "/voice/intake";
         const shell = document.querySelector("[data-voice-htmx]");
         const select = document.querySelector("#model-provider-select");
         const metric = document.querySelector("#metric-provider");
         const routingSelect = document.querySelector("#routing-mode-select");
         const routingMetric = document.querySelector("#metric-routing");
         const routingModeCopy = document.querySelector("#routing-mode-copy");
+        const engineSelect = document.querySelector("#speech-engine-select");
         if (shell) {
-          shell.dataset.voiceGuidedPath = `/voice/intake?scenarioId=guided&provider=${provider}&routing=${routing}`;
-          shell.dataset.voiceGeneralPath = `/voice/intake?scenarioId=general&provider=${provider}&routing=${routing}`;
+          shell.dataset.voiceGuidedPath = `${voicePath}?scenarioId=guided&provider=${provider}&routing=${routing}`;
+          shell.dataset.voiceGeneralPath = `${voicePath}?scenarioId=general&provider=${provider}&routing=${routing}`;
         }
         if (select) {
           select.value = provider;
@@ -430,6 +584,15 @@
             window.location.href = nextUrl.toString();
           });
         }
+        if (engineSelect) {
+          engineSelect.value = engine;
+          engineSelect.addEventListener("change", () => {
+            window.localStorage.setItem("voiceSpeechEngine", engineSelect.value);
+            const nextUrl = new URL(window.location.href);
+            nextUrl.searchParams.set("engine", engineSelect.value);
+            window.location.href = nextUrl.toString();
+          });
+        }
         if (metric) {
           metric.textContent = labels[provider] ?? provider;
         }
@@ -437,7 +600,8 @@
           routingMetric.textContent = routingLabels[routing] ?? routing;
         }
         if (routingModeCopy) {
-          routingModeCopy.textContent = routingCopy[routing] ?? "";
+          routingModeCopy.textContent =
+            engineCopy[engine] ?? routingCopy[routing] ?? "";
         }
         window.runCampaignDialerProof = async (button) => {
           const result = document.querySelector("#campaign-dialer-proof-result");
@@ -466,7 +630,7 @@
         };
       })();
     </script>
-    <script src="../../html/scripts/voice-ops-status.ts" type="module"></script>
+    <script src="../scripts/voice-ops-status.ts" type="module"></script>
     <script
       data-external
       src="/voice/intake/htmx/bootstrap.js"

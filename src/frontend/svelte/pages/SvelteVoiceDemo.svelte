@@ -2,30 +2,43 @@
   import { onDestroy, onMount } from "svelte";
   import Head from "@absolutejs/absolute/svelte/components/Head.js";
   import {
+    createVoiceDeliveryRuntime,
+    createVoiceOpsActionCenter,
     createVoiceOpsStatus,
+    createVoicePlatformCoverage,
+    createVoiceProofTrends,
     createVoiceProviderCapabilities,
+    createVoiceProviderContracts,
     createVoiceProviderSimulationControls,
     createVoiceProviderStatus,
+    createVoiceReadinessFailures,
     createVoiceRoutingStatus,
     createVoiceStream,
     createVoiceTraceTimeline,
     createVoiceTurnLatency,
     createVoiceTurnQuality,
   } from "@absolutejs/voice/svelte";
+  import {
+    renderVoicePlatformCoverageHTML,
+    renderVoiceProofTrendsHTML,
+    renderVoiceReadinessFailuresHTML,
+    createVoiceOpsActionCenterActions,
+    mountVoiceOpsActionHistory,
+  } from "@absolutejs/voice/client";
   import type { VoiceStream, VoiceStreamState } from "@absolutejs/voice";
   import {
     FRAMEWORKS,
     FRAMEWORK_DESCRIPTIONS,
-    getInitialVoiceModelProvider,
-    getInitialVoiceRoutingMode,
     getVoiceLeadMessage,
     getVoiceModeLabel,
     getVoiceModePrompt,
     getVoiceProviderLabel,
     getVoiceRoutingLabel,
     getVoiceRoutePath,
+    getVoiceSpeechEngineSampleRate,
     rememberVoiceModelProvider,
     rememberVoiceRoutingMode,
+    rememberVoiceSpeechEngine,
     VOICE_ASSISTANT_CONFIG,
     VOICE_DEMO_GUIDE_STEPS,
     VOICE_DEMO_GUIDE_TITLE,
@@ -36,11 +49,15 @@
     VOICE_DEMO_STOP_LABEL,
     VOICE_CALL_CONTROL_ACTIONS,
     VOICE_MODEL_PROVIDERS,
+    VOICE_PROOF_DASHBOARDS,
     VOICE_ROUTING_MODES,
+    VOICE_SPEECH_ENGINES,
+    type VoiceAgentSquadDemoStatus,
     type SavedIntake,
     type VoiceDemoMode,
     type VoiceModelProvider,
     type VoiceRoutingMode,
+    type VoiceSpeechEngine,
   } from "../../../shared/demo";
   import {
     createInitialVoiceWaveLevels,
@@ -48,10 +65,13 @@
     createDemoBargeInEvidence,
     createDemoLiveTurnLatencyEvidence,
     createDemoMicrophone,
+    fetchAgentSquadDemoStatus,
     fetchSavedIntakes,
     formatErrorMessage,
     formatDateTime,
+    formatReconnectState,
     mountDemoBargeInProof,
+    mountVoiceLiveOpsPanel,
     pushVoiceWaveLevel,
     renderDemoLiveTurnLatencyHTML,
   } from "../../shared/browser";
@@ -63,18 +83,34 @@
     error: null,
     isConnected: false,
     partial: "",
+    reconnect: {
+      attempts: 0,
+      maxAttempts: 0,
+      status: "idle",
+    },
     scenarioId: null,
     sessionId: null,
     status: "idle",
     turns: [],
   });
 
-  let { cssPath }: { cssPath?: string } = $props();
+  type SvelteVoiceDemoProps = {
+    cssPath?: string;
+    initialModelProvider?: VoiceModelProvider;
+    initialRoutingMode?: VoiceRoutingMode;
+    initialSpeechEngine?: VoiceSpeechEngine;
+  };
+
+  let {
+    cssPath,
+    initialModelProvider = "deterministic",
+    initialRoutingMode = "balanced",
+    initialSpeechEngine = "cascaded",
+  }: SvelteVoiceDemoProps = $props();
   let activeMode = $state<VoiceDemoMode | null>(null);
-  let modelProvider = $state<VoiceModelProvider>(
-    getInitialVoiceModelProvider(),
-  );
-  let routingMode = $state<VoiceRoutingMode>(getInitialVoiceRoutingMode());
+  let modelProvider = $state<VoiceModelProvider>(initialModelProvider);
+  let routingMode = $state<VoiceRoutingMode>(initialRoutingMode);
+  let speechEngine = $state<VoiceSpeechEngine>(initialSpeechEngine);
   let error = $state<string | null>(null);
   let hasStartedModes = $state<Record<VoiceDemoMode, boolean>>({
     general: false,
@@ -82,8 +118,15 @@
   });
   let isCapturing = $state(false);
   let savedIntakes = $state<SavedIntake[]>([]);
+  let agentSquadStatus = $state<VoiceAgentSquadDemoStatus | null>(null);
+  let deliveryRuntimeHTML = $state("");
+  let opsActionCenterHTML = $state("");
   let opsStatusHTML = $state("");
+  let platformCoverageHTML = $state("");
+  let proofTrendsHTML = $state("");
+  let readinessFailuresHTML = $state("");
   let providerCapabilitiesHTML = $state("");
+  let providerContractsHTML = $state("");
   let providerSimulationHTML = $state("");
   let providerStatusHTML = $state("");
   let campaignDialerProofSnapshot = $state<{
@@ -108,7 +151,12 @@
   let waveLevels = $state(createInitialVoiceWaveLevels());
   let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
   let bargeInProofElement: HTMLElement | null = null;
+  let opsActionHistoryElement: HTMLElement | null = null;
+  let liveOpsPanelElement: HTMLElement | null = null;
   let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
+  let opsActionHistory: ReturnType<typeof mountVoiceOpsActionHistory> | null =
+    null;
+  let liveOpsPanel: ReturnType<typeof mountVoiceLiveOpsPanel> | null = null;
   let providerSimulationElement: HTMLElement | null = null;
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
   let guidedVoice: VoiceStream<SavedIntake> | null = null;
@@ -116,11 +164,52 @@
   const opsStatus = createVoiceOpsStatus("/api/voice/ops-status", {
     intervalMs: 5_000,
   });
+  const deliveryRuntime = createVoiceDeliveryRuntime(
+    "/api/voice-delivery-runtime",
+    {
+      intervalMs: 5_000,
+    },
+  );
+  const opsActionCenter = createVoiceOpsActionCenter({
+    actions: createVoiceOpsActionCenterActions({
+      providers: ["deepgram", "assemblyai"],
+    }),
+  });
+  const platformCoverage = createVoicePlatformCoverage(
+    "/api/voice/vapi-coverage",
+    {
+      intervalMs: 10_000,
+    },
+  );
+  const proofTrends = createVoiceProofTrends("/api/voice/proof-trends", {
+    intervalMs: 10_000,
+  });
+  const readinessFailures = createVoiceReadinessFailures(
+    "/api/production-readiness",
+    {
+      intervalMs: 10_000,
+    },
+  );
+  const readinessFailuresWidgetOptions = {
+    description:
+      "Svelte renders structured deploy-gate explanations from production readiness JSON when calibrated gates warn or fail.",
+    title: "Readiness Gate Explanations",
+  };
+  readinessFailuresHTML = renderVoiceReadinessFailuresHTML(
+    readinessFailures.getSnapshot(),
+    readinessFailuresWidgetOptions,
+  );
   const providerStatus = createVoiceProviderStatus("/api/provider-status", {
     intervalMs: 5_000,
   });
   const providerCapabilities = createVoiceProviderCapabilities(
     "/api/provider-capabilities",
+    {
+      intervalMs: 5_000,
+    },
+  );
+  const providerContracts = createVoiceProviderContracts(
+    "/api/provider-contracts",
     {
       intervalMs: 5_000,
     },
@@ -147,15 +236,23 @@
     proofPath: "/api/turn-latency/proof",
   });
   const traceTimeline = createVoiceTraceTimeline("/api/voice-traces", {
+    incidentBundleBasePath: "/voice-incidents",
     intervalMs: 5_000,
     limit: 2,
+    operationsRecordBasePath: "/voice-operations",
   });
   let unsubscribeGuided = () => {};
   let unsubscribeGeneral = () => {};
+  let unsubscribeDeliveryRuntime = () => {};
+  let unsubscribeOpsActionCenter = () => {};
   let unsubscribeOpsStatus = () => {};
+  let unsubscribePlatformCoverage = () => {};
+  let unsubscribeProofTrends = () => {};
+  let unsubscribeReadinessFailures = () => {};
   let unsubscribeProviderSimulation = () => {};
   let unbindProviderSimulation = () => {};
   let unsubscribeProviderCapabilities = () => {};
+  let unsubscribeProviderContracts = () => {};
   let unsubscribeProviderStatus = () => {};
   let unsubscribeRoutingStatus = () => {};
   let unsubscribeTraceTimeline = () => {};
@@ -278,6 +375,12 @@
     savedIntakes = await fetchSavedIntakes();
   };
 
+  const refreshAgentSquadStatus = async () => {
+    agentSquadStatus = await fetchAgentSquadDemoStatus(
+      currentVoice.sessionId ?? undefined,
+    );
+  };
+
   const startMic = async () => {
     try {
       microphone ??= createDemoMicrophone(
@@ -294,6 +397,9 @@
         (level) => {
           waveLevels = pushVoiceWaveLevel(waveLevels, level);
         },
+        {
+          sampleRateHz: getVoiceSpeechEngineSampleRate(speechEngine),
+        },
       );
       await microphone.start();
       error = null;
@@ -309,6 +415,7 @@
 
   const stopMic = () => {
     microphone?.stop();
+    microphone = null;
     isCapturing = false;
     waveLevels = createInitialVoiceWaveLevels();
   };
@@ -333,10 +440,12 @@
     guidedVoice?.close();
     generalVoice?.close();
     guidedVoice = createVoiceStream<SavedIntake>(
-      getVoiceRoutePath("guided", modelProvider, routingMode),
+      getVoiceRoutePath("guided", modelProvider, routingMode, speechEngine),
+      { reconnectReportPath: "/api/voice/reconnect-traces" },
     );
     generalVoice = createVoiceStream<SavedIntake>(
-      getVoiceRoutePath("general", modelProvider, routingMode),
+      getVoiceRoutePath("general", modelProvider, routingMode, speechEngine),
+      { reconnectReportPath: "/api/voice/reconnect-traces" },
     );
     guidedState = { ...guidedVoice.getSnapshot() };
     generalState = { ...generalVoice.getSnapshot() };
@@ -374,6 +483,14 @@
     connectVoices();
   };
 
+  const changeSpeechEngine = (engine: VoiceSpeechEngine) => {
+    stopMic();
+    activeMode = null;
+    speechEngine = engine;
+    rememberVoiceSpeechEngine(engine);
+    connectVoices();
+  };
+
   const changeModelProviderFromEvent = (event: Event) => {
     const target = event.target;
     if (target instanceof HTMLSelectElement) {
@@ -388,16 +505,56 @@
     }
   };
 
+  const changeSpeechEngineFromEvent = (event: Event) => {
+    const target = event.target;
+    if (target instanceof HTMLSelectElement) {
+      changeSpeechEngine(target.value as VoiceSpeechEngine);
+    }
+  };
+
   onMount(() => {
     connectVoices();
     unsubscribeOpsStatus = opsStatus.subscribe(() => {
       opsStatusHTML = opsStatus.getHTML();
+    });
+    unsubscribePlatformCoverage = platformCoverage.subscribe(() => {
+      platformCoverageHTML = renderVoicePlatformCoverageHTML(
+        platformCoverage.getSnapshot(),
+        {
+          description:
+            "Svelte renders the package coverage widget against the same proof-backed route used by the server.",
+          limit: 4,
+          title: "Vapi Replacement Coverage",
+        },
+      );
+    });
+    unsubscribeProofTrends = proofTrends.subscribe(() => {
+      proofTrendsHTML = renderVoiceProofTrendsHTML(proofTrends.getSnapshot(), {
+        description:
+          "Svelte renders sustained proof freshness, provider p95, turn p95, and live p95 from the package proof-trends widget.",
+        title: "Sustained Proof Trends",
+      });
+    });
+    unsubscribeReadinessFailures = readinessFailures.subscribe(() => {
+      readinessFailuresHTML = renderVoiceReadinessFailuresHTML(
+        readinessFailures.getSnapshot(),
+        readinessFailuresWidgetOptions,
+      );
+    });
+    unsubscribeDeliveryRuntime = deliveryRuntime.subscribe(() => {
+      deliveryRuntimeHTML = deliveryRuntime.getHTML();
+    });
+    unsubscribeOpsActionCenter = opsActionCenter.subscribe(() => {
+      opsActionCenterHTML = opsActionCenter.getHTML();
     });
     unsubscribeProviderStatus = providerStatus.subscribe(() => {
       providerStatusHTML = providerStatus.getHTML();
     });
     unsubscribeProviderCapabilities = providerCapabilities.subscribe(() => {
       providerCapabilitiesHTML = providerCapabilities.getHTML();
+    });
+    unsubscribeProviderContracts = providerContracts.subscribe(() => {
+      providerContractsHTML = providerContracts.getHTML();
     });
     unsubscribeProviderSimulation = providerSimulation.subscribe(() => {
       providerSimulationHTML = providerSimulation.getHTML();
@@ -415,7 +572,28 @@
       traceTimelineHTML = traceTimeline.getHTML();
     });
     opsStatusHTML = opsStatus.getHTML();
+    deliveryRuntimeHTML = deliveryRuntime.getHTML();
+    opsActionCenterHTML = opsActionCenter.getHTML();
+    platformCoverageHTML = renderVoicePlatformCoverageHTML(
+      platformCoverage.getSnapshot(),
+      {
+        description:
+          "Svelte renders the package coverage widget against the same proof-backed route used by the server.",
+        limit: 4,
+        title: "Vapi Replacement Coverage",
+      },
+    );
+    proofTrendsHTML = renderVoiceProofTrendsHTML(proofTrends.getSnapshot(), {
+      description:
+        "Svelte renders sustained proof freshness, provider p95, turn p95, and live p95 from the package proof-trends widget.",
+      title: "Sustained Proof Trends",
+    });
+    readinessFailuresHTML = renderVoiceReadinessFailuresHTML(
+      readinessFailures.getSnapshot(),
+      readinessFailuresWidgetOptions,
+    );
     providerCapabilitiesHTML = providerCapabilities.getHTML();
+    providerContractsHTML = providerContracts.getHTML();
     providerSimulationHTML = providerSimulation.getHTML();
     providerStatusHTML = providerStatus.getHTML();
     routingStatusHTML = routingStatus.getHTML();
@@ -423,7 +601,12 @@
     turnLatencyHTML = turnLatency.getHTML();
     traceTimelineHTML = traceTimeline.getHTML();
     void opsStatus.refresh().catch(() => {});
+    void deliveryRuntime.refresh().catch(() => {});
+    void platformCoverage.refresh().catch(() => {});
+    void proofTrends.refresh().catch(() => {});
+    void readinessFailures.refresh().catch(() => {});
     void providerCapabilities.refresh().catch(() => {});
+    void providerContracts.refresh().catch(() => {});
     void providerStatus.refresh().catch(() => {});
     refreshCampaignDialerProof();
     void routingStatus.refresh().catch(() => {});
@@ -438,9 +621,50 @@
     if (bargeInProofElement) {
       bargeInProof = mountDemoBargeInProof(bargeInProofElement);
     }
+    if (opsActionHistoryElement) {
+      opsActionHistory = mountVoiceOpsActionHistory(
+        opsActionHistoryElement,
+        "/api/voice/ops-actions/history",
+        { intervalMs: 5_000 },
+      );
+    }
+    if (liveOpsPanelElement) {
+      liveOpsPanel = mountVoiceLiveOpsPanel(liveOpsPanelElement, {
+        getSessionId: () => currentVoice.sessionId,
+        onControl: ({ action, detail, tag }) => {
+          const activeVoice = activeMode === "general" ? generalVoice : guidedVoice;
+          if (!activeVoice) {
+            return;
+          }
+          if (action === "force-handoff") {
+            activeVoice.callControl({
+              action: "transfer",
+              metadata: { source: "live-ops" },
+              reason: detail,
+              target: tag,
+            });
+            stopMic();
+          } else if (action === "escalate" || action === "operator-takeover") {
+            activeVoice.callControl({
+              action: "escalate",
+              metadata: {
+                source: "live-ops",
+                takeover: action === "operator-takeover",
+              },
+              reason: detail,
+            });
+            stopMic();
+          } else if (action === "pause-assistant") {
+            stopMic();
+          }
+        },
+      });
+    }
     void refreshIntakes();
+    void refreshAgentSquadStatus();
     refreshTimer = setInterval(() => {
       void refreshIntakes();
+      void refreshAgentSquadStatus();
     }, 4000);
   });
 
@@ -451,20 +675,34 @@
     stopMic();
     unsubscribeGuided();
     unsubscribeGeneral();
+    unsubscribeDeliveryRuntime();
+    unsubscribeOpsActionCenter();
     unsubscribeOpsStatus();
+    unsubscribePlatformCoverage();
+    unsubscribeProofTrends();
+    unsubscribeReadinessFailures();
     unsubscribeProviderSimulation();
+    readinessFailures.close();
     unbindProviderSimulation();
     unsubscribeProviderCapabilities();
+    unsubscribeProviderContracts();
     unsubscribeProviderStatus();
     unsubscribeRoutingStatus();
     unsubscribeTraceTimeline();
     unsubscribeTurnQuality();
     unsubscribeTurnLatency();
     bargeInProof?.close();
+    opsActionHistory?.close();
+    liveOpsPanel?.close();
     guidedVoice?.close();
     generalVoice?.close();
     opsStatus.close();
+    platformCoverage.close();
+    proofTrends.close();
+    deliveryRuntime.close();
+    opsActionCenter.close();
     providerCapabilities.close();
+    providerContracts.close();
     providerSimulation.close();
     providerStatus.close();
     routingStatus.close();
@@ -571,15 +809,98 @@
             {/each}
           </select>
         </label>
+        <label class="voice-provider-select">
+          <span>Speech engine</span>
+          <select value={speechEngine} on:change={changeSpeechEngineFromEvent}>
+            {#each VOICE_SPEECH_ENGINES as engine}
+              <option value={engine.id}>{engine.label}</option>
+            {/each}
+          </select>
+        </label>
         <p class="voice-footnote">
-          {VOICE_ROUTING_MODES.find((item) => item.id === routingMode)
-            ?.description ?? ""}
+          {VOICE_SPEECH_ENGINES.find((item) => item.id === speechEngine)
+            ?.description ??
+            VOICE_ROUTING_MODES.find((item) => item.id === routingMode)
+              ?.description ??
+            ""}
         </p>
       </article>
+
+      <article class="voice-card voice-proof-dashboard-card">
+        <span class="voice-framework-pill">Proof dashboards</span>
+        <h2>Open the production evidence</h2>
+        <p class="voice-footnote">
+          The same trace-backed package routes work in every framework:
+          interruption, live timing, turn waterfalls, readiness, and provider
+          contracts.
+        </p>
+        <div class="voice-proof-links">
+          {#each VOICE_PROOF_DASHBOARDS as dashboard}
+            <a href={dashboard.href}>
+              <strong>{dashboard.label}</strong>
+              <span>{dashboard.description}</span>
+            </a>
+          {/each}
+        </div>
+      </article>
+
+      <div class="voice-card voice-provider-health-card">
+        {@html platformCoverageHTML}
+      </div>
+
+      <div class="voice-card voice-provider-health-card">
+        {@html proofTrendsHTML}
+      </div>
+
+      <div class="voice-card voice-provider-health-card">
+        {@html readinessFailuresHTML}
+      </div>
 
       <div class="voice-card voice-routing-card voice-routing-status-host">
         {@html routingStatusHTML}
       </div>
+
+      <article class="voice-card voice-agent-squad-card">
+        <span class="voice-framework-pill">Agent Squad</span>
+        <h2>Specialist routing is live</h2>
+        <p class="voice-footnote">
+          Say “I have a billing question about my invoice” to route from the
+          front desk to billing with a compact context policy.
+        </p>
+        <div class="voice-routing-grid">
+          <div>
+            <span>Current specialist</span>
+            <strong>{agentSquadStatus?.currentAgentId ?? "front-desk"}</strong>
+          </div>
+          <div>
+            <span>Context policy</span>
+            <strong>
+              {agentSquadStatus?.contextPolicy ??
+                "handoff-summary-current-turn"}
+            </strong>
+          </div>
+          <div>
+            <span>Handoffs</span>
+            <strong>{agentSquadStatus?.handoffCount ?? 0}</strong>
+          </div>
+          <div>
+            <span>Messages sent</span>
+            <strong>{agentSquadStatus?.messageCount ?? "ready"}</strong>
+          </div>
+        </div>
+        <p class="voice-footnote">
+          {#if agentSquadStatus?.lastHandoff}
+            {agentSquadStatus.lastHandoff.fromAgentId} → {agentSquadStatus.lastHandoff.targetAgentId}: {agentSquadStatus.lastHandoff.summary ??
+              agentSquadStatus.lastHandoff.reason ??
+              "handoff applied"}
+          {:else}
+            No specialist handoff in this session yet.
+          {/if}
+        </p>
+        <p class="voice-footnote">
+          <a href="/agent-squad-contract">Open squad contract proof</a>
+        </p>
+      </article>
 
       <div class="voice-card voice-provider-health-card voice-provider-status-host">
         {@html providerStatusHTML}
@@ -587,6 +908,10 @@
 
       <div class="voice-card voice-provider-health-card voice-provider-capabilities-host">
         {@html providerCapabilitiesHTML}
+      </div>
+
+      <div class="voice-card voice-provider-health-card voice-provider-contracts-host">
+        {@html providerContractsHTML}
       </div>
 
       <div
@@ -661,6 +986,21 @@
         {@html opsStatusHTML}
       </div>
 
+      <div class="voice-card voice-workflow-card voice-ops-status-host">
+        {@html deliveryRuntimeHTML}
+      </div>
+
+      <div class="voice-card voice-workflow-card voice-ops-status-host">
+        {@html opsActionCenterHTML}
+      </div>
+
+      <div bind:this={liveOpsPanelElement}></div>
+
+      <div
+        class="voice-card voice-workflow-card voice-ops-status-host"
+        bind:this={opsActionHistoryElement}
+      ></div>
+
       <div class="voice-card voice-provider-health-card voice-trace-timeline-host">
         {@html traceTimelineHTML}
       </div>
@@ -733,6 +1073,10 @@
           <div class="status-row">
             <span class="label">Voice status</span>
             <span class="value">{currentVoice.status}</span>
+          </div>
+          <div class="status-row">
+            <span class="label">Reconnect</span>
+            <span class="value">{formatReconnectState(currentVoice.reconnect)}</span>
           </div>
           <div class="status-row">
             <span class="label">Current prompt</span>

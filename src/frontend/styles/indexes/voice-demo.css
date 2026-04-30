@@ -216,6 +216,47 @@ nav a.active {
   grid-column: span 4;
 }
 
+.voice-proof-dashboard-card {
+  background:
+    radial-gradient(circle at top right, rgba(94, 234, 212, 0.14), transparent 36%),
+    linear-gradient(135deg, rgba(59, 130, 246, 0.13), transparent 48%),
+    rgba(255, 255, 255, 0.045);
+  border-color: rgba(94, 234, 212, 0.2);
+  grid-column: span 8;
+}
+
+.voice-proof-links {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.voice-proof-links a {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(94, 234, 212, 0.13);
+  border-radius: 16px;
+  display: grid;
+  gap: 5px;
+  padding: 13px;
+}
+
+.voice-proof-links a:hover {
+  background: rgba(94, 234, 212, 0.08);
+  border-color: rgba(94, 234, 212, 0.28);
+}
+
+.voice-proof-links strong {
+  color: var(--ink);
+  font-size: 0.92rem;
+}
+
+.voice-proof-links span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
 .voice-workflow-card {
   background:
     linear-gradient(135deg, rgba(34, 197, 94, 0.15), transparent 42%),
@@ -349,6 +390,7 @@ nav a.active {
   font-size: 0.84rem;
 }
 
+.voice-provider-select input,
 .voice-provider-select select {
   appearance: none;
   background:
@@ -364,12 +406,23 @@ nav a.active {
   font: inherit;
   font-weight: 800;
   min-height: 52px;
-  padding: 0 44px 0 14px;
+  padding: 0 14px;
   width: 100%;
+}
+
+.voice-provider-select select {
+  padding-right: 44px;
 }
 
 .voice-routing-card {
   border-color: rgba(245, 158, 11, 0.28);
+}
+
+.voice-agent-squad-card {
+  border-color: rgba(45, 212, 191, 0.34);
+  background:
+    radial-gradient(circle at top right, rgba(45, 212, 191, 0.16), transparent 34%),
+    rgba(255, 255, 255, 0.045);
 }
 
 .voice-routing-card.absolute-voice-routing-status,
@@ -1172,9 +1225,39 @@ nav a.active {
   border-color: rgba(251, 191, 36, 0.55);
 }
 
+.absolute-voice-trace-timeline__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .absolute-voice-trace-timeline__session a {
   color: #5eead4;
   font-weight: 800;
+}
+
+.voice-live-ops-panel {
+  border-color: rgba(245, 158, 11, 0.32);
+}
+
+.voice-live-ops-panel__session {
+  background: rgba(15, 23, 42, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  display: grid;
+  gap: 4px;
+  margin: 14px 0;
+  padding: 12px;
+}
+
+.voice-live-ops-panel__session span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+}
+
+.voice-live-ops-error {
+  color: #fca5a5;
 }
 
 .voice-barge-in-proof {
@@ -1307,11 +1390,13 @@ nav a.active {
 
   .voice-card-wide,
   .voice-card-side,
-  .voice-assistant-config {
+  .voice-assistant-config,
+  .voice-proof-dashboard-card {
     grid-column: span 12;
   }
 
-  .voice-config-grid {
+  .voice-config-grid,
+  .voice-proof-links {
     grid-template-columns: 1fr;
   }
 

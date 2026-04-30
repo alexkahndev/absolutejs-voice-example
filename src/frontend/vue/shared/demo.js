@@ -34,9 +34,94 @@ export const VOICE_ROUTING_MODES = [
     shortLabel: "Quality"
   }
 ];
+export const VOICE_SPEECH_ENGINES = [
+  {
+    description: "Deepgram or AssemblyAI STT, routed LLM, and OpenAI/emergency TTS.",
+    id: "cascaded",
+    label: "Cascaded STT + LLM + TTS",
+    sampleRateHz: 16000,
+    shortLabel: "Cascaded"
+  },
+  {
+    description: "Direct OpenAI Realtime speech-to-speech route with 24kHz PCM.",
+    id: "openai-realtime",
+    label: "OpenAI Realtime",
+    sampleRateHz: 24000,
+    shortLabel: "Realtime"
+  }
+];
+export const VOICE_PROOF_DASHBOARDS = [
+  {
+    description: "One action runs the demo proof suite and links every surface.",
+    href: "/demo-proof",
+    label: "Run full proof"
+  },
+  {
+    description: "Interruption stop latency from browser barge-in events.",
+    href: "/barge-in",
+    label: "Barge-in"
+  },
+  {
+    description: "Speech-to-assistant timing from live browser traces.",
+    href: "/live-latency",
+    label: "Live latency"
+  },
+  {
+    description: "Turn waterfall from speech detection through first audio.",
+    href: "/turn-latency",
+    label: "Turn waterfall"
+  },
+  {
+    description: "Repeated provider, turn, live-latency, recovery, and readiness trends.",
+    href: "/voice/proof-trends",
+    label: "Sustained trends"
+  },
+  {
+    description: "Session timelines across providers, tools, and recovery.",
+    href: "/traces",
+    label: "Trace timelines"
+  },
+  {
+    description: "Single-session trace, audit, handoff, and tool support record.",
+    href: "/voice-operations/demo-incident-bundle",
+    label: "Operations record"
+  },
+  {
+    description: "Copyable incident handoff generated from the operations record.",
+    href: "/voice-operations/demo-incident-bundle/incident.md",
+    label: "Incident handoff"
+  },
+  {
+    description: "Redacted Markdown export for support and incident response.",
+    href: "/voice-incidents/demo-incident-bundle/markdown",
+    label: "Incident bundle"
+  },
+  {
+    description: "Deploy gate for runtime, providers, sinks, and proof.",
+    href: "/production-readiness",
+    label: "Readiness"
+  },
+  {
+    description: "Provider fallback, queue failures, handoffs, live ops, and latency SLOs.",
+    href: "/ops-recovery",
+    label: "Ops recovery"
+  },
+  {
+    description: "Redaction, retention dry-runs, audit exports, and provider key posture.",
+    href: "/data-control",
+    label: "Data control"
+  },
+  {
+    description: "Configured provider capability and fallback matrix.",
+    href: "/provider-contracts",
+    label: "Provider contracts"
+  }
+];
 export const isVoiceModelProvider = (value) => value === "deterministic" || value === "openai" || value === "anthropic" || value === "gemini";
 export const isVoiceRoutingMode = (value) => value === "balanced" || value === "fastest" || value === "cheapest" || value === "quality";
+export const isVoiceSpeechEngine = (value) => value === "cascaded" || value === "openai-realtime";
 export const VOICE_ROUTE_PATH = "/voice/intake";
+export const VOICE_REALTIME_ROUTE_PATH = "/voice/realtime";
 export const VOICE_DEMO_GUIDE_TITLE = "Run the guided voice test";
 export const VOICE_DEMO_GUIDE_STEPS = [
   "Click Start voice test to begin the first prompt.",
@@ -92,7 +177,7 @@ export const VOICE_TEST_QUESTIONS = [
   "Now describe what you are trying to do or test.",
   "Finish with any detail that feels blocked, risky, or unclear."
 ];
-export const getVoiceRoutePath = (scenarioId, provider, routing) => {
+export const getVoiceRoutePath = (scenarioId, provider, routing, engine = "cascaded") => {
   const params = new URLSearchParams({
     scenarioId
   });
@@ -102,10 +187,13 @@ export const getVoiceRoutePath = (scenarioId, provider, routing) => {
   if (routing) {
     params.set("routing", routing);
   }
-  return `${VOICE_ROUTE_PATH}?${params.toString()}`;
+  const path = engine === "openai-realtime" ? VOICE_REALTIME_ROUTE_PATH : VOICE_ROUTE_PATH;
+  return `${path}?${params.toString()}`;
 };
 export const getVoiceProviderLabel = (provider) => VOICE_MODEL_PROVIDERS.find((item) => item.id === provider)?.label ?? provider;
 export const getVoiceRoutingLabel = (routing) => VOICE_ROUTING_MODES.find((item) => item.id === routing)?.label ?? routing ?? "Unknown";
+export const getVoiceSpeechEngineLabel = (engine) => VOICE_SPEECH_ENGINES.find((item) => item.id === engine)?.label ?? engine;
+export const getVoiceSpeechEngineSampleRate = (engine) => VOICE_SPEECH_ENGINES.find((item) => item.id === engine)?.sampleRateHz ?? 16000;
 export const getVoiceProviderStatusLabel = (status) => {
   switch (status) {
     case "healthy":
@@ -156,6 +244,22 @@ export const getInitialVoiceRoutingMode = () => {
 export const rememberVoiceRoutingMode = (routing) => {
   if (typeof window !== "undefined") {
     window.localStorage.setItem("voiceRoutingMode", routing);
+  }
+};
+export const getInitialVoiceSpeechEngine = () => {
+  if (typeof window === "undefined") {
+    return "cascaded";
+  }
+  const urlEngine = new URLSearchParams(window.location.search).get("engine");
+  if (isVoiceSpeechEngine(urlEngine)) {
+    return urlEngine;
+  }
+  const storedEngine = window.localStorage.getItem("voiceSpeechEngine");
+  return isVoiceSpeechEngine(storedEngine) ? storedEngine : "cascaded";
+};
+export const rememberVoiceSpeechEngine = (engine) => {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem("voiceSpeechEngine", engine);
   }
 };
 export const getVoiceScenarioLabel = (scenarioId) => scenarioId === "guided" ? "Guided test" : "General recording";

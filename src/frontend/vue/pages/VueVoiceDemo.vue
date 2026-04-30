@@ -2,29 +2,39 @@
 import { computed, onMounted, onUnmounted, ref, watchEffect } from "vue";
 import {
   useVoiceStream,
+  VoiceDeliveryRuntime,
+  VoiceOpsActionCenter,
   VoiceOpsStatus,
+  VoicePlatformCoverage,
+  VoiceProofTrends,
   VoiceProviderCapabilities,
+  VoiceProviderContracts,
   VoiceProviderSimulationControls,
   VoiceProviderStatus,
+  VoiceReadinessFailures,
   VoiceRoutingStatus,
   useVoiceTraceTimeline,
   VoiceTurnLatency,
   VoiceTurnQuality,
 } from "@absolutejs/voice/vue";
-import { createVoiceTraceTimelineViewModel } from "@absolutejs/voice/client";
+import {
+  createVoiceOpsActionCenterActions,
+  createVoiceTraceTimelineViewModel,
+  mountVoiceOpsActionHistory,
+} from "@absolutejs/voice/client";
 import {
   FRAMEWORKS,
   FRAMEWORK_DESCRIPTIONS,
-  getInitialVoiceModelProvider,
-  getInitialVoiceRoutingMode,
   getVoiceLeadMessage,
   getVoiceModeLabel,
   getVoiceModePrompt,
   getVoiceProviderLabel,
   getVoiceRoutingLabel,
   getVoiceRoutePath,
+  getVoiceSpeechEngineSampleRate,
   rememberVoiceModelProvider,
   rememberVoiceRoutingMode,
+  rememberVoiceSpeechEngine,
   VOICE_ASSISTANT_CONFIG,
   VOICE_DEMO_GUIDE_STEPS,
   VOICE_DEMO_GUIDE_TITLE,
@@ -35,11 +45,15 @@ import {
   VOICE_DEMO_STOP_LABEL,
   VOICE_CALL_CONTROL_ACTIONS,
   VOICE_MODEL_PROVIDERS,
+  VOICE_PROOF_DASHBOARDS,
   VOICE_ROUTING_MODES,
+  VOICE_SPEECH_ENGINES,
+  type VoiceAgentSquadDemoStatus,
   type SavedIntake,
   type VoiceDemoMode,
   type VoiceModelProvider,
   type VoiceRoutingMode,
+  type VoiceSpeechEngine,
 } from "../../../shared/demo";
 import {
   createInitialVoiceWaveLevels,
@@ -47,21 +61,49 @@ import {
   createDemoBargeInEvidence,
   createDemoLiveTurnLatencyEvidence,
   createDemoMicrophone,
+  fetchAgentSquadDemoStatus,
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
+  formatReconnectState,
   mountDemoBargeInProof,
+  mountVoiceLiveOpsPanel,
   pushVoiceWaveLevel,
   renderDemoLiveTurnLatencyHTML,
 } from "../../shared/browser";
 
-const modelProvider = ref<VoiceModelProvider>(getInitialVoiceModelProvider());
-const routingMode = ref<VoiceRoutingMode>(getInitialVoiceRoutingMode());
+type VueVoiceDemoProps = {
+  initialModelProvider?: VoiceModelProvider;
+  initialRoutingMode?: VoiceRoutingMode;
+  initialSpeechEngine?: VoiceSpeechEngine;
+};
+
+const props = withDefaults(defineProps<VueVoiceDemoProps>(), {
+  initialModelProvider: "deterministic",
+  initialRoutingMode: "balanced",
+  initialSpeechEngine: "cascaded",
+});
+
+const modelProvider = ref<VoiceModelProvider>(props.initialModelProvider);
+const routingMode = ref<VoiceRoutingMode>(props.initialRoutingMode);
+const speechEngine = ref<VoiceSpeechEngine>(props.initialSpeechEngine);
 const guidedVoice = useVoiceStream<SavedIntake>(
-  getVoiceRoutePath("guided", modelProvider.value, routingMode.value),
+  getVoiceRoutePath(
+    "guided",
+    modelProvider.value,
+    routingMode.value,
+    speechEngine.value,
+  ),
+  { reconnectReportPath: "/api/voice/reconnect-traces" },
 );
 const generalVoice = useVoiceStream<SavedIntake>(
-  getVoiceRoutePath("general", modelProvider.value, routingMode.value),
+  getVoiceRoutePath(
+    "general",
+    modelProvider.value,
+    routingMode.value,
+    speechEngine.value,
+  ),
+  { reconnectReportPath: "/api/voice/reconnect-traces" },
 );
 const traceTimeline = useVoiceTraceTimeline("/api/voice-traces", {
   intervalMs: 5_000,
@@ -139,12 +181,17 @@ const hasStartedModes = ref<Record<VoiceDemoMode, boolean>>({
 });
 const micError = ref<string | null>(null);
 const savedIntakes = ref<SavedIntake[]>([]);
+const agentSquadStatus = ref<VoiceAgentSquadDemoStatus | null>(null);
 const waveLevels = ref(createInitialVoiceWaveLevels());
 const bargeInProofEl = ref<HTMLElement | null>(null);
+const opsActionHistoryEl = ref<HTMLElement | null>(null);
+const liveOpsPanelEl = ref<HTMLElement | null>(null);
 const liveLatencyHTML = ref("");
 let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
+let opsActionHistory: ReturnType<typeof mountVoiceOpsActionHistory> | null = null;
+let liveOpsPanel: ReturnType<typeof mountVoiceLiveOpsPanel> | null = null;
 const currentVoice = computed(() =>
   activeMode.value === "general" ? generalVoice : guidedVoice,
 );
@@ -206,7 +253,11 @@ const traceTimelineModel = computed(() =>
       report: traceTimeline.report.value,
       updatedAt: traceTimeline.updatedAt.value,
     },
-    { limit: 2 },
+    {
+      incidentBundleBasePath: "/voice-incidents",
+      limit: 2,
+      operationsRecordBasePath: "/voice-operations",
+    },
   ),
 );
 watchEffect(() => {
@@ -224,6 +275,12 @@ const refreshIntakes = async () => {
   savedIntakes.value = await fetchSavedIntakes();
 };
 
+const refreshAgentSquadStatus = async () => {
+  agentSquadStatus.value = await fetchAgentSquadDemoStatus(
+    currentVoice.value.sessionId.value || undefined,
+  );
+};
+
 const startMic = async () => {
   try {
     microphone ??= createDemoMicrophone(
@@ -236,6 +293,9 @@ const startMic = async () => {
       },
       (level) => {
         waveLevels.value = pushVoiceWaveLevel(waveLevels.value, level);
+      },
+      {
+        sampleRateHz: getVoiceSpeechEngineSampleRate(speechEngine.value),
       },
     );
     await microphone.start();
@@ -252,6 +312,7 @@ const startMic = async () => {
 
 const stopMic = () => {
   microphone?.stop();
+  microphone = null;
   isCapturing.value = false;
   waveLevels.value = createInitialVoiceWaveLevels();
 };
@@ -272,6 +333,14 @@ const changeRoutingMode = (routing: VoiceRoutingMode) => {
   window.location.href = nextUrl.toString();
 };
 
+const changeSpeechEngine = (engine: VoiceSpeechEngine) => {
+  stopMic();
+  rememberVoiceSpeechEngine(engine);
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("engine", engine);
+  window.location.href = nextUrl.toString();
+};
+
 const changeModelProviderFromEvent = (event: Event) => {
   const target = event.target;
   if (target instanceof HTMLSelectElement) {
@@ -283,6 +352,13 @@ const changeRoutingModeFromEvent = (event: Event) => {
   const target = event.target;
   if (target instanceof HTMLSelectElement) {
     changeRoutingMode(target.value as VoiceRoutingMode);
+  }
+};
+
+const changeSpeechEngineFromEvent = (event: Event) => {
+  const target = event.target;
+  if (target instanceof HTMLSelectElement) {
+    changeSpeechEngine(target.value as VoiceSpeechEngine);
   }
 };
 
@@ -306,6 +382,41 @@ onMounted(() => {
   if (bargeInProofEl.value) {
     bargeInProof = mountDemoBargeInProof(bargeInProofEl.value);
   }
+  if (opsActionHistoryEl.value) {
+    opsActionHistory = mountVoiceOpsActionHistory(
+      opsActionHistoryEl.value,
+      "/api/voice/ops-actions/history",
+      { intervalMs: 5_000 },
+    );
+  }
+  if (liveOpsPanelEl.value) {
+    liveOpsPanel = mountVoiceLiveOpsPanel(liveOpsPanelEl.value, {
+      getSessionId: () => currentVoice.value.sessionId.value,
+      onControl: ({ action, detail, tag }) => {
+        if (action === "force-handoff") {
+          currentVoice.value.callControl({
+            action: "transfer",
+            metadata: { source: "live-ops" },
+            reason: detail,
+            target: tag,
+          });
+          stopMic();
+        } else if (action === "escalate" || action === "operator-takeover") {
+          currentVoice.value.callControl({
+            action: "escalate",
+            metadata: {
+              source: "live-ops",
+              takeover: action === "operator-takeover",
+            },
+            reason: detail,
+          });
+          stopMic();
+        } else if (action === "pause-assistant") {
+          stopMic();
+        }
+      },
+    });
+  }
   void refreshIntakes();
   void refreshCampaignDialerProof().catch((error) => {
     campaignDialerProof.value = {
@@ -315,7 +426,9 @@ onMounted(() => {
   });
   refreshTimer = setInterval(() => {
     void refreshIntakes();
+    void refreshAgentSquadStatus();
   }, 4_000);
+  void refreshAgentSquadStatus();
 });
 
 onUnmounted(() => {
@@ -323,6 +436,8 @@ onUnmounted(() => {
     clearInterval(refreshTimer);
   }
   bargeInProof?.close();
+  opsActionHistory?.close();
+  liveOpsPanel?.close();
   stopMic();
 });
 </script>
@@ -440,18 +555,125 @@ onUnmounted(() => {
               </option>
             </select>
           </label>
+          <label class="voice-provider-select">
+            <span>Speech engine</span>
+            <select
+              :value="speechEngine"
+              @change="changeSpeechEngineFromEvent"
+            >
+              <option
+                v-for="engine in VOICE_SPEECH_ENGINES"
+                :key="engine.id"
+                :value="engine.id"
+              >
+                {{ engine.label }}
+              </option>
+            </select>
+          </label>
           <p class="voice-footnote">
             {{
+              VOICE_SPEECH_ENGINES.find((item) => item.id === speechEngine)
+                ?.description ??
               VOICE_ROUTING_MODES.find((item) => item.id === routingMode)
                 ?.description
             }}
           </p>
         </article>
 
+        <article class="voice-card voice-proof-dashboard-card">
+          <span class="voice-framework-pill">Proof dashboards</span>
+          <h2>Open the production evidence</h2>
+          <p class="voice-footnote">
+            The same trace-backed package routes work in every framework:
+            interruption, live timing, turn waterfalls, readiness, and provider
+            contracts.
+          </p>
+          <div class="voice-proof-links">
+            <a
+              v-for="dashboard in VOICE_PROOF_DASHBOARDS"
+              :key="dashboard.href"
+              :href="dashboard.href"
+            >
+              <strong>{{ dashboard.label }}</strong>
+              <span>{{ dashboard.description }}</span>
+            </a>
+          </div>
+        </article>
+
+        <VoicePlatformCoverage
+          class="voice-card voice-provider-health-card"
+          description="Vue renders the package coverage component against the same proof-backed route used by the server."
+          :interval-ms="10000"
+          :limit="4"
+          path="/api/voice/vapi-coverage"
+          title="Vapi Replacement Coverage"
+        />
+
+        <VoiceProofTrends
+          class="voice-card voice-provider-health-card"
+          description="Vue renders sustained proof freshness, provider p95, turn p95, and live p95 from the package proof-trends widget."
+          :interval-ms="10000"
+          path="/api/voice/proof-trends"
+          title="Sustained Proof Trends"
+        />
+
+        <VoiceReadinessFailures
+          class="voice-card voice-provider-health-card"
+          description="Vue renders structured deploy-gate explanations from production readiness JSON when calibrated gates warn or fail."
+          :interval-ms="10000"
+          path="/api/production-readiness"
+          title="Readiness Gate Explanations"
+        />
+
         <VoiceRoutingStatus
           class="voice-card voice-routing-card"
           :interval-ms="4000"
         />
+
+        <article class="voice-card voice-agent-squad-card">
+          <span class="voice-framework-pill">Agent Squad</span>
+          <h2>Specialist routing is live</h2>
+          <p class="voice-footnote">
+            Say “I have a billing question about my invoice” to route from the
+            front desk to billing with a compact context policy.
+          </p>
+          <div class="voice-routing-grid">
+            <div>
+              <span>Current specialist</span>
+              <strong>{{ agentSquadStatus?.currentAgentId ?? "front-desk" }}</strong>
+            </div>
+            <div>
+              <span>Context policy</span>
+              <strong>{{
+                agentSquadStatus?.contextPolicy ??
+                "handoff-summary-current-turn"
+              }}</strong>
+            </div>
+            <div>
+              <span>Handoffs</span>
+              <strong>{{ agentSquadStatus?.handoffCount ?? 0 }}</strong>
+            </div>
+            <div>
+              <span>Messages sent</span>
+              <strong>{{ agentSquadStatus?.messageCount ?? "ready" }}</strong>
+            </div>
+          </div>
+          <p class="voice-footnote">
+            <template v-if="agentSquadStatus?.lastHandoff">
+              {{ agentSquadStatus.lastHandoff.fromAgentId }} →
+              {{ agentSquadStatus.lastHandoff.targetAgentId }}:
+              {{
+                agentSquadStatus.lastHandoff.summary ??
+                agentSquadStatus.lastHandoff.reason ??
+                "handoff applied"
+              }}
+            </template>
+            <template v-else>No specialist handoff in this session yet.</template>
+          </p>
+          <p class="voice-footnote">
+            <a href="/agent-squad-contract">Open squad contract proof</a>
+          </p>
+        </article>
 
         <VoiceProviderStatus
           class="voice-card voice-provider-health-card"
@@ -459,6 +681,11 @@ onUnmounted(() => {
         />
 
         <VoiceProviderCapabilities
+          class="voice-card voice-provider-health-card"
+          :interval-ms="5000"
+        />
+
+        <VoiceProviderContracts
           class="voice-card voice-provider-health-card"
           :interval-ms="5000"
         />
@@ -543,6 +770,27 @@ onUnmounted(() => {
           :interval-ms="5000"
         />
 
+        <VoiceDeliveryRuntime
+          class="voice-card voice-workflow-card"
+          :interval-ms="5000"
+        />
+
+        <VoiceOpsActionCenter
+          class="voice-card voice-workflow-card"
+          :actions="
+            createVoiceOpsActionCenterActions({
+              providers: ['deepgram', 'assemblyai'],
+            })
+          "
+        />
+
+        <div ref="liveOpsPanelEl" />
+
+        <div
+          ref="opsActionHistoryEl"
+          class="voice-card voice-workflow-card"
+        />
+
         <article
           class="voice-card voice-provider-health-card absolute-voice-trace-timeline"
           :class="`absolute-voice-trace-timeline--${traceTimelineModel.status}`"
@@ -576,7 +824,21 @@ onUnmounted(() => {
                 {{ session.label }} · {{ session.durationLabel }} ·
                 {{ session.providerLabel }}
               </p>
-              <a :href="session.detailHref">Open timeline</a>
+              <p class="absolute-voice-trace-timeline__actions">
+                <a :href="session.detailHref">Open timeline</a>
+                <a
+                  v-if="session.operationsRecordHref"
+                  :href="session.operationsRecordHref"
+                >
+                  Open operations record
+                </a>
+                <a
+                  v-if="session.incidentBundleHref"
+                  :href="session.incidentBundleHref"
+                >
+                  Export incident bundle
+                </a>
+              </p>
             </article>
           </div>
           <p v-else class="absolute-voice-trace-timeline__empty">
@@ -661,6 +923,12 @@ onUnmounted(() => {
             <div class="status-row">
               <span class="label">Voice status</span>
               <span class="value">{{ currentVoice.status.value }}</span>
+            </div>
+            <div class="status-row">
+              <span class="label">Reconnect</span>
+              <span class="value">{{
+                formatReconnectState(currentVoice.reconnect.value)
+              }}</span>
             </div>
             <div class="status-row">
               <span class="label">Current prompt</span>

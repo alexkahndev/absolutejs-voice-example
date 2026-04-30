@@ -3,6 +3,9 @@ import {
   createVoiceAudioPlayer,
   createVoiceBargeInMonitor,
   createVoiceLiveTurnLatencyMonitor,
+  postVoiceLiveOpsAction as postCoreVoiceLiveOpsAction,
+  type VoiceLiveOpsAction,
+  type VoiceLiveOpsActionResult as CoreVoiceLiveOpsActionResult,
   type VoiceLiveTurnLatencyMonitorOptions,
   type VoiceLiveTurnLatencySnapshot,
 } from "@absolutejs/voice/client";
@@ -11,10 +14,16 @@ import type {
   VoiceBargeInMonitor,
   VoiceBargeInReport,
   VoiceOpsStatusReport,
+  VoiceReconnectClientState,
   VoiceRoutingDecisionSummary,
   VoiceStreamState,
 } from "@absolutejs/voice";
-import type { SavedIntake } from "../../shared/demo";
+import type {
+  SavedIntake,
+  VoiceAgentSquadDemoStatus,
+} from "../../shared/demo";
+
+export type { VoiceLiveOpsAction };
 
 const VOICE_WAVE_POINTS = 48;
 const VOICE_WAVE_WIDTH = 320;
@@ -82,6 +91,21 @@ export const fetchSavedIntakes = async () => {
   return (await response.json()) as SavedIntake[];
 };
 
+export const fetchAgentSquadDemoStatus = async (sessionId?: string) => {
+  const url = new URL("/api/agent-squad/status", window.location.origin);
+  if (sessionId) {
+    url.searchParams.set("sessionId", sessionId);
+  }
+
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    return null;
+  }
+
+  return (await response.json()) as VoiceAgentSquadDemoStatus;
+};
+
 export const fetchLatestRoutingDecision = async () => {
   const response = await fetch("/api/routing/latest");
 
@@ -117,6 +141,23 @@ export const formatDateTime = (value: number) =>
     dateStyle: "medium",
     timeStyle: "short",
   });
+
+export const formatReconnectState = (
+  reconnect: VoiceReconnectClientState,
+) => {
+  const pieces: string[] = [reconnect.status];
+
+  if (reconnect.attempts > 0 || reconnect.maxAttempts > 0) {
+    pieces.push(`${reconnect.attempts}/${reconnect.maxAttempts} attempts`);
+  }
+
+  if (reconnect.nextAttemptAt) {
+    const waitMs = Math.max(0, reconnect.nextAttemptAt - Date.now());
+    pieces.push(`retry in ${Math.ceil(waitMs / 100) / 10}s`);
+  }
+
+  return pieces.join(" · ");
+};
 
 export const formatErrorMessage = (error: unknown): string => {
   if (typeof error === "string" && error.trim()) {
@@ -224,6 +265,7 @@ export const createVoiceWavePath = (
 export const createDemoMicrophone = (
   onAudio: (audio: Uint8Array | ArrayBuffer) => void,
   onLevel?: (level: number) => void,
+  options: { sampleRateHz?: number } = {},
 ) => {
   let capture: ReturnType<typeof createMicrophoneCapture> | null = null;
 
@@ -244,7 +286,7 @@ export const createDemoMicrophone = (
           onLevel?.(getPcmLevel(audio));
           onAudio(audio);
         },
-        sampleRateHz: 16_000,
+        sampleRateHz: options.sampleRateHz ?? 16_000,
       });
 
       capture = nextCapture;
@@ -717,5 +759,235 @@ export const createDemoLiveTurnLatencyEvidence = <TResult = unknown>(
     },
     subscribe: monitor.subscribe,
     syncAssistantOutput,
+  };
+};
+
+export type VoiceLiveOpsActionResult = CoreVoiceLiveOpsActionResult & {
+  incidentBundleHref: string;
+  operationsRecordHref: string;
+  task?: { id: string; title: string };
+  taskHref?: string;
+};
+
+export const VOICE_LIVE_OPS_ACTIONS: Array<{
+  action: VoiceLiveOpsAction;
+  description: string;
+  label: string;
+}> = [
+  {
+    action: "tag",
+    description: "Attach a lightweight audit tag to the active session.",
+    label: "Tag",
+  },
+  {
+    action: "assign",
+    description: "Record which operator owns the live session.",
+    label: "Assign",
+  },
+  {
+    action: "escalate",
+    description: "Create an in-progress escalation task and trace event.",
+    label: "Escalate",
+  },
+  {
+    action: "create-task",
+    description: "Create an open follow-up task from the active call.",
+    label: "Create task",
+  },
+  {
+    action: "pause-assistant",
+    description: "Stop assistant-side automation while the operator intervenes.",
+    label: "Pause assistant",
+  },
+  {
+    action: "resume-assistant",
+    description: "Release the session back to assistant automation.",
+    label: "Resume assistant",
+  },
+  {
+    action: "operator-takeover",
+    description: "Mark the call as human-owned and pause local capture.",
+    label: "Take over",
+  },
+  {
+    action: "force-handoff",
+    description: "Force the session to the queue named by the tag field.",
+    label: "Force handoff",
+  },
+  {
+    action: "inject-instruction",
+    description: "Record an operator instruction for the assistant trace.",
+    label: "Inject instruction",
+  },
+];
+
+export const postVoiceLiveOpsAction = async (input: {
+  action: VoiceLiveOpsAction;
+  assignee?: string;
+  detail?: string;
+  sessionId: string | null | undefined;
+  tag?: string;
+}) => {
+  return await postCoreVoiceLiveOpsAction(
+    {
+      ...input,
+      sessionId: input.sessionId ?? "",
+    },
+    { actionPath: "/api/voice/live-ops/action" },
+  ) as VoiceLiveOpsActionResult;
+};
+
+export const renderVoiceLiveOpsResultHTML = (
+  result: VoiceLiveOpsActionResult | null,
+  error?: string | null,
+) => {
+  if (error) {
+    return `<p class="voice-footnote voice-live-ops-error">${escapeHtml(error)}</p>`;
+  }
+  if (!result) {
+    return `<p class="voice-footnote">Run an action during a live call to record trace and audit evidence.</p>`;
+  }
+
+  const control = result.control
+    ? ` Control: ${escapeHtml(result.control.status)}.`
+    : "";
+
+  return `<p class="voice-footnote">Recorded ${escapeHtml(result.action)} for ${escapeHtml(result.sessionId)}.${control} <a href="${escapeHtml(result.operationsRecordHref)}">Open operations record</a> · <a href="${escapeHtml(result.incidentBundleHref)}">Export incident bundle</a>${result.taskHref ? ` · <a href="${escapeHtml(result.taskHref)}">Open tasks</a>` : ""}</p>`;
+};
+
+export const renderVoiceLiveOpsPanelHTML = (input: {
+  assignee?: string;
+  detail?: string;
+  error?: string | null;
+  isRunning?: boolean;
+  result?: VoiceLiveOpsActionResult | null;
+  sessionId?: string | null;
+  tag?: string;
+}) => {
+  const sessionId = input.sessionId || "No active session";
+  const disabled = input.isRunning || !input.sessionId;
+
+  return `<article class="voice-card voice-live-ops-panel">
+  <span class="voice-framework-pill">Live Ops</span>
+  <h2>Operator intervention</h2>
+  <p class="voice-footnote">Tag, assign, pause, take over, force handoff, or inject an instruction while the voice session is still running.</p>
+  <div class="voice-live-ops-panel__session"><span>Active session</span><strong>${escapeHtml(sessionId)}</strong></div>
+  <label class="voice-provider-select"><span>Operator</span><input data-live-ops-assignee value="${escapeHtml(input.assignee ?? "demo-operator")}" /></label>
+  <label class="voice-provider-select"><span>Tag</span><input data-live-ops-tag value="${escapeHtml(input.tag ?? "needs-review")}" /></label>
+  <label class="voice-provider-select"><span>Detail</span><input data-live-ops-detail value="${escapeHtml(input.detail ?? "Operator marked this live session.")}" /></label>
+  <div class="voice-actions">
+    ${VOICE_LIVE_OPS_ACTIONS.map(
+      (action) =>
+        `<button data-live-ops-action="${action.action}" ${disabled ? "disabled" : ""} type="button">${input.isRunning ? "Running" : escapeHtml(action.label)}</button>`,
+    ).join("")}
+  </div>
+  ${renderVoiceLiveOpsResultHTML(input.result ?? null, input.error)}
+</article>`;
+};
+
+export const mountVoiceLiveOpsPanel = (
+  element: HTMLElement,
+  options: {
+    getSessionId: () => string | null | undefined;
+    onControl?: (input: {
+      action: VoiceLiveOpsAction;
+      assignee: string;
+      detail: string;
+      result: VoiceLiveOpsActionResult;
+      tag: string;
+    }) => void;
+  },
+) => {
+  let assignee = "demo-operator";
+  let detail = "Operator marked this live session.";
+  let error: string | null = null;
+  let isRunning = false;
+  let result: VoiceLiveOpsActionResult | null = null;
+  let tag = "needs-review";
+
+  const syncInputs = () => {
+    const assigneeInput = element.querySelector("[data-live-ops-assignee]");
+    const detailInput = element.querySelector("[data-live-ops-detail]");
+    const tagInput = element.querySelector("[data-live-ops-tag]");
+    if (assigneeInput instanceof HTMLInputElement) {
+      assignee = assigneeInput.value;
+    }
+    if (detailInput instanceof HTMLInputElement) {
+      detail = detailInput.value;
+    }
+    if (tagInput instanceof HTMLInputElement) {
+      tag = tagInput.value;
+    }
+  };
+
+  const render = () => {
+    element.innerHTML = renderVoiceLiveOpsPanelHTML({
+      assignee,
+      detail,
+      error,
+      isRunning,
+      result,
+      sessionId: options.getSessionId(),
+      tag,
+    });
+  };
+
+  const onClick = async (event: Event) => {
+    const button = event.target instanceof Element
+      ? event.target.closest("[data-live-ops-action]")
+      : null;
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    const action = button.dataset.liveOpsAction as VoiceLiveOpsAction | undefined;
+    if (!action) {
+      return;
+    }
+
+    syncInputs();
+    isRunning = true;
+    error = null;
+    render();
+
+    try {
+      result = await postVoiceLiveOpsAction({
+        action,
+        assignee,
+        detail,
+        sessionId: options.getSessionId(),
+        tag,
+      });
+      options.onControl?.({
+        action,
+        assignee,
+        detail,
+        result,
+        tag,
+      });
+    } catch (caught) {
+      error = formatErrorMessage(caught);
+    } finally {
+      isRunning = false;
+      render();
+    }
+  };
+
+  const onInput = () => {
+    syncInputs();
+  };
+
+  element.addEventListener("click", onClick);
+  element.addEventListener("input", onInput);
+  render();
+
+  const timer = setInterval(render, 1_000);
+
+  return {
+    close: () => {
+      clearInterval(timer);
+      element.removeEventListener("click", onClick);
+      element.removeEventListener("input", onInput);
+    },
+    render,
   };
 };

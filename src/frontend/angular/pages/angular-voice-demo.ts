@@ -1,17 +1,25 @@
 import {
   Component,
   CUSTOM_ELEMENTS_SCHEMA,
+  InjectionToken,
   computed,
   effect,
   inject,
   signal,
 } from "@angular/core";
 import { defineVoiceProviderSimulationControlsElement } from "@absolutejs/voice/client";
+import { createVoiceOpsActionCenterActions } from "@absolutejs/voice/client";
 import {
   VoiceOpsStatusService,
+  VoiceOpsActionCenterService,
   VoiceCampaignDialerProofService,
+  VoiceDeliveryRuntimeService,
   VoiceProviderCapabilitiesService,
+  VoiceProviderContractsService,
   VoiceProviderStatusService,
+  VoicePlatformCoverageService,
+  VoiceProofTrendsService,
+  VoiceReadinessFailuresService,
   VoiceRoutingStatusService,
   VoiceStreamService,
   VoiceTraceTimelineService,
@@ -20,16 +28,16 @@ import {
 } from "@absolutejs/voice/angular";
 import {
   FRAMEWORK_DESCRIPTIONS,
-  getInitialVoiceModelProvider,
-  getInitialVoiceRoutingMode,
   getVoiceLeadMessage,
   getVoiceModeLabel,
   getVoiceModePrompt,
   getVoiceProviderLabel,
   getVoiceRoutingLabel,
   getVoiceRoutePath,
+  getVoiceSpeechEngineSampleRate,
   rememberVoiceModelProvider,
   rememberVoiceRoutingMode,
+  rememberVoiceSpeechEngine,
   VOICE_ASSISTANT_CONFIG,
   VOICE_DEMO_GUIDE_STEPS,
   VOICE_DEMO_GUIDE_TITLE,
@@ -40,11 +48,15 @@ import {
   VOICE_DEMO_STOP_LABEL,
   VOICE_CALL_CONTROL_ACTIONS,
   VOICE_MODEL_PROVIDERS,
+  VOICE_PROOF_DASHBOARDS,
   VOICE_ROUTING_MODES,
+  VOICE_SPEECH_ENGINES,
+  type VoiceAgentSquadDemoStatus,
   type SavedIntake,
   type VoiceDemoMode,
   type VoiceModelProvider,
   type VoiceRoutingMode,
+  type VoiceSpeechEngine,
 } from "../../../shared/demo";
 import {
   createInitialVoiceWaveLevels,
@@ -52,15 +64,38 @@ import {
   createDemoBargeInEvidence,
   createDemoLiveTurnLatencyEvidence,
   createDemoMicrophone,
+  fetchAgentSquadDemoStatus,
   fetchBargeInReport,
   fetchSavedIntakes,
   getOpsStatusLabel,
   formatErrorMessage,
   formatDateTime,
+  formatReconnectState,
+  postVoiceLiveOpsAction,
   renderDemoBargeInProofHTML,
   renderDemoLiveTurnLatencyHTML,
+  renderVoiceLiveOpsResultHTML,
   pushVoiceWaveLevel,
+  VOICE_LIVE_OPS_ACTIONS,
+  type VoiceLiveOpsAction,
+  type VoiceLiveOpsActionResult,
 } from "../../shared/browser";
+
+type AngularVoiceDemoProps = {
+  initialModelProvider: VoiceModelProvider;
+  initialRoutingMode: VoiceRoutingMode;
+  initialSpeechEngine: VoiceSpeechEngine;
+};
+
+export const INITIAL_MODEL_PROVIDER = new InjectionToken<VoiceModelProvider>(
+  "INITIAL_MODEL_PROVIDER",
+);
+export const INITIAL_ROUTING_MODE = new InjectionToken<VoiceRoutingMode>(
+  "INITIAL_ROUTING_MODE",
+);
+export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
+  "INITIAL_SPEECH_ENGINE",
+);
 
 @Component({
   selector: "angular-voice-demo-page",
@@ -178,8 +213,182 @@ import {
                 }
               </select>
             </label>
+            <label class="voice-provider-select">
+              <span>Speech engine</span>
+              <select
+                (change)="changeSpeechEngine($any($event.target).value)"
+              >
+                @for (engine of speechEngines; track engine.id) {
+                  <option
+                    value="{{ engine.id }}"
+                    [attr.selected]="engine.id === speechEngine() ? '' : null"
+                  >
+                    {{ engine.label }}
+                  </option>
+                }
+              </select>
+            </label>
             <p class="voice-footnote">
               {{ routingDescription() }}
+            </p>
+          </article>
+
+          <article class="voice-card voice-proof-dashboard-card">
+            <span class="voice-framework-pill">Proof dashboards</span>
+            <h2>Open the production evidence</h2>
+            <p class="voice-footnote">
+              The same trace-backed package routes work in every framework:
+              interruption, live timing, turn waterfalls, readiness, and
+              provider contracts.
+            </p>
+            <div class="voice-proof-links">
+              @for (dashboard of proofDashboards; track dashboard.href) {
+                <a [href]="dashboard.href">
+                  <strong>{{ dashboard.label }}</strong>
+                  <span>{{ dashboard.description }}</span>
+                </a>
+              }
+            </div>
+          </article>
+
+          <article class="voice-card voice-provider-health-card">
+            <span class="voice-framework-pill">Vapi Replacement Coverage</span>
+            <h2>
+              @if (platformCoverage.report(); as report) {
+                {{ platformCoveragePassing() }}/{{ report.total }} surfaces passing
+              } @else if (platformCoverage.error()) {
+                Coverage unavailable
+              } @else if (platformCoverage.isLoading()) {
+                Checking coverage
+              } @else {
+                Awaiting proof pack
+              }
+            </h2>
+            <p class="voice-footnote">
+              Angular reads the package route primitive behind the switching
+              proof, so the framework page proves the same replacement surface
+              as the server.
+            </p>
+            @if (platformCoverage.report()?.coverage?.length) {
+              <div class="voice-provider-health-list">
+                @for (
+                  surface of platformCoverage.report()!.coverage.slice(0, 4);
+                  track surface.surface
+                ) {
+                  <div class="voice-provider-health-item">
+                    <strong>{{ surface.surface }}</strong>
+                    <span>{{ surface.status }}</span>
+                    <small>{{ surface.replacement }}</small>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="empty-copy">
+                {{
+                  platformCoverage.error() ??
+                  "Run the proof pack to populate coverage evidence."
+                }}
+              </p>
+            }
+            <p class="voice-footnote">
+              <a href="/switching-from-vapi">Open switching guide</a> ·
+              <a href="/api/voice/vapi-coverage">Open JSON</a>
+            </p>
+          </article>
+
+          <article class="voice-card voice-provider-health-card">
+            <span class="voice-framework-pill">Sustained Proof Trends</span>
+            <h2>
+              @if (proofTrends.report(); as report) {
+                {{ report.status }} · {{ report.summary.cycles ?? report.cycles.length }} cycles
+              } @else if (proofTrends.error()) {
+                Proof trends unavailable
+              } @else if (proofTrends.isLoading()) {
+                Checking proof trends
+              } @else {
+                Awaiting trend proof
+              }
+            </h2>
+            <p class="voice-footnote">
+              Angular reads the package proof-trends primitive for freshness,
+              provider p95, turn p95, and live p95.
+            </p>
+            @if (proofTrends.report(); as report) {
+              <div class="voice-routing-grid">
+                <div>
+                  <span>Provider p95</span>
+                  <strong>{{ formatMs(report.summary.maxProviderP95Ms) }}</strong>
+                </div>
+                <div>
+                  <span>Turn p95</span>
+                  <strong>{{ formatMs(report.summary.maxTurnP95Ms) }}</strong>
+                </div>
+                <div>
+                  <span>Live p95</span>
+                  <strong>{{ formatMs(report.summary.maxLiveP95Ms) }}</strong>
+                </div>
+                <div>
+                  <span>Fresh until</span>
+                  <strong>{{ report.freshUntil ?? "n/a" }}</strong>
+                </div>
+              </div>
+            } @else {
+              <p class="empty-copy">
+                {{
+                  proofTrends.error() ??
+                  "Run the sustained proof trends script to populate evidence."
+                }}
+              </p>
+            }
+            <p class="voice-footnote">
+              <a href="/voice/proof-trends">Open trends</a> ·
+              <a href="/api/voice/proof-trends">Open JSON</a>
+            </p>
+          </article>
+
+          <article class="voice-card voice-provider-health-card">
+            <span class="voice-framework-pill">Readiness Gate Explanations</span>
+            <h2>
+              @if (readinessFailures.explanations().length > 0) {
+                {{ readinessFailures.explanations().length }} calibrated gate issue(s)
+              } @else if (readinessFailures.error()) {
+                Readiness explanations unavailable
+              } @else if (readinessFailures.isLoading()) {
+                Checking readiness gates
+              } @else {
+                No calibrated gate issues
+              }
+            </h2>
+            <p class="voice-footnote">
+              Angular reads structured gate explanations from production
+              readiness JSON so deploy blockers show observed values,
+              thresholds, evidence, and remediation.
+            </p>
+            @if (readinessFailures.explanations().length > 0) {
+              <div class="voice-routing-grid">
+                @for (check of readinessFailures.explanations(); track check.label) {
+                <div>
+                  <span>{{ check.status }} · {{ check.label }}</span>
+                  <strong>
+                    {{ check.gateExplanation?.observed ?? "n/a" }}
+                    /
+                    {{ check.gateExplanation?.threshold ?? "n/a" }}
+                    {{ check.gateExplanation?.unit ?? "" }}
+                  </strong>
+                </div>
+                }
+              </div>
+            } @else {
+              <p class="empty-copy">
+                {{
+                  readinessFailures.error() ??
+                  "No calibrated readiness gate explanations are open."
+                }}
+              </p>
+            }
+            <p class="voice-footnote">
+              <a href="/production-readiness">Open readiness</a> ·
+              <a href="/voice/slo-readiness-thresholds">Open thresholds</a>
             </p>
           </article>
 
@@ -225,6 +434,51 @@ import {
                 Start a voice session to see the selected STT provider.
               </p>
             }
+          </article>
+
+          <article class="voice-card voice-agent-squad-card">
+            <span class="voice-framework-pill">Agent Squad</span>
+            <h2>Specialist routing is live</h2>
+            <p class="voice-footnote">
+              Say “I have a billing question about my invoice” to route from
+              the front desk to billing with a compact context policy.
+            </p>
+            <div class="voice-routing-grid">
+              <div>
+                <span>Current specialist</span>
+                <strong>{{
+                  agentSquadStatus()?.currentAgentId ?? "front-desk"
+                }}</strong>
+              </div>
+              <div>
+                <span>Context policy</span>
+                <strong>{{
+                  agentSquadStatus()?.contextPolicy ??
+                    "handoff-summary-current-turn"
+                }}</strong>
+              </div>
+              <div>
+                <span>Handoffs</span>
+                <strong>{{ agentSquadStatus()?.handoffCount ?? 0 }}</strong>
+              </div>
+              <div>
+                <span>Messages sent</span>
+                <strong>{{
+                  agentSquadStatus()?.messageCount ?? "ready"
+                }}</strong>
+              </div>
+            </div>
+            <p class="voice-footnote">
+              @if (agentSquadStatus()?.lastHandoff; as handoff) {
+                {{ handoff.fromAgentId }} → {{ handoff.targetAgentId }}:
+                {{ handoff.summary ?? handoff.reason ?? "handoff applied" }}
+              } @else {
+                No specialist handoff in this session yet.
+              }
+            </p>
+            <p class="voice-footnote">
+              <a href="/agent-squad-contract">Open squad contract proof</a>
+            </p>
           </article>
 
           <article class="voice-card voice-provider-health-card">
@@ -350,6 +604,47 @@ import {
             }
           </article>
 
+          <article class="voice-card voice-provider-health-card">
+            <span class="voice-framework-pill">Provider Contracts</span>
+            <h2>
+              {{
+                providerContracts.report()
+                  ? providerContracts.report()!.passed + "/" + providerContracts.report()!.total + " passing"
+                  : "Checking contracts"
+              }}
+            </h2>
+            <p class="voice-footnote">
+              Required env, latency budget, fallback, streaming, and capability contracts.
+            </p>
+            @if (providerContracts.report()?.rows?.length) {
+              <div class="voice-provider-health-list">
+                @for (
+                  row of providerContracts.report()!.rows;
+                  track row.kind + ":" + row.provider
+                ) {
+                  <div class="voice-provider-health-item">
+                    <strong>{{ row.provider }} {{ row.kind }}</strong>
+                    <span>{{ row.status }}</span>
+                    <small>
+                      {{ row.checks.length }} checks ·
+                      {{ row.selected ? "selected" : "available" }}
+                    </small>
+                    @for (check of row.checks; track check.key) {
+                      @if (check.remediation) {
+                        <small>
+                          {{ check.remediation.label }}:
+                          {{ check.remediation.detail }}
+                        </small>
+                      }
+                    }
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="empty-copy">Configure provider contracts to see coverage.</p>
+            }
+          </article>
+
           <absolute-voice-provider-simulation
             class="voice-card voice-provider-simulation-card"
             failure-message="Prove Deepgram STT failover to AssemblyAI without changing credentials."
@@ -462,6 +757,142 @@ import {
             </p>
           </article>
 
+          <article class="voice-card voice-workflow-card">
+            <span class="voice-framework-pill">Delivery Runtime</span>
+            <h2>
+              {{
+                deliveryRuntime.error()
+                  ? "Unavailable"
+                  : deliveryRuntime.report()?.isRunning
+                    ? "Running"
+                    : deliveryRuntime.report()
+                      ? "Stopped"
+                      : "Checking"
+              }}
+            </h2>
+            <p class="voice-footnote">
+              Audit and trace delivery worker health from the Angular service
+              primitive.
+            </p>
+            <div class="voice-workflow-summary">
+              <span class="pill"
+                >{{
+                  deliveryRuntime.report()?.summary?.audit?.pending ?? 0
+                }}
+                audit pending</span
+              >
+              <span class="pill"
+                >{{
+                  deliveryRuntime.report()?.summary?.trace?.pending ?? 0
+                }}
+                trace pending</span
+              >
+              <span class="pill"
+                >{{
+                  (deliveryRuntime.report()?.summary?.audit?.deadLettered ?? 0) +
+                    (deliveryRuntime.report()?.summary?.trace?.deadLettered ?? 0)
+                }}
+                dead-lettered</span
+              >
+            </div>
+            <p class="voice-footnote">
+              <a href="/delivery-runtime">Open delivery runtime</a>
+            </p>
+          </article>
+
+          <article class="voice-card voice-workflow-card">
+            <span class="voice-framework-pill">Voice Ops Action Center</span>
+            <h2>
+              {{
+                opsActionCenter.error()
+                  ? "Needs attention"
+                  : opsActionCenter.isRunning()
+                    ? "Running"
+                    : opsActionCenter.lastResult()
+                      ? "Action completed"
+                      : "Ready"
+              }}
+            </h2>
+            <p class="voice-footnote">
+              One Angular service primitive for readiness, delivery workers,
+              latency proof, and provider failover actions.
+            </p>
+            <div class="voice-workflow-summary">
+              @for (action of opsActionCenter.actions(); track action.id) {
+                <button
+                  class="pill"
+                  type="button"
+                  [disabled]="opsActionCenter.isRunning() || action.disabled"
+                  (click)="runOpsAction(action.id)"
+                >
+                  {{
+                    opsActionCenter.runningActionId() === action.id
+                      ? "Working..."
+                      : action.label
+                  }}
+                </button>
+              }
+            </div>
+            @if (opsActionCenter.error()) {
+              <p class="voice-footnote">{{ opsActionCenter.error() }}</p>
+            }
+          </article>
+
+          <article class="voice-card voice-live-ops-panel">
+            <span class="voice-framework-pill">Live Ops</span>
+            <h2>Operator intervention</h2>
+            <p class="voice-footnote">
+              Tag, assign, pause, take over, force handoff, or inject an
+              instruction while the voice session is still running.
+            </p>
+            <div class="voice-live-ops-panel__session">
+              <span>Active session</span>
+              <strong>{{ currentVoice().sessionId() || "No active session" }}</strong>
+            </div>
+            <label class="voice-provider-select">
+              <span>Operator</span>
+              <input
+                [value]="liveOpsAssignee()"
+                (input)="setLiveOpsAssignee($event)"
+              />
+            </label>
+            <label class="voice-provider-select">
+              <span>Tag</span>
+              <input [value]="liveOpsTag()" (input)="setLiveOpsTag($event)" />
+            </label>
+            <label class="voice-provider-select">
+              <span>Detail</span>
+              <input
+                [value]="liveOpsDetail()"
+                (input)="setLiveOpsDetail($event)"
+              />
+            </label>
+            <div class="voice-actions">
+              @for (action of liveOpsActions; track action.action) {
+                <button
+                  type="button"
+                  [disabled]="liveOpsRunning() || !currentVoice().sessionId()"
+                  (click)="runLiveOpsAction(action.action)"
+                >
+                  {{ liveOpsRunning() ? "Running" : action.label }}
+                </button>
+              }
+            </div>
+            <div [innerHTML]="liveOpsResultHtml()"></div>
+          </article>
+
+          <article class="voice-card voice-workflow-card">
+            <span class="voice-framework-pill">Operator Action History</span>
+            <h2>Auditable actions</h2>
+            <p class="voice-footnote">
+              Every action-center click is recorded as audit and trace evidence.
+            </p>
+            <p class="voice-footnote">
+              <a href="/voice/ops-actions">Open action history</a> ·
+              <a href="/api/voice/ops-actions/history">Open JSON</a>
+            </p>
+          </article>
+
           <article
             class="voice-card voice-provider-health-card absolute-voice-trace-timeline"
             [class.absolute-voice-trace-timeline--failed]="
@@ -500,7 +931,17 @@ import {
                       {{ session.summary.turnCount }} turns ·
                       {{ session.providers.length }} providers
                     </p>
-                    <a href="/traces/{{ session.sessionId }}">Open timeline</a>
+                    <p class="absolute-voice-trace-timeline__actions">
+                      <a href="/traces/{{ session.sessionId }}"
+                        >Open timeline</a
+                      >
+                      <a [href]="operationsRecordHref(session.sessionId)"
+                        >Open operations record</a
+                      >
+                      <a [href]="incidentBundleHref(session.sessionId)"
+                        >Export incident bundle</a
+                      >
+                    </p>
                   </article>
                 }
               </div>
@@ -579,6 +1020,12 @@ import {
               <div class="status-row">
                 <span class="label">Voice status</span>
                 <span class="value">{{ currentVoice().status() }}</span>
+              </div>
+              <div class="status-row">
+                <span class="label">Reconnect</span>
+                <span class="value">{{
+                  formatReconnectState(currentVoice().reconnect())
+                }}</span>
               </div>
               <div class="status-row">
                 <span class="label">Current prompt</span>
@@ -763,11 +1210,21 @@ export class AngularVoiceDemoComponent {
   guideSteps = VOICE_DEMO_GUIDE_STEPS;
   guideTitle = VOICE_DEMO_GUIDE_TITLE;
   activeMode = signal<VoiceDemoMode | null>(null);
-  modelProvider = signal<VoiceModelProvider>(getInitialVoiceModelProvider());
-  routingMode = signal<VoiceRoutingMode>(getInitialVoiceRoutingMode());
+  private readonly initialModelProvider =
+    inject(INITIAL_MODEL_PROVIDER, { optional: true }) ?? "deterministic";
+  private readonly initialRoutingMode =
+    inject(INITIAL_ROUTING_MODE, { optional: true }) ?? "balanced";
+  private readonly initialSpeechEngine =
+    inject(INITIAL_SPEECH_ENGINE, { optional: true }) ?? "cascaded";
+  modelProvider = signal<VoiceModelProvider>(this.initialModelProvider);
+  routingMode = signal<VoiceRoutingMode>(this.initialRoutingMode);
+  speechEngine = signal<VoiceSpeechEngine>(this.initialSpeechEngine);
   modelProviders = VOICE_MODEL_PROVIDERS;
+  proofDashboards = VOICE_PROOF_DASHBOARDS;
   routingModes = VOICE_ROUTING_MODES;
+  speechEngines = VOICE_SPEECH_ENGINES;
   callControlActions = VOICE_CALL_CONTROL_ACTIONS;
+  liveOpsActions = VOICE_LIVE_OPS_ACTIONS;
   getVoiceProviderLabel = getVoiceProviderLabel;
   getVoiceRoutingLabel = getVoiceRoutingLabel;
   getOpsStatusLabel = getOpsStatusLabel;
@@ -776,25 +1233,73 @@ export class AngularVoiceDemoComponent {
     guided: false,
   });
   isCapturing = signal(false);
+  agentSquadStatus = signal<VoiceAgentSquadDemoStatus | null>(null);
   idleMicCopy = VOICE_DEMO_MIC_IDLE;
   liveMicCopy = VOICE_DEMO_MIC_LIVE;
   micError = signal<string | null>(null);
   bargeInProofHtml = signal(renderDemoBargeInProofHTML(null));
   liveLatencyHtml = signal("");
+  liveOpsAssignee = signal("demo-operator");
+  liveOpsDetail = signal("Operator marked this live session.");
+  liveOpsError = signal<string | null>(null);
+  liveOpsResult = signal<VoiceLiveOpsActionResult | null>(null);
+  liveOpsRunning = signal(false);
+  liveOpsTag = signal("needs-review");
   savedIntakes = signal<SavedIntake[]>([]);
   generalLabel = VOICE_DEMO_GENERAL_LABEL;
   guidedLabel = VOICE_DEMO_GUIDED_LABEL;
   stopLabel = VOICE_DEMO_STOP_LABEL;
   getVoiceModeLabel = getVoiceModeLabel;
   guidedVoice = inject(VoiceStreamService).connect<SavedIntake>(
-    getVoiceRoutePath("guided", this.modelProvider(), this.routingMode()),
+    getVoiceRoutePath(
+      "guided",
+      this.modelProvider(),
+      this.routingMode(),
+      this.speechEngine(),
+    ),
+    { reconnectReportPath: "/api/voice/reconnect-traces" },
   );
   generalVoice = inject(VoiceStreamService).connect<SavedIntake>(
-    getVoiceRoutePath("general", this.modelProvider(), this.routingMode()),
+    getVoiceRoutePath(
+      "general",
+      this.modelProvider(),
+      this.routingMode(),
+      this.speechEngine(),
+    ),
+    { reconnectReportPath: "/api/voice/reconnect-traces" },
   );
   opsStatus = inject(VoiceOpsStatusService).connect("/api/voice/ops-status", {
     intervalMs: 5_000,
   });
+  deliveryRuntime = inject(VoiceDeliveryRuntimeService).connect(
+    "/api/voice-delivery-runtime",
+    {
+      intervalMs: 5_000,
+    },
+  );
+  opsActionCenter = inject(VoiceOpsActionCenterService).connect({
+    actions: createVoiceOpsActionCenterActions({
+      providers: ["deepgram", "assemblyai"],
+    }),
+  });
+  platformCoverage = inject(VoicePlatformCoverageService).connect(
+    "/api/voice/vapi-coverage",
+    {
+      intervalMs: 10_000,
+    },
+  );
+  proofTrends = inject(VoiceProofTrendsService).connect(
+    "/api/voice/proof-trends",
+    {
+      intervalMs: 10_000,
+    },
+  );
+  readinessFailures = inject(VoiceReadinessFailuresService).connect(
+    "/api/production-readiness",
+    {
+      intervalMs: 10_000,
+    },
+  );
   providerStatus = inject(VoiceProviderStatusService).connect(
     "/api/provider-status",
     {
@@ -803,6 +1308,12 @@ export class AngularVoiceDemoComponent {
   );
   providerCapabilities = inject(VoiceProviderCapabilitiesService).connect(
     "/api/provider-capabilities",
+    {
+      intervalMs: 5_000,
+    },
+  );
+  providerContracts = inject(VoiceProviderContractsService).connect(
+    "/api/provider-contracts",
     {
       intervalMs: 5_000,
     },
@@ -829,6 +1340,17 @@ export class AngularVoiceDemoComponent {
       intervalMs: 5_000,
     },
   );
+  platformCoveragePassing = computed(
+    () =>
+      this.platformCoverage
+        .report()
+        ?.coverage.filter((surface) => surface.status === "pass").length ?? 0,
+  );
+  formatMs(value: unknown) {
+    return typeof value === "number" && Number.isFinite(value)
+      ? `${Math.round(value)}ms`
+      : "n/a";
+  }
   currentVoice = computed(() =>
     this.activeMode() === "general" ? this.generalVoice : this.guidedVoice,
   );
@@ -883,6 +1405,8 @@ export class AngularVoiceDemoComponent {
   });
   routingDescription = computed(
     () =>
+      this.speechEngines.find((item) => item.id === this.speechEngine())
+        ?.description ??
       this.routingModes.find((item) => item.id === this.routingMode())
         ?.description ?? "",
   );
@@ -908,15 +1432,26 @@ export class AngularVoiceDemoComponent {
       void this.refreshIntakes();
       this.refreshTimer = setInterval(() => {
         void this.refreshIntakes();
+        void this.refreshAgentSquadStatus();
       }, 4_000);
+      void this.refreshAgentSquadStatus();
       this.syncLiveLatencyProof();
     }
   }
 
   formatDateTime = formatDateTime;
+  formatReconnectState = formatReconnectState;
 
   async refreshIntakes() {
     this.savedIntakes.set(await fetchSavedIntakes());
+  }
+
+  async refreshAgentSquadStatus() {
+    this.agentSquadStatus.set(
+      await fetchAgentSquadDemoStatus(
+        this.currentVoice().sessionId() || undefined,
+      ),
+    );
   }
 
   async refreshBargeInProof() {
@@ -944,6 +1479,9 @@ export class AngularVoiceDemoComponent {
             pushVoiceWaveLevel(current, level),
           );
         },
+        {
+          sampleRateHz: getVoiceSpeechEngineSampleRate(this.speechEngine()),
+        },
       );
       await this.microphone.start();
       this.micError.set(null);
@@ -959,6 +1497,7 @@ export class AngularVoiceDemoComponent {
 
   stopMic() {
     this.microphone?.stop();
+    this.microphone = null;
     this.isCapturing.set(false);
     this.waveLevels.set(createInitialVoiceWaveLevels());
   }
@@ -976,6 +1515,14 @@ export class AngularVoiceDemoComponent {
     rememberVoiceRoutingMode(routing);
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("routing", routing);
+    window.location.href = nextUrl.toString();
+  }
+
+  changeSpeechEngine(engine: VoiceSpeechEngine) {
+    this.stopMic();
+    rememberVoiceSpeechEngine(engine);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("engine", engine);
     window.location.href = nextUrl.toString();
   }
 
@@ -1001,10 +1548,86 @@ export class AngularVoiceDemoComponent {
     void this.campaignDialerProof.runProof().catch(() => {});
   }
 
+  runOpsAction(actionId: string) {
+    void this.opsActionCenter.run(actionId).catch(() => {});
+  }
+
+  liveOpsResultHtml = computed(() =>
+    renderVoiceLiveOpsResultHTML(this.liveOpsResult(), this.liveOpsError()),
+  );
+
+  setLiveOpsAssignee(event: Event) {
+    if (event.target instanceof HTMLInputElement) {
+      this.liveOpsAssignee.set(event.target.value);
+    }
+  }
+
+  setLiveOpsTag(event: Event) {
+    if (event.target instanceof HTMLInputElement) {
+      this.liveOpsTag.set(event.target.value);
+    }
+  }
+
+  setLiveOpsDetail(event: Event) {
+    if (event.target instanceof HTMLInputElement) {
+      this.liveOpsDetail.set(event.target.value);
+    }
+  }
+
+  async runLiveOpsAction(action: VoiceLiveOpsAction) {
+    this.liveOpsRunning.set(true);
+    this.liveOpsError.set(null);
+    try {
+      const detail = this.liveOpsDetail();
+      const tag = this.liveOpsTag();
+      const result = await postVoiceLiveOpsAction({
+        action,
+        assignee: this.liveOpsAssignee(),
+        detail,
+        sessionId: this.currentVoice().sessionId(),
+        tag,
+      });
+      this.liveOpsResult.set(result);
+      if (action === "force-handoff") {
+        this.currentVoice().callControl({
+          action: "transfer",
+          metadata: { source: "live-ops" },
+          reason: detail,
+          target: tag,
+        });
+        this.stopMic();
+      } else if (action === "escalate" || action === "operator-takeover") {
+        this.currentVoice().callControl({
+          action: "escalate",
+          metadata: {
+            source: "live-ops",
+            takeover: action === "operator-takeover",
+          },
+          reason: detail,
+        });
+        this.stopMic();
+      } else if (action === "pause-assistant") {
+        this.stopMic();
+      }
+    } catch (error) {
+      this.liveOpsError.set(formatErrorMessage(error));
+    } finally {
+      this.liveOpsRunning.set(false);
+    }
+  }
+
   campaignDialerProofProviderPassed(provider: {
     outcomes: Array<{ applied: boolean }>;
   }) {
     return provider.outcomes.every((outcome) => outcome.applied);
+  }
+
+  operationsRecordHref(sessionId: string) {
+    return `/voice-operations/${encodeURIComponent(sessionId)}`;
+  }
+
+  incidentBundleHref(sessionId: string) {
+    return `/voice-incidents/${encodeURIComponent(sessionId)}/markdown`;
   }
 
   syncLiveLatencyProof() {
@@ -1025,7 +1648,12 @@ export class AngularVoiceDemoComponent {
     this.guidedVoice.close();
     this.generalVoice.close();
     this.opsStatus.close();
+    this.deliveryRuntime.close();
+    this.opsActionCenter.close();
+    this.platformCoverage.close();
+    this.proofTrends.close();
     this.providerCapabilities.close();
+    this.providerContracts.close();
     this.providerStatus.close();
     this.campaignDialerProof.close();
     this.routingStatus.close();
@@ -1034,8 +1662,7 @@ export class AngularVoiceDemoComponent {
   }
 }
 
-export const factory = () => AngularVoiceDemoComponent;
+export const factory = (_props: AngularVoiceDemoProps) =>
+  AngularVoiceDemoComponent;
 
-const AngularVoiceDemoDefault = AngularVoiceDemoComponent;
-
-export default AngularVoiceDemoDefault;
+export default AngularVoiceDemoComponent;

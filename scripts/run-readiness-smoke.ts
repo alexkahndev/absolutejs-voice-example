@@ -5,10 +5,15 @@ type EndpointName =
   | "opsStatus"
   | "bargeIn"
   | "campaignProof"
+  | "campaignReadiness"
   | "campaigns"
   | "carriers"
+  | "dataControl"
   | "handoffs"
+  | "incidentHandoff"
   | "liveLatency"
+  | "opsRecovery"
+  | "outcomeContracts"
   | "phoneAgent"
   | "productionReadiness"
   | "providerCapabilities"
@@ -16,6 +21,7 @@ type EndpointName =
   | "simulationSuite"
   | "sttProviderRoutingContract"
   | "telephonyWebhookDecisions"
+  | "toolContracts"
   | "ttsProviderRoutingContract"
   | "turnLatency"
   | "voiceTraces";
@@ -50,9 +56,11 @@ const endpoints: Array<{
         status?: unknown;
         summary?: {
           agentSquadContracts?: unknown;
+          campaignReadiness?: unknown;
           carriers?: unknown;
           handoffs?: unknown;
           liveLatency?: unknown;
+          opsRecovery?: unknown;
           providerRoutingContracts?: unknown;
           providers?: unknown;
           quality?: unknown;
@@ -62,9 +70,11 @@ const endpoints: Array<{
       };
       return {
         agentSquadContracts: report.summary?.agentSquadContracts,
+        campaignReadiness: report.summary?.campaignReadiness,
         carriers: report.summary?.carriers,
         handoffs: report.summary?.handoffs,
         liveLatency: report.summary?.liveLatency,
+        opsRecovery: report.summary?.opsRecovery,
         providerRoutingContracts: report.summary?.providerRoutingContracts,
         providers: report.summary?.providers,
         quality: report.summary?.quality,
@@ -85,6 +95,53 @@ const endpoints: Array<{
       return {
         carrierPass: matrix.pass,
         carrierSummary: matrix.summary,
+      };
+    },
+  },
+  {
+    name: "dataControl",
+    path: "/data-control.json",
+    summarize: (body) => {
+      const report = body as {
+        audit?: { configured?: unknown };
+        redaction?: { enabled?: unknown };
+        retentionPlan?: { dryRun?: unknown; totalMatches?: unknown };
+        storage?: unknown[];
+        traceDeliveries?: { configured?: unknown };
+        zeroRetentionAvailable?: unknown;
+      };
+      return {
+        auditConfigured: report.audit?.configured,
+        redactionEnabled: report.redaction?.enabled,
+        retentionDryRun: report.retentionPlan?.dryRun,
+        retentionMatches: report.retentionPlan?.totalMatches,
+        storageSurfaces: Array.isArray(report.storage) ? report.storage.length : 0,
+        traceDeliveriesConfigured: report.traceDeliveries?.configured,
+        zeroRetentionAvailable: report.zeroRetentionAvailable,
+      };
+    },
+  },
+  {
+    name: "opsRecovery",
+    path: "/api/voice/ops-recovery",
+    summarize: (body) => {
+      const report = body as {
+        issues?: unknown[];
+        providers?: {
+          recoveredFallbacks?: unknown;
+          unresolvedFailures?: unknown;
+        };
+        status?: unknown;
+        interventions?: {
+          total?: unknown;
+        };
+      };
+      return {
+        issueCount: Array.isArray(report.issues) ? report.issues.length : 0,
+        opsRecoveryStatus: report.status,
+        operatorInterventions: report.interventions?.total,
+        recoveredFallbacks: report.providers?.recoveredFallbacks,
+        unresolvedProviderFailures: report.providers?.unresolvedFailures,
       };
     },
   },
@@ -223,6 +280,27 @@ const endpoints: Array<{
     },
   },
   {
+    name: "campaignReadiness",
+    path: "/api/voice/campaigns/readiness-proof",
+    summarize: (body) => {
+      const report = body as {
+        checks?: Array<{ status?: unknown }>;
+        ok?: unknown;
+        proof?: unknown;
+      };
+      return {
+        failedChecks: Array.isArray(report.checks)
+          ? report.checks.filter((check) => check.status !== "pass").length
+          : undefined,
+        ok: report.ok,
+        proof: report.proof,
+        totalChecks: Array.isArray(report.checks)
+          ? report.checks.length
+          : undefined,
+      };
+    },
+  },
+  {
     name: "telephonyWebhookDecisions",
     path: "/api/telephony-webhook-decisions",
     summarize: (body) => {
@@ -323,17 +401,122 @@ const endpoints: Array<{
     path: "/api/voice/simulations",
     summarize: (body) => {
       const report = body as {
-        actions?: unknown[];
+        actions?: Array<{
+          href?: unknown;
+          section?: unknown;
+        }>;
         failed?: unknown;
         status?: unknown;
         summary?: unknown;
         total?: unknown;
       };
+      const actions = Array.isArray(report.actions) ? report.actions : [];
+      const operationsRecordActionHrefs = actions
+        .map((action) => action.href)
+        .filter(
+          (href): href is string =>
+            typeof href === "string" && href.includes("/voice-operations/"),
+        );
+      const requiresOperationsRecordAction =
+        report.status === "fail" && actions.length > 0;
+
       return {
-        actions: Array.isArray(report.actions) ? report.actions.length : 0,
+        actionHrefs: actions
+          .map((action) => action.href)
+          .filter((href): href is string => typeof href === "string"),
+        actions: actions.length,
         failed: report.failed,
+        operationsRecordActionHrefs,
+        operationsRecordActions: operationsRecordActionHrefs.length,
+        operationsRecordActionsOk:
+          !requiresOperationsRecordAction ||
+          operationsRecordActionHrefs.length > 0,
         status: report.status,
         summary: report.summary,
+        total: report.total,
+      };
+    },
+  },
+  {
+    name: "toolContracts",
+    path: "/api/tool-contracts",
+    summarize: (body) => {
+      const report = body as {
+        contracts?: Array<{
+          cases?: Array<{
+            operationsRecordHref?: unknown;
+            sessionId?: unknown;
+          }>;
+        }>;
+        failed?: unknown;
+        status?: unknown;
+        total?: unknown;
+      };
+      const cases = (report.contracts ?? []).flatMap((contract) =>
+        Array.isArray(contract.cases) ? contract.cases : [],
+      );
+      const operationsRecordCaseHrefs = cases
+        .map((testCase) => testCase.operationsRecordHref)
+        .filter(
+          (href): href is string =>
+            typeof href === "string" && href.includes("/voice-operations/"),
+        );
+      const requiresOperationsRecordCases = cases.length > 0;
+
+      return {
+        cases: cases.length,
+        failed: report.failed,
+        operationsRecordCaseHrefs,
+        operationsRecordCases: operationsRecordCaseHrefs.length,
+        operationsRecordCasesOk:
+          !requiresOperationsRecordCases ||
+          operationsRecordCaseHrefs.length === cases.length,
+        status: report.status,
+        total: report.total,
+      };
+    },
+  },
+  {
+    name: "outcomeContracts",
+    path: "/api/outcome-contracts",
+    summarize: (body) => {
+      const report = body as {
+        contracts?: Array<{
+          operationsRecordHrefs?: unknown[];
+          sessionIds?: unknown[];
+        }>;
+        failed?: unknown;
+        status?: unknown;
+        total?: unknown;
+      };
+      const contracts = Array.isArray(report.contracts) ? report.contracts : [];
+      const matchedSessionCount = contracts.reduce(
+        (total, contract) =>
+          total +
+          (Array.isArray(contract.sessionIds) ? contract.sessionIds.length : 0),
+        0,
+      );
+      const operationsRecordHrefs = contracts
+        .flatMap((contract) =>
+          Array.isArray(contract.operationsRecordHrefs)
+            ? contract.operationsRecordHrefs
+            : [],
+        )
+        .filter(
+          (href): href is string =>
+            typeof href === "string" && href.includes("/voice-operations/"),
+        );
+      const requiresOperationsRecordHrefs = matchedSessionCount > 0;
+
+      return {
+        failed: report.failed,
+        matchedSessionCount,
+        operationsRecordHrefs,
+        operationsRecordLinks: operationsRecordHrefs.length,
+        operationsRecordLinksOk:
+          !requiresOperationsRecordHrefs ||
+          operationsRecordHrefs.length === matchedSessionCount,
+        status: report.status,
         total: report.total,
       };
     },
@@ -400,6 +583,31 @@ const endpoints: Array<{
   },
 ];
 
+const textEndpoints: Array<{
+  name: EndpointName;
+  path: string;
+  requiredText: string[];
+  summarize: (text: string) => Record<string, unknown>;
+}> = [
+  {
+    name: "incidentHandoff",
+    path: "/voice-operations/demo-incident-bundle/incident.md",
+    requiredText: [
+      "# Voice incident handoff",
+      "demo-incident-bundle",
+      "Guardrail evidence",
+      "assistant.guardrail assistant-output",
+      "assistant.guardrail tool-input",
+      "operations-record-guardrail-seed",
+    ],
+    summarize: (text) => ({
+      bytes: new TextEncoder().encode(text).byteLength,
+      lines: text.split(/\r?\n/).length,
+      markdownHeading: text.split(/\r?\n/)[0],
+    }),
+  },
+];
+
 const fetchJson = async (
   endpoint: (typeof endpoints)[number],
 ): Promise<EndpointResult> => {
@@ -424,6 +632,54 @@ const fetchJson = async (
       ok: response.ok,
       status: response.status,
       summary: endpoint.summarize(body),
+      url,
+    };
+  } catch (error) {
+    return {
+      elapsedMs: Math.round(performance.now() - startedAt),
+      error: error instanceof Error ? error.message : String(error),
+      name: endpoint.name,
+      ok: false,
+      url,
+    };
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const fetchText = async (
+  endpoint: (typeof textEndpoints)[number],
+): Promise<EndpointResult> => {
+  const url = `${baseUrl}${endpoint.path}`;
+  const startedAt = performance.now();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        accept: "text/markdown,text/plain,*/*",
+      },
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    const missingText = endpoint.requiredText.filter(
+      (required) => !text.includes(required),
+    );
+
+    return {
+      elapsedMs: Math.round(performance.now() - startedAt),
+      error:
+        missingText.length > 0
+          ? `Missing required text: ${missingText.join(", ")}`
+          : undefined,
+      name: endpoint.name,
+      ok: response.ok && missingText.length === 0,
+      status: response.status,
+      summary: {
+        ...endpoint.summarize(text),
+        requiredTextFound: missingText.length === 0,
+      },
       url,
     };
   } catch (error) {
@@ -490,15 +746,38 @@ const postCampaignProof = async (): Promise<EndpointResult> => {
   }
 };
 
-const results = await Promise.all(endpoints.map((endpoint) => fetchJson(endpoint)));
+const results = await Promise.all([
+  ...endpoints.map((endpoint) => fetchJson(endpoint)),
+  ...textEndpoints.map((endpoint) => fetchText(endpoint)),
+]);
 results.push(await postCampaignProof());
 const readinessStatus = results.find(
   (result) => result.name === "productionReadiness",
 )?.summary?.readinessStatus;
 const endpointOk = results.every((result) => result.ok);
+const simulationSuiteSummary = results.find(
+  (result) => result.name === "simulationSuite",
+)?.summary;
+const simulationSuiteOk =
+  simulationSuiteSummary?.operationsRecordActionsOk !== false;
+const toolContractsSummary = results.find(
+  (result) => result.name === "toolContracts",
+)?.summary;
+const toolContractsOk =
+  toolContractsSummary?.operationsRecordCasesOk !== false;
+const outcomeContractsSummary = results.find(
+  (result) => result.name === "outcomeContracts",
+)?.summary;
+const outcomeContractsOk =
+  outcomeContractsSummary?.operationsRecordLinksOk !== false;
 const readinessOk =
   !strict || (readinessStatus === "pass" || readinessStatus === undefined);
-const ok = endpointOk && readinessOk;
+const ok =
+  endpointOk &&
+  readinessOk &&
+  simulationSuiteOk &&
+  toolContractsOk &&
+  outcomeContractsOk;
 
 console.log(
   JSON.stringify(
@@ -506,9 +785,12 @@ console.log(
       baseUrl,
       endpointOk,
       ok,
+      outcomeContractsOk,
       readinessStatus,
       results,
+      simulationSuiteOk,
       strict,
+      toolContractsOk,
     },
     null,
     2,

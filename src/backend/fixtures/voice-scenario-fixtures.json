@@ -9,7 +9,7 @@
           "at": 1777200000000,
           "id": "fixture-guided-start",
           "payload": {},
-          "scenarioId": "guided",
+          "scenarioId": "proof-guided",
           "sessionId": "fixture-guided",
           "type": "session.started"
         },
@@ -17,7 +17,7 @@
           "at": 1777200001000,
           "id": "fixture-guided-turn-1",
           "payload": { "text": "My name is Riley Chen" },
-          "scenarioId": "guided",
+          "scenarioId": "proof-guided",
           "sessionId": "fixture-guided",
           "turnId": "guided-1",
           "type": "turn.committed"
@@ -28,7 +28,7 @@
           "payload": {
             "text": "Thanks Riley. Which integration are you testing?"
           },
-          "scenarioId": "guided",
+          "scenarioId": "proof-guided",
           "sessionId": "fixture-guided",
           "turnId": "guided-1",
           "type": "turn.assistant"
@@ -39,7 +39,7 @@
           "payload": {
             "text": "I am testing the absolutejs voice integration"
           },
-          "scenarioId": "guided",
+          "scenarioId": "proof-guided",
           "sessionId": "fixture-guided",
           "turnId": "guided-2",
           "type": "turn.committed"
@@ -48,7 +48,7 @@
           "at": 1777200004000,
           "id": "fixture-guided-assistant-2",
           "payload": { "text": "Got it. What follow up should be created?" },
-          "scenarioId": "guided",
+          "scenarioId": "proof-guided",
           "sessionId": "fixture-guided",
           "turnId": "guided-2",
           "type": "turn.assistant"
@@ -57,7 +57,7 @@
           "at": 1777200005000,
           "id": "fixture-guided-turn-3",
           "payload": { "text": "Create a follow up task for tomorrow" },
-          "scenarioId": "guided",
+          "scenarioId": "proof-guided",
           "sessionId": "fixture-guided",
           "turnId": "guided-3",
           "type": "turn.committed"
@@ -68,7 +68,7 @@
           "payload": {
             "text": "The guided demo is complete and the follow up is saved."
           },
-          "scenarioId": "guided",
+          "scenarioId": "proof-guided",
           "sessionId": "fixture-guided",
           "turnId": "guided-3",
           "type": "turn.assistant"
@@ -77,7 +77,7 @@
           "at": 1777200007000,
           "id": "fixture-guided-end",
           "payload": { "disposition": "completed", "type": "end" },
-          "scenarioId": "guided",
+          "scenarioId": "proof-guided",
           "sessionId": "fixture-guided",
           "type": "call.lifecycle"
         },
@@ -97,7 +97,7 @@
             ],
             "status": "pass"
           },
-          "scenarioId": "guided",
+          "scenarioId": "proof-guided",
           "sessionId": "fixture-guided",
           "turnId": "guided-3",
           "type": "workflow.contract"
@@ -106,7 +106,7 @@
           "at": 1777200010000,
           "id": "fixture-general-start",
           "payload": {},
-          "scenarioId": "general",
+          "scenarioId": "proof-general",
           "sessionId": "fixture-general",
           "type": "session.started"
         },
@@ -114,7 +114,7 @@
           "at": 1777200011000,
           "id": "fixture-general-turn-1",
           "payload": { "text": "This is a general recording for the demo." },
-          "scenarioId": "general",
+          "scenarioId": "proof-general",
           "sessionId": "fixture-general",
           "turnId": "general-1",
           "type": "turn.committed"
@@ -123,7 +123,7 @@
           "at": 1777200012000,
           "id": "fixture-general-assistant-1",
           "payload": { "text": "Recording saved." },
-          "scenarioId": "general",
+          "scenarioId": "proof-general",
           "sessionId": "fixture-general",
           "turnId": "general-1",
           "type": "turn.assistant"
@@ -132,7 +132,7 @@
           "at": 1777200013000,
           "id": "fixture-general-end",
           "payload": { "disposition": "completed", "type": "end" },
-          "scenarioId": "general",
+          "scenarioId": "proof-general",
           "sessionId": "fixture-general",
           "type": "call.lifecycle"
         },
@@ -147,7 +147,7 @@
             "requiredFields": ["transcript", "assistantSummary", "turnCount"],
             "status": "pass"
           },
-          "scenarioId": "general",
+          "scenarioId": "proof-general",
           "sessionId": "fixture-general",
           "turnId": "general-1",
           "type": "workflow.contract"
@@ -156,7 +156,7 @@
           "at": 1777200020000,
           "id": "fixture-transfer-start",
           "payload": {},
-          "scenarioId": "transfer",
+          "scenarioId": "proof-transfer",
           "sessionId": "fixture-transfer",
           "type": "session.started"
         },
@@ -164,7 +164,7 @@
           "at": 1777200021000,
           "id": "fixture-transfer-turn-1",
           "payload": { "text": "Please transfer me to a human agent." },
-          "scenarioId": "transfer",
+          "scenarioId": "proof-transfer",
           "sessionId": "fixture-transfer",
           "turnId": "transfer-1",
           "type": "turn.committed"
@@ -173,7 +173,7 @@
           "at": 1777200022000,
           "id": "fixture-transfer-assistant-1",
           "payload": { "text": "I will transfer you now." },
-          "scenarioId": "transfer",
+          "scenarioId": "proof-transfer",
           "sessionId": "fixture-transfer",
           "turnId": "transfer-1",
           "type": "turn.assistant"
@@ -182,7 +182,7 @@
           "at": 1777200023000,
           "id": "fixture-transfer-lifecycle",
           "payload": { "target": "+15551234567", "type": "transfer" },
-          "scenarioId": "transfer",
+          "scenarioId": "proof-transfer",
           "sessionId": "fixture-transfer",
           "type": "call.lifecycle"
         },
@@ -195,7 +195,7 @@
             "status": "delivered",
             "target": "+15551234567"
           },
-          "scenarioId": "transfer",
+          "scenarioId": "proof-transfer",
           "sessionId": "fixture-transfer",
           "type": "call.handoff"
         },
@@ -207,7 +207,7 @@
             "target": "+15551234567",
             "type": "end"
           },
-          "scenarioId": "transfer",
+          "scenarioId": "proof-transfer",
           "sessionId": "fixture-transfer",
           "type": "call.lifecycle"
         },
@@ -222,7 +222,7 @@
             "requiredFields": ["transcript", "assistantSummary"],
             "status": "pass"
           },
-          "scenarioId": "transfer",
+          "scenarioId": "proof-transfer",
           "sessionId": "fixture-transfer",
           "turnId": "transfer-1",
           "type": "workflow.contract"

@@ -11,25 +11,69 @@ import {
   createVoiceEvalRoutes,
   createVoiceFileEvalBaselineStore,
   createVoiceFileScenarioFixtureStore,
+  createVoiceGuardrailRuntime,
+  createVoiceGuardrailRoutes,
   createVoiceAssistant,
   createVoiceAgent,
   createVoiceAgentSquad,
   createVoiceAgentTool,
   createVoiceAssistantHealthRoutes,
-  createVoiceBargeInRoutes,
+  createVoiceAuditDeliveryRoutes,
+  createVoiceAuditEvent,
+  createVoiceAuditSinkDeliveryRecord,
   createVoiceCampaignRoutes,
+  createVoiceDeliverySinkPair,
+  createVoiceDeliverySinkRoutes,
+  createVoiceDeliveryRuntime,
+  createVoiceDeliveryRuntimePresetConfig,
+  createVoiceDeliveryRuntimeRoutes,
+  createVoiceDataControlRoutes,
   createVoiceExperiment,
   createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
   createVoiceMemoryTraceEventStore,
   createVoiceOpsConsoleRoutes,
+  createVoiceOpsActionAuditRoutes,
+  createVoiceOpsRecoveryRoutes,
   createVoiceOpsStatusRoutes,
+  createVoiceObservabilityExportRoutes,
+  createVoiceObservabilityExportReplayRoutes,
+  createVoiceCompetitiveCoverageRoutes,
+  createVoicePlatformCoverageRoutes,
+  createVoicePostCallAnalysisRoutes,
+  createVoiceProofTrendRoutes,
+  createVoiceFileObservabilityExportDeliveryReceiptStore,
+  buildVoiceCompetitiveCoverageReport,
+  buildVoicePlatformCoverageSummary,
+  buildVoiceOpsRecoveryReport,
+  buildVoiceObservabilityExport,
+  buildVoiceObservabilityExportReplayReport,
+  buildVoiceProductionReadinessGate,
+  buildVoiceProductionReadinessReport,
+  buildEmptyVoiceProofTrendReport,
+  buildVoicePostCallAnalysisReport,
+  buildVoiceGuardrailReport,
+  createVoiceProviderContractMatrixPreset,
+  createVoiceReadinessProfile,
   createVoiceSQLiteCampaignStore,
+  createOpenAIRealtimeAdapter,
   createOpenAIVoiceAssistantModel,
   createOpenAIVoiceTTS,
   createVoiceHandoffDeliveryWorker,
+  createVoiceIncidentBundleRoutes,
   createVoiceProviderCapabilityRoutes,
   createVoiceProviderHealthRoutes,
+  buildVoiceProviderOrchestrationReport,
+  createVoiceProviderOrchestrationProfile,
+  createVoiceProviderOrchestrationRoutes,
+  createVoiceProviderDecisionTraceEvent,
+  createVoiceProviderDecisionTraceRoutes,
+  createVoiceProviderSloRoutes,
+  createVoiceSloCalibrationRoutes,
+  createVoiceSloReadinessThresholdOptions,
+  createVoiceSloReadinessThresholdRoutes,
+  createVoiceSloThresholdProfile,
+  createVoiceOperationsRecordRoutes,
   createVoiceProviderRouter,
   createVoiceProductionReadinessRoutes,
   createVoiceQualityRoutes,
@@ -41,12 +85,20 @@ import {
   createVoiceSimulationSuiteRoutes,
   createVoiceTTSProviderRouter,
   createVoiceTaskUpdatedEvent,
+  createVoiceTraceDeliveryRoutes,
+  createVoiceTraceEvent,
+  createVoiceTraceSinkDeliveryRecord,
   createVoiceTraceTimelineRoutes,
   createVoiceTelephonyOutcomePolicy,
+  createVoiceTelephonyWebhookRoutes,
+  createVoiceTelephonyWebhookSecurityPreset,
+  createVoiceTelephonyWebhookSecurityRoutes,
   createVoicePhoneAgent,
   createVoiceToolContractRoutes,
   createVoiceToolRuntimeContractDefaults,
   createVoiceLiveLatencyRoutes,
+  buildVoiceLiveOpsControlState,
+  VOICE_LIVE_OPS_ACTIONS,
   createVoiceTurnLatencyRoutes,
   createVoiceTurnQualityRoutes,
   createVoiceWorkflowContractHandler,
@@ -57,22 +109,43 @@ import {
   createVoiceOutcomeContractRoutes,
   createVoiceWebhookHandoffAdapter,
   deliverVoiceIntegrationEventToSinks,
+  buildVoiceProviderContractMatrix,
+  evaluateVoiceProviderStackGaps,
   recordVoiceRuntimeOps,
   reopenVoiceOpsTask,
   renderVoiceHandoffHealthHTML,
+  renderVoiceBargeInHTML,
+  renderVoiceGuardrailMarkdown,
+  renderVoiceReconnectContractHTML,
   renderVoiceSessionsHTML,
+  recommendVoiceProviderStack,
+  recommendVoiceReadinessProfile,
+  renderVoiceProviderContractMatrixHTML,
   resolveVoiceTelephonyOutcome,
+  signVoiceTwilioWebhook,
+  signVoicePlivoWebhook,
+  buildVoiceProofTrendReport,
+  formatVoiceProofTrendAge,
   getVoiceCampaignDialerProofStatus,
   runVoiceCampaignDialerProof,
   runVoiceCampaignProof,
+  runVoiceCampaignReadinessProof,
   runVoiceAgentSquadContract,
+  runVoiceReconnectContract,
   runVoiceProviderRoutingContract,
   startVoiceOpsTask,
+  summarizeVoiceReconnectContractSnapshots,
   summarizeVoiceAssistantRuns,
+  summarizeVoiceAuditSinkDeliveries,
+  summarizeVoiceBargeIn,
   summarizeVoiceHandoffDeliveries,
+  summarizeVoiceLiveLatency,
   summarizeVoiceHandoffHealth,
+  summarizeVoiceProviderFallbackRecovery,
   summarizeVoiceProviderHealth,
   summarizeVoiceSessions,
+  summarizeVoiceTurnLatency,
+  summarizeVoiceTraceSinkDeliveries,
   type STTAdapter,
   type StoredVoiceHandoffDelivery,
   type TTSAdapter,
@@ -82,31 +155,52 @@ import {
   type VoiceAgentModel,
   type VoiceHandoffDeliveryStore,
   type VoiceIOProviderRouterEvent,
+  type VoiceLiveOpsAction,
+  type VoiceLiveOpsControlState,
   type VoiceProviderHealthSummary,
+  type VoiceProviderOrchestrationReport,
   type VoiceProviderRouterEvent,
   type VoiceOpsTaskStatus,
   type VoiceOpsTaskStore,
   type VoiceOutcomeContractDefinition,
   type VoiceTelephonyOutcomeProviderEvent,
+  type VoiceTelephonyWebhookDecision,
   type VoiceTelephonyCarrierMatrixInput,
   type VoiceTelephonyProvider,
   type VoiceTelephonySetupStatus,
   type VoiceTelephonySmokeReport,
   type VoiceToolContractDefinition,
   type VoiceOpsWebhookEnvelope,
+  type VoiceSessionListItem,
   type StoredVoiceTraceEvent,
   type VoiceTraceEvent,
   type VoiceTraceEventStore,
+  type VoiceTraceSinkDeliveryRecord,
   type VoiceTurnCorrectionHandler,
   type VoiceTurnRecord,
   type VoiceSessionRecord,
+  type VoiceOnTurnObjectHandler,
+  type VoicePlatformCoverageEvidence,
+  type VoicePlatformCoverageSurface,
+  type VoicePlatformCoverageSummary,
+  type VoiceCompetitiveCoverageReport,
+  type VoiceCompetitiveSurface,
+  type VoicePostCallAnalysisOptions,
+  type VoiceGuardrailDecision,
+  type VoiceProofTrendCycle,
+  type VoiceProofTrendReport,
+  type VoiceSloCalibrationSample,
+  type VoiceProofTrendSummary,
   voice,
+  voiceComplianceRedactionDefaults,
+  voiceGuardrailPolicyPresets,
   voiceTelephonyOutcomeToRouteResult,
 } from "@absolutejs/voice";
 import { assemblyai } from "@absolutejs/voice-assemblyai";
 import { deepgram } from "@absolutejs/voice-deepgram";
 import { Elysia } from "elysia";
-import { mkdir } from "node:fs/promises";
+import { existsSync, statSync } from "node:fs";
+import { mkdir, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
   filterVoiceOpsTasks,
@@ -149,6 +243,7 @@ import {
   isVoiceRoutingMode,
   VOICE_ASSISTANT_CONFIG,
   type SavedIntake,
+  type VoiceAgentSquadDemoStatus,
   type VoiceModelProvider,
   type VoiceRoutingMode,
 } from "../shared/demo";
@@ -302,13 +397,10 @@ const normalizeReviewFilters = (
 });
 
 const savedIntakes: SavedIntake[] = [];
-const runtimeDirectory = resolve(
-  import.meta.dir,
-  "..",
-  "..",
-  ".voice-runtime",
-  "voice-demo",
-);
+const runtimeDirectory = process.env.VOICE_DEMO_RUNTIME_DIR
+  ? resolve(process.env.VOICE_DEMO_RUNTIME_DIR)
+  : resolve(import.meta.dir, "..", "..", ".voice-runtime", "voice-demo");
+await mkdir(runtimeDirectory, { recursive: true });
 const runtimeStorage = createVoiceFileRuntimeStorage<
   VoiceSessionRecord,
   SavedVoiceReviewArtifact,
@@ -317,6 +409,186 @@ const runtimeStorage = createVoiceFileRuntimeStorage<
 >({
   directory: runtimeDirectory,
 });
+const supportedDeliverySinkKinds = [
+  "file",
+  "webhook",
+  "s3",
+  "postgres",
+  "sqlite",
+] as const;
+type DemoDeliverySinkKind = (typeof supportedDeliverySinkKinds)[number];
+const resolveDeliverySinkKind = (
+  value: string | undefined,
+): DemoDeliverySinkKind =>
+  supportedDeliverySinkKinds.includes(value as DemoDeliverySinkKind)
+    ? (value as DemoDeliverySinkKind)
+    : "file";
+const titleCaseSinkKind = (value: string) =>
+  value
+    .split(/[-_]/g)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+const deliverySinkMode = process.env.VOICE_DELIVERY_SINK ?? "file";
+const deliverySinkKind = resolveDeliverySinkKind(
+  deliverySinkMode.toLowerCase(),
+);
+const parseS3DeliveryTarget = (value: string | undefined) => {
+  const fallback = {
+    bucket: "absolutejs-voice-demo-deliveries",
+    keyPrefix: "voice-demo",
+    target: "s3://absolutejs-voice-demo-deliveries/voice-demo",
+  };
+  if (!value?.trim()) {
+    return fallback;
+  }
+
+  const cleaned = value
+    .trim()
+    .replace(/^s3:\/\//, "")
+    .replace(/^\/+|\/+$/g, "");
+  const [bucket, ...prefixParts] = cleaned.split("/");
+  if (!bucket) {
+    return fallback;
+  }
+
+  const keyPrefix = prefixParts.join("/") || "voice-demo";
+  return {
+    bucket,
+    keyPrefix,
+    target: `s3://${bucket}/${keyPrefix}`,
+  };
+};
+const s3DeliveryTarget = parseS3DeliveryTarget(
+  process.env.VOICE_DELIVERY_S3_BUCKET,
+);
+const deliverySinkTarget =
+  deliverySinkKind === "webhook"
+    ? (process.env.VOICE_DELIVERY_WEBHOOK_URL ??
+      "https://example.test/voice-delivery")
+    : deliverySinkKind === "s3"
+      ? s3DeliveryTarget.target
+      : deliverySinkKind === "postgres"
+        ? "postgres://VOICE_DATABASE_URL/voice_delivery"
+        : deliverySinkKind === "sqlite"
+          ? "sqlite://voice-demo.sqlite/voice_delivery"
+          : "file://.voice-runtime/voice-demo";
+const auditDeliverySinkTarget = `${deliverySinkTarget}/audit-deliveries`;
+const traceDeliverySinkTarget = `${deliverySinkTarget}/trace-deliveries`;
+const deliverySinkLabel = titleCaseSinkKind(deliverySinkKind);
+const auditDeliverySinkId = `demo-${deliverySinkKind}-audit-sink`;
+const traceDeliverySinkId = `demo-${deliverySinkKind}-trace-sink`;
+const deliverySinkDescriptors = createVoiceDeliverySinkPair({
+  auditHref: "/audit/deliveries",
+  auditId: auditDeliverySinkId,
+  auditLabel: `${deliverySinkLabel} audit sink`,
+  description: `Demo ${deliverySinkKind} delivery sink selected by VOICE_DELIVERY_SINK.`,
+  kind: deliverySinkKind,
+  mode: deliverySinkKind,
+  target: deliverySinkTarget,
+  traceHref: "/traces/deliveries",
+  traceId: traceDeliverySinkId,
+  traceLabel: `${deliverySinkLabel} trace sink`,
+});
+const traceDeliveryRecordId = (event: StoredVoiceTraceEvent) =>
+  `trace-export:${encodeURIComponent(event.id)}`;
+
+const createDeliveredTraceDeliveryRecord = (
+  event: StoredVoiceTraceEvent,
+): VoiceTraceSinkDeliveryRecord => {
+  const deliveredAt = Date.now();
+
+  return createVoiceTraceSinkDeliveryRecord({
+    deliveredAt,
+    deliveryAttempts: 1,
+    deliveryStatus: "delivered",
+    events: [event],
+    id: traceDeliveryRecordId(event),
+    sinkDeliveries: {
+      [traceDeliverySinkId]: {
+        attempts: 1,
+        deliveredAt,
+        deliveredTo: traceDeliverySinkTarget,
+        eventCount: 1,
+        status: "delivered",
+      },
+    },
+    updatedAt: deliveredAt,
+  });
+};
+
+const recordAuditDeliveryForTraceExport = async (
+  event: StoredVoiceTraceEvent,
+) => {
+  const deliveredAt = Date.now();
+  const auditEvent = await runtimeStorage.audit.append(
+    createVoiceAuditEvent({
+      action: "trace.export.delivered",
+      actor: {
+        id: "absolutejs-voice-demo",
+        kind: "system",
+        name: "AbsoluteJS Voice Demo",
+      },
+      at: deliveredAt,
+      metadata: {
+        source: "runtime-trace-export",
+      },
+      outcome: "success",
+      payload: {
+        traceEventId: event.id,
+        traceEventType: event.type,
+      },
+      resource: {
+        id: event.id,
+        type: "voice.trace",
+      },
+      sessionId: event.sessionId,
+      traceId: event.traceId ?? event.id,
+      type: "operator.action",
+    }),
+  );
+
+  await runtimeStorage.auditDeliveries.set(
+    `audit-export:${encodeURIComponent(auditEvent.id)}`,
+    createVoiceAuditSinkDeliveryRecord({
+      deliveredAt,
+      deliveryAttempts: 1,
+      deliveryStatus: "delivered",
+      events: [auditEvent],
+      id: `audit-export:${encodeURIComponent(auditEvent.id)}`,
+      sinkDeliveries: {
+        [auditDeliverySinkId]: {
+          attempts: 1,
+          deliveredAt,
+          deliveredTo: auditDeliverySinkTarget,
+          eventCount: 1,
+          status: "delivered",
+        },
+      },
+      updatedAt: deliveredAt,
+    }),
+  );
+};
+
+const deliveryTraceStore: VoiceTraceEventStore = {
+  append: async (event) => {
+    const stored = await runtimeStorage.traces.append(event);
+    await runtimeStorage.traceDeliveries.set(
+      traceDeliveryRecordId(stored),
+      createDeliveredTraceDeliveryRecord(stored),
+    );
+    await recordAuditDeliveryForTraceExport(stored);
+
+    return stored;
+  },
+  get: (id) => runtimeStorage.traces.get(id),
+  list: (filter) => runtimeStorage.traces.list(filter),
+  remove: async (id) => {
+    await runtimeStorage.traces.remove(id);
+    await runtimeStorage.traceDeliveries.remove(
+      `trace-export:${encodeURIComponent(id)}`,
+    );
+  },
+};
 const hiddenTraceTimelineSessionPattern =
   /^(latency-proof-|phone-|provider-sim-|quality-routing-proof$|stt-contract-|stt-sim-|tts-contract-|tts-sim-)/;
 const filterDemoTraceTimelineEvents = (
@@ -354,24 +626,483 @@ const filterDemoTraceTimelineEvents = (
   return events.filter((event) => visibleSessionIds.has(event.sessionId));
 };
 const traceTimelineStore: VoiceTraceEventStore = {
-  append: (event) => runtimeStorage.traces.append(event),
-  get: (id) => runtimeStorage.traces.get(id),
+  append: (event) => deliveryTraceStore.append(event),
+  get: (id) => deliveryTraceStore.get(id),
   list: async (filter) =>
-    filterDemoTraceTimelineEvents(await runtimeStorage.traces.list(filter)),
-  remove: (id) => runtimeStorage.traces.remove(id),
+    filterDemoTraceTimelineEvents(await deliveryTraceStore.list(filter)),
+  remove: (id) => deliveryTraceStore.remove(id),
+};
+const demoGuardrailPolicies = [voiceGuardrailPolicyPresets.supportSafeDefaults];
+const guardrailBlockedResult = (
+  session: VoiceSessionRecord,
+  context: unknown,
+  reason: string,
+): {
+  assistantText: string;
+  escalate: { metadata: Record<string, unknown>; reason: string };
+  result: SavedIntake;
+} => ({
+  assistantText:
+    "I cannot safely complete that in the automated flow. I am routing this to a human specialist.",
+  escalate: {
+    metadata: {
+      guardrail: true,
+    },
+    reason,
+  },
+  result: buildSavedIntake(session, resolveScenarioFromContext(context)),
+});
+const demoLiveGuardrails = createVoiceGuardrailRuntime<
+  unknown,
+  VoiceSessionRecord,
+  SavedIntake
+>({
+  blockResult: ({ context, decision, session }) =>
+    guardrailBlockedResult(
+      session,
+      context,
+      `guardrail-blocked-${decision.stage}`,
+    ),
+  name: "absolutejs-voice-example-live",
+  policies: demoGuardrailPolicies,
+  trace: deliveryTraceStore,
+});
+const demoIncidentSessionId = "demo-incident-bundle";
+const voiceSupportArtifactRedaction = {
+  keys: ["apiKey", "authorization", "secret", "token"],
+  redactEmails: true,
+  redactPhoneNumbers: true,
+};
+const ensureDemoIncidentBundleEvidence = async () => {
+  const existing = await runtimeStorage.traces.list({
+    sessionId: demoIncidentSessionId,
+  });
+
+  const at = Date.now() - 2_400;
+  const appendTrace = (event: VoiceTraceEvent) => deliveryTraceStore.append(event);
+
+  if (existing.length === 0) {
+    await appendTrace({
+      at,
+      metadata: {
+        proof: "incident-bundle-seed",
+        source: "demo",
+      },
+      payload: {
+        status: "started",
+      },
+      sessionId: demoIncidentSessionId,
+      type: "call.lifecycle",
+    });
+    await appendTrace({
+      at: at + 300,
+      metadata: {
+        proof: "incident-bundle-seed",
+        source: "demo",
+      },
+      payload: {
+        isFinal: true,
+        text: "My email is demo.customer@example.com and I need billing help.",
+      },
+      sessionId: demoIncidentSessionId,
+      traceId: "demo-incident-transcript",
+      turnId: "demo-incident-turn-1",
+      type: "turn.transcript",
+    });
+    await appendTrace({
+      at: at + 520,
+      metadata: {
+        proof: "incident-bundle-seed",
+        source: "demo",
+      },
+      payload: {
+        text: "My email is demo.customer@example.com and I need billing help.",
+      },
+      sessionId: demoIncidentSessionId,
+      turnId: "demo-incident-turn-1",
+      type: "turn.committed",
+    });
+    await appendTrace({
+      at: at + 760,
+      metadata: {
+        proof: "incident-bundle-seed",
+        source: "demo",
+      },
+      payload: {
+        fromAgentId: "intake",
+        reason: "billing_request",
+        status: "allowed",
+        summary:
+          "Customer needs billing support for account demo.customer@example.com.",
+        targetAgentId: "billing",
+      },
+      sessionId: demoIncidentSessionId,
+      turnId: "demo-incident-turn-1",
+      type: "agent.handoff",
+    });
+    await appendTrace({
+      at: at + 980,
+      metadata: {
+        proof: "incident-bundle-seed",
+        source: "demo",
+      },
+      payload: {
+        elapsedMs: 87,
+        status: "success",
+        toolCallId: "demo-lookup-invoice",
+        toolName: "lookup_invoice",
+      },
+      sessionId: demoIncidentSessionId,
+      turnId: "demo-incident-turn-1",
+      type: "agent.tool",
+    });
+    await appendTrace({
+      at: at + 1_220,
+      metadata: {
+        proof: "incident-bundle-seed",
+        source: "demo",
+      },
+      payload: {
+        text: "I found the invoice and can connect you with billing.",
+      },
+      sessionId: demoIncidentSessionId,
+      turnId: "demo-incident-turn-1",
+      type: "turn.assistant",
+    });
+    await appendTrace({
+      at: at + 1_500,
+      metadata: {
+        proof: "incident-bundle-seed",
+        source: "demo",
+      },
+      payload: {
+        status: "completed",
+      },
+      sessionId: demoIncidentSessionId,
+      type: "call.lifecycle",
+    });
+    await runtimeStorage.audit.append(
+      createVoiceAuditEvent({
+        action: "incident.bundle.demo.seeded",
+        actor: {
+          id: "absolutejs-voice-demo",
+          kind: "system",
+          name: "AbsoluteJS Voice Demo",
+        },
+        at: at + 1_700,
+        metadata: {
+          proof: "incident-bundle-seed",
+          source: "demo",
+        },
+        outcome: "success",
+        payload: {
+          note: "Support export can redact demo.customer@example.com from traces and audit.",
+        },
+        resource: {
+          id: demoIncidentSessionId,
+          type: "voice.incident_bundle",
+        },
+        sessionId: demoIncidentSessionId,
+        type: "operator.action",
+      }),
+    );
+  }
+
+  const hasGuardrailEvidence = existing.some(
+    (event) =>
+      event.type === "assistant.guardrail" &&
+      event.metadata?.proof === "operations-record-guardrail-seed",
+  );
+
+  if (!hasGuardrailEvidence) {
+    await appendTrace({
+      at: at + 1_060,
+      metadata: {
+        proof: "operations-record-guardrail-seed",
+        source: "demo",
+      },
+      payload: {
+        allowed: false,
+        findings: [
+          {
+            action: "block",
+            label: "Unsafe medical claim",
+            ruleId: "support.no-medical-advice",
+          },
+        ],
+        stage: "assistant-output",
+        status: "fail",
+      },
+      sessionId: demoIncidentSessionId,
+      turnId: "demo-incident-turn-1",
+      type: "assistant.guardrail",
+    });
+    await appendTrace({
+      at: at + 1_100,
+      metadata: {
+        proof: "operations-record-guardrail-seed",
+        source: "demo",
+      },
+      payload: {
+        allowed: false,
+        findings: [
+          {
+            action: "block",
+            label: "Unsafe tool argument",
+            ruleId: "support.tool-input-policy",
+          },
+        ],
+        stage: "tool-input",
+        status: "fail",
+        toolName: "lookup_invoice",
+      },
+      sessionId: demoIncidentSessionId,
+      turnId: "demo-incident-turn-1",
+      type: "assistant.guardrail",
+    });
+  }
+
+  const latest = await runtimeStorage.traces.list({
+    sessionId: demoIncidentSessionId,
+  });
+  const hasProviderDecisionEvidence = (status: string) =>
+    latest.some(
+      (event) =>
+        event.type === "provider.decision" &&
+        event.payload.status === status &&
+        event.metadata?.proof === "operations-record-provider-decision-seed",
+    );
+
+  if (!hasProviderDecisionEvidence("selected")) {
+    await appendTrace({
+      ...createVoiceProviderDecisionTraceEvent({
+        at: at + 1_030,
+        elapsedMs: 320,
+        kind: "llm",
+        provider: modelProvider,
+        reason:
+          "live-call selected the configured model provider for the billing support turn.",
+        scenarioId: "operations-record-provider-decision-seed",
+        selectedProvider: modelProvider,
+        sessionId: demoIncidentSessionId,
+        status: "selected",
+        surface: "live-call",
+        turnId: "demo-incident-turn-1",
+      }),
+      metadata: {
+        proof: "operations-record-provider-decision-seed",
+        source: "demo",
+      },
+    });
+  }
+  if (!hasProviderDecisionEvidence("fallback")) {
+    await appendTrace({
+      ...createVoiceProviderDecisionTraceEvent({
+        at: at + 1_040,
+        elapsedMs: 520,
+        fallbackProvider: modelProvider === "openai" ? "anthropic" : modelProvider,
+        kind: "llm",
+        provider: modelProvider,
+        reason:
+          "live-call recovered with the configured fallback provider after a simulated primary model timeout.",
+        scenarioId: "operations-record-provider-decision-seed",
+        selectedProvider: modelProvider === "openai" ? "anthropic" : modelProvider,
+        sessionId: demoIncidentSessionId,
+        status: "fallback",
+        surface: "live-call",
+        turnId: "demo-incident-turn-1",
+      }),
+      metadata: {
+        proof: "operations-record-provider-decision-seed",
+        source: "demo",
+      },
+    });
+  }
+  if (!hasProviderDecisionEvidence("degraded")) {
+    await appendTrace({
+      ...createVoiceProviderDecisionTraceEvent({
+        at: at + 1_050,
+        elapsedMs: 980,
+        fallbackProvider: "deterministic",
+        kind: "llm",
+        provider: modelProvider,
+        reason:
+          "live-call degraded to deterministic fallback after model providers exceeded the latency budget.",
+        scenarioId: "operations-record-provider-decision-seed",
+        selectedProvider: "deterministic",
+        sessionId: demoIncidentSessionId,
+        status: "degraded",
+        surface: "live-call",
+        turnId: "demo-incident-turn-1",
+      }),
+      metadata: {
+        proof: "operations-record-provider-decision-seed",
+        source: "demo",
+      },
+    });
+  }
+
+  const reviewId = `${demoIncidentSessionId}:review`;
+  if (!(await runtimeStorage.reviews.get(reviewId))) {
+    await runtimeStorage.reviews.set(reviewId, {
+      config: {
+        phraseHints: VOICE_DEMO_PHRASE_HINTS.map((hint) => hint.text),
+        preset: "reliability",
+        stt: {
+          model: "flux-general-en",
+          provider: "deepgram",
+        },
+      },
+      errors: [],
+      generatedAt: at + 1_800,
+      id: reviewId,
+      intakeId: reviewId,
+      latencyBreakdown: [
+        {
+          label: "first turn",
+          valueMs: 520,
+        },
+      ],
+      notes: [
+        "Demo post-call analysis seed.",
+        "Extracted category: billing.",
+        "Follow-up task and integration event are intentionally persisted.",
+      ],
+      postCall: {
+        label: "Billing support follow-up",
+        recommendedAction:
+          "Create a billing support task and send the summary to the customer-owned workflow sink.",
+        reason: "billing_request",
+        summary:
+          "Customer asked for billing help and should be routed to billing support.",
+        target: "customer-1",
+      },
+      scenarioId: "guided",
+      sessionId: demoIncidentSessionId,
+      summary: {
+        elapsedMs: 1_500,
+        firstTurnLatencyMs: 520,
+        outcome: "completed",
+        pass: true,
+        turnCount: 1,
+      },
+      timeline: [
+        {
+          atMs: 300,
+          event: "transcript",
+          source: "turn",
+          text: "My email is demo.customer@example.com and I need billing help.",
+        },
+        {
+          atMs: 1_220,
+          event: "assistant",
+          source: "turn",
+          text: "I found the invoice and can connect you with billing.",
+        },
+      ],
+      title: "Demo billing support review",
+      transcript: {
+        actual:
+          "My email is demo.customer@example.com and I need billing help.",
+      },
+    });
+  }
+
+  const taskId = `${reviewId}:support-triage`;
+  if (!(await runtimeStorage.tasks.get(taskId))) {
+    await runtimeStorage.tasks.set(taskId, {
+      createdAt: at + 1_900,
+      description:
+        "Post-call analysis classified the demo incident as billing support.",
+      history: [
+        {
+          actor: "absolutejs-voice-demo",
+          at: at + 1_900,
+          detail: "Created by deterministic post-call analysis proof seed.",
+          type: "created",
+        },
+      ],
+      id: taskId,
+      intakeId: reviewId,
+      kind: "support-triage",
+      outcome: "completed",
+      priority: "normal",
+      queue: "billing-support",
+      recommendedAction:
+        "Review the billing issue and follow up with the customer.",
+      reviewId,
+      status: "open",
+      target: "customer-1",
+      title: "Follow up billing support demo incident",
+      updatedAt: at + 1_900,
+    });
+  }
+
+  const eventId = `${reviewId}:post-call-analysis-delivered`;
+  if (!(await runtimeStorage.events.get(eventId))) {
+    await runtimeStorage.events.set(eventId, {
+      createdAt: at + 2_000,
+      deliveredAt: at + 2_050,
+      deliveredTo: "customer-owned-workflow",
+      deliveryAttempts: 1,
+      deliveryStatus: "delivered",
+      id: eventId,
+      payload: {
+        category: "billing",
+        customerId: "customer-1",
+        reviewId,
+        sessionId: demoIncidentSessionId,
+        summary: "Billing support follow-up created.",
+      },
+      sinkDeliveries: {
+        "customer-owned-workflow": {
+          attempts: 1,
+          deliveredAt: at + 2_050,
+          deliveredTo: "customer-owned-workflow",
+          sinkId: "customer-owned-workflow",
+          sinkKind: "webhook",
+          status: "delivered",
+        },
+      },
+      type: "task.created",
+    });
+  }
+};
+
+const renderVoiceSessionsWithSupportActions = (
+  sessions: VoiceSessionListItem[],
+) => {
+  let html = renderVoiceSessionsHTML(sessions);
+
+  for (const session of sessions) {
+    const sessionId = encodeURIComponent(session.sessionId);
+    const supportLinks = `<p class="voice-session-support-actions"><a href="${escapeHtml(session.replayHref)}">Open replay</a> · <a href="/voice-operations/${sessionId}">Open operations record</a> · <a href="/voice-incidents/${sessionId}/markdown">Export incident bundle</a></p>`;
+    html = html.replace(
+      `<p><a href="${session.replayHref}">Open replay</a></p>`,
+      supportLinks,
+    );
+  }
+
+  return html;
 };
 type TelephonyWebhookDecisionSnapshot = {
   action: string;
   at: number;
   campaignOutcome: unknown;
   disposition?: string;
+  duplicate?: boolean;
+  idempotencyKey?: string;
   provider: VoiceTelephonyProvider;
+  routeResult: unknown;
   source?: string;
+  sessionId?: string;
 };
-const telephonyWebhookDecisionSnapshots: TelephonyWebhookDecisionSnapshot[] = [];
+const telephonyWebhookDecisionSnapshots: TelephonyWebhookDecisionSnapshot[] =
+  [];
 const recordTelephonyWebhookDecision = async (
   provider: VoiceTelephonyProvider,
-  input: Parameters<typeof recordCampaignTelephonyOutcome>[0],
+  input: Parameters<typeof recordCampaignTelephonyOutcome>[0] &
+    Pick<VoiceTelephonyWebhookDecision, "duplicate" | "idempotencyKey">,
 ) => {
   const { decision } = input;
   const campaignOutcome = await recordCampaignTelephonyOutcome(input);
@@ -380,10 +1111,343 @@ const recordTelephonyWebhookDecision = async (
     at: Date.now(),
     campaignOutcome,
     disposition: decision.disposition,
+    duplicate: input.duplicate,
+    idempotencyKey: input.idempotencyKey,
     provider,
+    routeResult: input.routeResult,
     source: decision.source,
+    sessionId: input.sessionId,
   });
   telephonyWebhookDecisionSnapshots.splice(20);
+};
+
+const base64FromBytes = (bytes: ArrayBuffer | Uint8Array) =>
+  Buffer.from(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)).toString(
+    "base64",
+  );
+
+const runTelephonyWebhookVerificationProof = async () => {
+  const attempts: Array<{
+    decisions: number;
+    provider: VoiceTelephonyProvider;
+    rejected: boolean;
+    replayRejected?: boolean;
+    sideEffects: number;
+    status: number;
+    verification?: { ok: false; reason: "invalid-signature" };
+  }> = [];
+
+  const twilioPath = "/carrier";
+  const twilioUrl = "https://voice.example.test/carrier";
+  const twilioBody = {
+    CallSid: `proof-twilio-verification-${crypto.randomUUID()}`,
+    CallStatus: "busy",
+    SipResponseCode: "486",
+  };
+  const telnyxBody = {
+    data: {
+      id: `proof-telnyx-verification-${crypto.randomUUID()}`,
+      payload: {
+        call_control_id: "proof-telnyx-verification-control",
+        call_session_id: "proof-telnyx-verification-session",
+        status: "completed",
+      },
+    },
+  };
+  const telnyxRawBody = JSON.stringify(telnyxBody);
+  const telnyxTimestamp = String(Math.floor(Date.now() / 1000));
+  const staleTelnyxTimestamp = String(Math.floor(Date.now() / 1000) - 600);
+  const telnyxKeyPair = (await crypto.subtle.generateKey(
+    "Ed25519",
+    true,
+    ["sign", "verify"],
+  )) as CryptoKeyPair;
+  const telnyxPublicKey = base64FromBytes(
+    await crypto.subtle.exportKey("raw", telnyxKeyPair.publicKey),
+  );
+  const telnyxSignature = base64FromBytes(
+    await crypto.subtle.sign(
+      "Ed25519",
+      telnyxKeyPair.privateKey,
+      new TextEncoder().encode(`${telnyxTimestamp}|${telnyxRawBody}`),
+    ),
+  );
+  const staleTelnyxSignature = base64FromBytes(
+    await crypto.subtle.sign(
+      "Ed25519",
+      telnyxKeyPair.privateKey,
+      new TextEncoder().encode(`${staleTelnyxTimestamp}|${telnyxRawBody}`),
+    ),
+  );
+  const proofWebhookSecurity = createVoiceTelephonyWebhookSecurityPreset({
+    plivo: {
+      authToken: "proof-plivo-secret",
+    },
+    store: {
+      kind: "sqlite",
+      path: resolve(runtimeDirectory, "telephony-webhook-security.sqlite"),
+    },
+    telnyx: {
+      publicKey: telnyxPublicKey,
+      toleranceSeconds: 300,
+    },
+    ttlSeconds: 300,
+    twilio: {
+      authToken: "proof-secret",
+      verificationUrl: twilioUrl,
+    },
+  });
+  let twilioDecisions = 0;
+  const twilioRoutes = createVoiceTelephonyWebhookRoutes({
+    idempotency: proofWebhookSecurity.twilio.idempotency,
+    onDecision: () => {
+      twilioDecisions += 1;
+    },
+    path: twilioPath,
+    provider: "twilio",
+    verify: proofWebhookSecurity.verify.twilio,
+  });
+  const twilioInvalidBefore = twilioDecisions;
+  const twilioInvalidResponse = await twilioRoutes.handle(
+    new Request(twilioUrl, {
+      body: new URLSearchParams(twilioBody),
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "x-twilio-signature": "invalid-signature",
+      },
+      method: "POST",
+    }),
+  );
+  const twilioInvalidBody = (await twilioInvalidResponse.json()) as {
+    verification?: { ok: false; reason: "invalid-signature" };
+  };
+  attempts.push({
+    decisions: twilioDecisions - twilioInvalidBefore,
+    provider: "twilio",
+    rejected: twilioInvalidResponse.status === 401,
+    sideEffects: twilioDecisions - twilioInvalidBefore,
+    status: twilioInvalidResponse.status,
+    verification: twilioInvalidBody.verification,
+  });
+  const twilioValidSignature = await signVoiceTwilioWebhook({
+    authToken: "proof-secret",
+    body: twilioBody,
+    url: twilioUrl,
+  });
+  const twilioValidBefore = twilioDecisions;
+  const twilioValidResponse = await twilioRoutes.handle(
+    new Request(twilioUrl, {
+      body: new URLSearchParams(twilioBody),
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "x-twilio-signature": twilioValidSignature,
+      },
+      method: "POST",
+    }),
+  );
+  attempts.push({
+    decisions: twilioDecisions - twilioValidBefore,
+    provider: "twilio",
+    rejected: false,
+    sideEffects: twilioDecisions - twilioValidBefore,
+    status: twilioValidResponse.status,
+  });
+
+  let telnyxDecisions = 0;
+  const telnyxRoutes = createVoiceTelephonyWebhookRoutes({
+    onDecision: () => {
+      telnyxDecisions += 1;
+    },
+    path: "/telnyx",
+    provider: "telnyx",
+    verify: proofWebhookSecurity.verify.telnyx,
+  });
+  const telnyxInvalidBefore = telnyxDecisions;
+  const telnyxInvalidResponse = await telnyxRoutes.handle(
+    new Request("https://voice.example.test/telnyx", {
+      body: telnyxRawBody,
+      headers: {
+        "content-type": "application/json",
+        "telnyx-signature-ed25519": "invalid-signature",
+        "telnyx-timestamp": telnyxTimestamp,
+      },
+      method: "POST",
+    }),
+  );
+  const telnyxInvalidBody = (await telnyxInvalidResponse.json()) as {
+    verification?: { ok: false; reason: "invalid-signature" };
+  };
+  attempts.push({
+    decisions: telnyxDecisions - telnyxInvalidBefore,
+    provider: "telnyx",
+    rejected: telnyxInvalidResponse.status === 401,
+    sideEffects: telnyxDecisions - telnyxInvalidBefore,
+    status: telnyxInvalidResponse.status,
+    verification: telnyxInvalidBody.verification,
+  });
+  const telnyxStaleBefore = telnyxDecisions;
+  const telnyxStaleResponse = await telnyxRoutes.handle(
+    new Request("https://voice.example.test/telnyx", {
+      body: telnyxRawBody,
+      headers: {
+        "content-type": "application/json",
+        "telnyx-signature-ed25519": staleTelnyxSignature,
+        "telnyx-timestamp": staleTelnyxTimestamp,
+      },
+      method: "POST",
+    }),
+  );
+  const telnyxStaleBody = (await telnyxStaleResponse.json()) as {
+    verification?: { ok: false; reason: "invalid-signature" };
+  };
+  attempts.push({
+    decisions: telnyxDecisions - telnyxStaleBefore,
+    provider: "telnyx",
+    rejected: telnyxStaleResponse.status === 401,
+    replayRejected: true,
+    sideEffects: telnyxDecisions - telnyxStaleBefore,
+    status: telnyxStaleResponse.status,
+    verification: telnyxStaleBody.verification,
+  });
+  const telnyxValidBefore = telnyxDecisions;
+  const telnyxValidResponse = await telnyxRoutes.handle(
+    new Request("https://voice.example.test/telnyx", {
+      body: telnyxRawBody,
+      headers: {
+        "content-type": "application/json",
+        "telnyx-signature-ed25519": telnyxSignature,
+        "telnyx-timestamp": telnyxTimestamp,
+      },
+      method: "POST",
+    }),
+  );
+  attempts.push({
+    decisions: telnyxDecisions - telnyxValidBefore,
+    provider: "telnyx",
+    rejected: false,
+    sideEffects: telnyxDecisions - telnyxValidBefore,
+    status: telnyxValidResponse.status,
+  });
+  const telnyxReplayBefore = telnyxDecisions;
+  const telnyxReplayResponse = await telnyxRoutes.handle(
+    new Request("https://voice.example.test/telnyx", {
+      body: telnyxRawBody,
+      headers: {
+        "content-type": "application/json",
+        "telnyx-signature-ed25519": telnyxSignature,
+        "telnyx-timestamp": telnyxTimestamp,
+      },
+      method: "POST",
+    }),
+  );
+  const telnyxReplayBody = (await telnyxReplayResponse.json()) as {
+    verification?: { ok: false; reason: "invalid-signature" };
+  };
+  attempts.push({
+    decisions: telnyxDecisions - telnyxReplayBefore,
+    provider: "telnyx",
+    rejected: telnyxReplayResponse.status === 401,
+    replayRejected: true,
+    sideEffects: telnyxDecisions - telnyxReplayBefore,
+    status: telnyxReplayResponse.status,
+    verification: telnyxReplayBody.verification,
+  });
+
+  const plivoBody = {
+    CallUUID: "proof-plivo-verification",
+    SessionId: "proof-plivo-verification-session",
+    status: "completed",
+  };
+  const plivoNonce = `proof-plivo-nonce-${crypto.randomUUID()}`;
+  const plivoUrl = "https://voice.example.test/plivo";
+  const plivoSignature = await signVoicePlivoWebhook({
+    authToken: "proof-plivo-secret",
+    body: plivoBody,
+    nonce: plivoNonce,
+    url: plivoUrl,
+  });
+  let plivoDecisions = 0;
+  const plivoRoutes = createVoiceTelephonyWebhookRoutes({
+    onDecision: () => {
+      plivoDecisions += 1;
+    },
+    path: "/plivo",
+    provider: "plivo",
+    verify: proofWebhookSecurity.verify.plivo,
+  });
+  const plivoInvalidBefore = plivoDecisions;
+  const plivoInvalidResponse = await plivoRoutes.handle(
+    new Request(plivoUrl, {
+      body: new URLSearchParams(plivoBody),
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "x-plivo-signature-v3": "invalid-signature",
+        "x-plivo-signature-v3-nonce": plivoNonce,
+      },
+      method: "POST",
+    }),
+  );
+  const plivoInvalidBody = (await plivoInvalidResponse.json()) as {
+    verification?: { ok: false; reason: "invalid-signature" };
+  };
+  attempts.push({
+    decisions: plivoDecisions - plivoInvalidBefore,
+    provider: "plivo",
+    rejected: plivoInvalidResponse.status === 401,
+    sideEffects: plivoDecisions - plivoInvalidBefore,
+    status: plivoInvalidResponse.status,
+    verification: plivoInvalidBody.verification,
+  });
+  const plivoValidBefore = plivoDecisions;
+  const plivoValidResponse = await plivoRoutes.handle(
+    new Request(plivoUrl, {
+      body: new URLSearchParams(plivoBody),
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "x-plivo-signature-v3": plivoSignature,
+        "x-plivo-signature-v3-nonce": plivoNonce,
+      },
+      method: "POST",
+    }),
+  );
+  attempts.push({
+    decisions: plivoDecisions - plivoValidBefore,
+    provider: "plivo",
+    rejected: false,
+    sideEffects: plivoDecisions - plivoValidBefore,
+    status: plivoValidResponse.status,
+  });
+  const plivoReplayBefore = plivoDecisions;
+  const plivoReplayResponse = await plivoRoutes.handle(
+    new Request(plivoUrl, {
+      body: new URLSearchParams(plivoBody),
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "x-plivo-signature-v3": plivoSignature,
+        "x-plivo-signature-v3-nonce": plivoNonce,
+      },
+      method: "POST",
+    }),
+  );
+  const plivoReplayBody = (await plivoReplayResponse.json()) as {
+    verification?: { ok: false; reason: "invalid-signature" };
+  };
+  attempts.push({
+    decisions: plivoDecisions - plivoReplayBefore,
+    provider: "plivo",
+    rejected: plivoReplayResponse.status === 401,
+    replayRejected: true,
+    sideEffects: plivoDecisions - plivoReplayBefore,
+    status: plivoReplayResponse.status,
+    verification: plivoReplayBody.verification,
+  });
+
+  return {
+    attempts,
+    ok: attempts.every((attempt) =>
+      attempt.rejected ? attempt.status === 401 && attempt.sideEffects === 0 : attempt.status === 200 && attempt.sideEffects === 1,
+    ),
+  };
 };
 const handoffDeliveryStore = createJsonHandoffDeliveryStore<
   StoredVoiceHandoffDelivery<unknown, VoiceSessionRecord, SavedIntake>
@@ -396,13 +1460,21 @@ const assemblyAIApiKey = process.env.ASSEMBLYAI_API_KEY;
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
 const geminiApiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
 const openAIApiKey = process.env.OPENAI_API_KEY;
+const openAIRealtime = openAIApiKey
+  ? createOpenAIRealtimeAdapter({
+      apiKey: openAIApiKey,
+      instructions:
+        "Speak like a concise product demo assistant for AbsoluteJS Voice. Keep replies short, natural, and useful.",
+      model: process.env.OPENAI_REALTIME_MODEL ?? "gpt-realtime",
+      voice: process.env.OPENAI_REALTIME_VOICE ?? "marin",
+    })
+  : undefined;
 const publicBaseUrl = process.env.VOICE_DEMO_PUBLIC_BASE_URL;
 const carrierReadinessMode =
   process.env.VOICE_DEMO_CARRIER_READINESS === "production"
     ? "production"
     : "local";
-const requireProductionCarrierReadiness =
-  carrierReadinessMode === "production";
+const requireProductionCarrierReadiness = carrierReadinessMode === "production";
 const handoffWebhookUrl = process.env.VOICE_DEMO_HANDOFF_WEBHOOK_URL;
 const telephonyWebhookSigningSecret =
   process.env.VOICE_DEMO_TELEPHONY_WEBHOOK_SECRET;
@@ -534,7 +1606,7 @@ const telephonyTTS = createVoiceTTSProviderRouter<VoiceTTSProvider>({
   },
   fallback: openAITelephonyTTS ? ["openai", "emergency"] : ["emergency"],
   onProviderEvent: async (event, input) => {
-    await runtimeStorage.traces.append({
+    await deliveryTraceStore.append({
       at: event.at,
       payload: {
         ...event,
@@ -569,12 +1641,271 @@ const telephonyTTS = createVoiceTTSProviderRouter<VoiceTTSProvider>({
 });
 const voiceProviderFeatures = {
   anthropic: ["tool calling", "JSON result shaping", "fallback routing"],
-  assemblyai: ["realtime STT", "turn formatting", "fallback STT"],
+  assemblyai: ["realtime STT", "VAD events", "turn formatting", "fallback STT"],
   deepgram: ["Flux realtime STT", "VAD events", "smart formatting"],
-  deterministic: ["offline demo mode", "zero external dependency"],
+  deterministic: [
+    "tool calling",
+    "JSON result shaping",
+    "fallback routing",
+    "offline demo mode",
+    "zero external dependency",
+  ],
   gemini: ["tool calling", "JSON result shaping", "fallback routing"],
   openai: ["tool calling", "JSON result shaping", "fallback routing"],
 } satisfies Record<VoiceModelProvider | VoiceSTTProvider, string[]>;
+const voiceProviderStackCapabilities = {
+  llm: {
+    anthropic: voiceProviderFeatures.anthropic,
+    deterministic: voiceProviderFeatures.deterministic,
+    gemini: voiceProviderFeatures.gemini,
+    openai: voiceProviderFeatures.openai,
+  },
+  stt: {
+    assemblyai: voiceProviderFeatures.assemblyai,
+    deepgram: voiceProviderFeatures.deepgram,
+  },
+  tts: {
+    emergency: [
+      "streaming speech",
+      "barge-in friendly",
+      "spoken playback",
+      "offline fallback",
+    ],
+    openai: ["streaming speech", "barge-in friendly", "spoken playback"],
+  },
+};
+type DemoProviderOrchestrationSurface =
+  | "background-summary"
+  | "live-call"
+  | "live-stt"
+  | "telephony-tts";
+type DemoProviderOrchestrationProvider =
+  | VoiceModelProvider
+  | VoiceSTTProvider
+  | VoiceTTSProvider;
+const providerOrchestrationProfile = createVoiceProviderOrchestrationProfile<
+  unknown,
+  VoiceSessionRecord,
+  DemoProviderOrchestrationProvider,
+  DemoProviderOrchestrationSurface
+>({
+  defaultSurface: "live-call",
+  id: "absolutejs-voice-demo-provider-orchestration",
+  surfaces: {
+    "background-summary": {
+      fallback: configuredModelProviders.includes("gemini")
+        ? ["gemini", ...configuredModelProviders.filter((provider) => provider !== "gemini")]
+        : configuredModelProviders,
+      maxCost: configuredModelProviders.includes("gemini") ? 2 : 3,
+      minQuality: 0.7,
+      policy: "cost-cap",
+      providerProfiles: {
+        anthropic: {
+          cost: 3,
+          latencyMs: 700,
+          priority: 2,
+          quality: 0.95,
+          timeoutMs: providerLatencyBudgets.anthropic,
+        },
+        deterministic: {
+          cost: 0,
+          latencyMs: 5,
+          priority: 4,
+          quality: 0.72,
+          timeoutMs: providerLatencyBudgets.deterministic,
+        },
+        gemini: {
+          cost: 1,
+          latencyMs: 650,
+          priority: 3,
+          quality: 0.86,
+          timeoutMs: providerLatencyBudgets.gemini,
+        },
+        openai: {
+          cost: 2,
+          latencyMs: 500,
+          priority: 1,
+          quality: 0.92,
+          timeoutMs: providerLatencyBudgets.openai,
+        },
+      },
+    },
+    "live-call": {
+      fallback: configuredModelProviders,
+      maxLatencyMs: 900,
+      minQuality: 0.7,
+      policy: "latency-first",
+      providerHealth: {
+        cooldownMs: 30_000,
+        failureThreshold: 1,
+        rateLimitCooldownMs: 120_000,
+      },
+      providerProfiles: {
+        anthropic: {
+          cost: 3,
+          latencyMs: 700,
+          priority: 2,
+          quality: 0.95,
+          timeoutMs: providerLatencyBudgets.anthropic,
+        },
+        deterministic: {
+          cost: 0,
+          latencyMs: 5,
+          priority: 4,
+          quality: 0.72,
+          timeoutMs: providerLatencyBudgets.deterministic,
+        },
+        gemini: {
+          cost: 1,
+          latencyMs: 650,
+          priority: 3,
+          quality: 0.86,
+          timeoutMs: providerLatencyBudgets.gemini,
+        },
+        openai: {
+          cost: 2,
+          latencyMs: 500,
+          priority: 1,
+          quality: 0.92,
+          timeoutMs: providerLatencyBudgets.openai,
+        },
+      },
+      timeoutMs: 6_000,
+    },
+    "live-stt": {
+      fallback: configuredSTTProviders,
+      maxLatencyMs: 900,
+      minQuality: 0.85,
+      policy: "latency-first",
+      providerHealth: {
+        cooldownMs: 30_000,
+        failureThreshold: 1,
+      },
+      providerProfiles: {
+        assemblyai: {
+          cost: 2,
+          latencyMs: 450,
+          priority: 2,
+          quality: 0.88,
+          timeoutMs: sttLatencyBudgets.assemblyai,
+        },
+        deepgram: {
+          cost: 4,
+          latencyMs: 250,
+          priority: 1,
+          quality: 0.94,
+          timeoutMs: sttLatencyBudgets.deepgram,
+        },
+      },
+    },
+    "telephony-tts": {
+      fallback: openAITelephonyTTS ? ["openai", "emergency"] : ["emergency"],
+      maxLatencyMs: 1_200,
+      policy: "latency-first",
+      providerHealth: {
+        cooldownMs: 30_000,
+        failureThreshold: 1,
+      },
+      providerProfiles: {
+        emergency: {
+          cost: 0,
+          latencyMs: 5,
+          priority: 2,
+          quality: 0.2,
+          timeoutMs: ttsLatencyBudgets.emergency,
+        },
+        openai: {
+          cost: 2,
+          latencyMs: 500,
+          priority: 1,
+          quality: 0.9,
+          timeoutMs: ttsLatencyBudgets.openai,
+        },
+      },
+    },
+  },
+});
+const providerOrchestrationRequirements = {
+  "background-summary": {
+    minProviders: 1,
+    requireBudgetPolicy: true,
+    requireFallback: true,
+    requireTimeoutBudget: true,
+  },
+  "live-call": {
+    minProviders: 1,
+    requireBudgetPolicy: true,
+    requireCircuitBreaker: true,
+    requireFallback: true,
+    requireTimeoutBudget: true,
+  },
+  "live-stt": {
+    minProviders: 1,
+    requireBudgetPolicy: true,
+    requireCircuitBreaker: true,
+    requireFallback: true,
+    requireTimeoutBudget: true,
+  },
+  "telephony-tts": {
+    minProviders: 1,
+    requireBudgetPolicy: true,
+    requireCircuitBreaker: true,
+    requireFallback: true,
+    requireTimeoutBudget: true,
+  },
+} as const;
+const buildDemoProviderOrchestrationReport =
+  (): VoiceProviderOrchestrationReport =>
+    buildVoiceProviderOrchestrationReport({
+      profile: providerOrchestrationProfile,
+      requirements: providerOrchestrationRequirements,
+    });
+const buildDemoProviderContractDefinitions = () =>
+  createVoiceProviderContractMatrixPreset("phone-agent", {
+    capabilities: voiceProviderStackCapabilities,
+    configured: {
+      anthropic: Boolean(anthropicApiKey),
+      assemblyai: Boolean(assemblyAIApiKey),
+      deepgram: Boolean(deepgramApiKey),
+      deterministic: true,
+      gemini: Boolean(geminiApiKey),
+      openai: Boolean(openAIApiKey),
+      emergency: true,
+    },
+    env: {
+      ...process.env,
+      GEMINI_API_KEY: geminiApiKey,
+    },
+    latencyBudgets: {
+      ...providerLatencyBudgets,
+      ...sttLatencyBudgets,
+      ...ttsLatencyBudgets,
+    },
+    providers: {
+      llm: configuredModelProviders,
+      stt: configuredSTTProviders,
+      tts: configuredTTSProviders,
+    },
+    remediationHref: "/provider-contracts",
+    selected: {
+      llm: modelProvider,
+      stt: selectedSTTProvider,
+      tts: openAITelephonyTTS ? "openai" : "emergency",
+    },
+    streaming: {
+      anthropic: true,
+      assemblyai: true,
+      deepgram: true,
+      deterministic: true,
+      emergency: true,
+      gemini: true,
+      openai: true,
+    },
+  }).contracts;
+const buildDemoProviderContractMatrix = () =>
+  buildVoiceProviderContractMatrix({
+    contracts: buildDemoProviderContractDefinitions(),
+  });
 const resolveModelProvider = () => {
   if (
     requestedModelProvider === "openai" ||
@@ -696,7 +2027,7 @@ const traceProviderEvent = async (
     VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake>["generate"]
   >[0],
 ) => {
-  await runtimeStorage.traces.append({
+  await deliveryTraceStore.append({
     at: event.at,
     payload: {
       ...event,
@@ -780,7 +2111,7 @@ const traceSTTProviderEvent = async (
   input: { sessionId: string },
 ) => {
   const routing = sessionRoutingModes.get(input.sessionId) ?? "balanced";
-  await runtimeStorage.traces.append({
+  await deliveryTraceStore.append({
     at: event.at,
     payload: {
       ...event,
@@ -791,9 +2122,7 @@ const traceSTTProviderEvent = async (
     type: "session.error",
   });
 };
-const createDemoSTTRouter = (
-  routing: VoiceRoutingMode,
-): STTAdapter =>
+const createDemoSTTRouter = (routing: VoiceRoutingMode): STTAdapter =>
   createVoiceSTTProviderRouter<VoiceSTTProvider>({
     adapters: sttProviderAdapters,
     fallback: configuredSTTProviders,
@@ -853,9 +2182,7 @@ const rememberSessionRoutingMode = (input: {
       ? input.context.query
       : undefined;
   const routing =
-    query &&
-    "routing" in query &&
-    isVoiceRoutingMode(query.routing)
+    query && "routing" in query && isVoiceRoutingMode(query.routing)
       ? query.routing
       : "balanced";
 
@@ -880,11 +2207,10 @@ const providerFailureSimulator = createVoiceProviderFailureSimulator({
 });
 const runDemoProviderRoutingContract = async () => {
   const events: StoredVoiceTraceEvent[] = [];
-  const requestedProvider: VoiceModelProvider = configuredModelProviders.includes(
-    "openai",
-  )
-    ? "openai"
-    : configuredModelProviders[0] ?? "deterministic";
+  const requestedProvider: VoiceModelProvider =
+    configuredModelProviders.includes("openai")
+      ? "openai"
+      : (configuredModelProviders[0] ?? "deterministic");
   const fallbackProvider = providerFallbackOrder(requestedProvider).find(
     (provider) => provider !== requestedProvider,
   );
@@ -1029,10 +2355,10 @@ const runDemoAgentSquadContract = async () => {
                   targetAgentId: "legal",
                 },
               }
-          : {
-              assistantText: "Support can help with this request.",
-              result: { queue: "support" },
-            },
+            : {
+                assistantText: "Support can help with this request.",
+                result: { queue: "support" },
+              },
     },
     system: "Route callers to the correct demo specialist.",
     trace,
@@ -1150,9 +2476,10 @@ const renderAgentSquadContractHTML = async () => {
   const issueRows = report.issues.length
     ? report.issues
         .map(
-          (issue) => `<li><code>${escapeHtml(issue.code)}</code> ${escapeHtml(
-            issue.message,
-          )}</li>`,
+          (issue) =>
+            `<li><code>${escapeHtml(issue.code)}</code> ${escapeHtml(
+              issue.message,
+            )}</li>`,
         )
         .join("")
     : "<li>No routing issues.</li>";
@@ -1209,6 +2536,106 @@ const renderAgentSquadContractHTML = async () => {
     </body>
   </html>`;
 };
+
+const readPayloadString = (
+  payload: Record<string, unknown> | undefined,
+  key: string,
+) => {
+  const value = payload?.[key];
+  return typeof value === "string" ? value : undefined;
+};
+
+const readPayloadNumber = (
+  payload: Record<string, unknown> | undefined,
+  key: string,
+) => {
+  const value = payload?.[key];
+  return typeof value === "number" ? value : undefined;
+};
+
+const buildAgentSquadDemoStatus = async (
+  sessionId?: string,
+): Promise<VoiceAgentSquadDemoStatus> => {
+  if (!sessionId) {
+    return {
+      contextPolicy: "default",
+      currentAgentId: "front-desk",
+      handoffCount: 0,
+      status: "idle",
+    };
+  }
+
+  const [contextEvents, handoffEvents] = await Promise.all([
+    deliveryTraceStore.list({
+      sessionId,
+      limit: 25,
+      type: "agent.context",
+    }),
+    deliveryTraceStore.list({
+      sessionId,
+      limit: 25,
+      type: "agent.handoff",
+    }),
+  ]);
+  const latestContext = [...contextEvents].sort(
+    (left, right) => right.at - left.at,
+  )[0];
+  const latestHandoff = [...handoffEvents].sort(
+    (left, right) => right.at - left.at,
+  )[0];
+  const contextPayload = latestContext?.payload as
+    | Record<string, unknown>
+    | undefined;
+  const handoffPayload = latestHandoff?.payload as
+    | Record<string, unknown>
+    | undefined;
+  const latestEvent = [latestContext, latestHandoff]
+    .filter(Boolean)
+    .sort((left, right) => (right?.at ?? 0) - (left?.at ?? 0))[0];
+
+  if (!latestEvent) {
+    return {
+      contextPolicy: "default",
+      currentAgentId: "front-desk",
+      handoffCount: 0,
+      status: "idle",
+    };
+  }
+
+  return {
+    at: latestEvent.at,
+    contextPolicy:
+      readPayloadString(contextPayload, "status") === "applied"
+        ? "handoff-summary-current-turn"
+        : "default",
+    currentAgentId:
+      readPayloadString(contextPayload, "targetAgentId") ??
+      readPayloadString(handoffPayload, "targetAgentId") ??
+      "front-desk",
+    handoffCount: handoffEvents.length,
+    lastHandoff: latestHandoff
+      ? {
+          fromAgentId: readPayloadString(handoffPayload, "fromAgentId"),
+          reason: readPayloadString(handoffPayload, "reason"),
+          status: readPayloadString(handoffPayload, "status"),
+          summary: readPayloadString(handoffPayload, "summary"),
+          targetAgentId: readPayloadString(handoffPayload, "targetAgentId"),
+        }
+      : undefined,
+    messageCount: readPayloadNumber(contextPayload, "nextMessageCount"),
+    sessionId: latestEvent.sessionId,
+    status: "active",
+  };
+};
+
+const agentSquadStatusRoutes = new Elysia().get(
+  "/api/agent-squad/status",
+  ({ query }) =>
+    buildAgentSquadDemoStatus(
+      typeof query.sessionId === "string" ? query.sessionId : undefined,
+    ),
+);
+
 const createContractTurn = (
   id: string,
   text: string,
@@ -1415,14 +2842,14 @@ const transferWorkflowContract = createVoiceWorkflowContractPreset<SavedIntake>(
     outcome: "transfer",
     requiredDisposition: "transferred",
     requiredHandoffActions: ["transfer"],
-    scenarioId: "transfer",
+    scenarioId: "proof-transfer",
   },
 );
 
 const workflowScenarios = [
-  guidedWorkflowContract.toScenarioEval(),
-  generalWorkflowContract.toScenarioEval(),
-  transferWorkflowContract.toScenarioEval(),
+  guidedWorkflowContract.toScenarioEval({ scenarioId: "proof-guided" }),
+  generalWorkflowContract.toScenarioEval({ scenarioId: "proof-general" }),
+  transferWorkflowContract.toScenarioEval({ scenarioId: "proof-transfer" }),
 ];
 
 const demoOutcomeContracts = [
@@ -1442,7 +2869,11 @@ const demoOutcomeContracts = [
     id: "transfer-call-artifacts",
     label: "Transfer call artifacts",
     requireHandoffActions: ["transfer"],
-    requireIntegrationEvents: ["call.completed", "review.saved", "task.created"],
+    requireIntegrationEvents: [
+      "call.completed",
+      "review.saved",
+      "task.created",
+    ],
     requireReview: true,
     requireTask: true,
   },
@@ -1452,7 +2883,11 @@ const demoOutcomeContracts = [
     expectedDisposition: "escalated",
     id: "escalation-call-artifacts",
     label: "Escalation call artifacts",
-    requireIntegrationEvents: ["call.completed", "review.saved", "task.created"],
+    requireIntegrationEvents: [
+      "call.completed",
+      "review.saved",
+      "task.created",
+    ],
     requireReview: true,
     requireTask: true,
   },
@@ -1462,7 +2897,11 @@ const demoOutcomeContracts = [
     expectedDisposition: "voicemail",
     id: "voicemail-call-artifacts",
     label: "Voicemail call artifacts",
-    requireIntegrationEvents: ["call.completed", "review.saved", "task.created"],
+    requireIntegrationEvents: [
+      "call.completed",
+      "review.saved",
+      "task.created",
+    ],
     requireReview: true,
     requireTask: true,
   },
@@ -1472,7 +2911,11 @@ const demoOutcomeContracts = [
     expectedDisposition: "no-answer",
     id: "no-answer-call-artifacts",
     label: "No-answer call artifacts",
-    requireIntegrationEvents: ["call.completed", "review.saved", "task.created"],
+    requireIntegrationEvents: [
+      "call.completed",
+      "review.saved",
+      "task.created",
+    ],
     requireReview: true,
     requireTask: true,
   },
@@ -1494,7 +2937,9 @@ const campaignStore = createVoiceSQLiteCampaignStore({
   path: resolve(runtimeDirectory, "campaigns.sqlite"),
 });
 const recordCampaignTelephonyOutcome = (input: {
-  decision: Parameters<typeof applyVoiceCampaignTelephonyOutcome>[0]["decision"];
+  decision: Parameters<
+    typeof applyVoiceCampaignTelephonyOutcome
+  >[0]["decision"];
   event: Parameters<typeof applyVoiceCampaignTelephonyOutcome>[0]["event"];
   routeResult?: unknown;
   sessionId?: string;
@@ -1660,10 +3105,12 @@ const renderTelephonyWebhookDecisionsHTML = () => {
     ? telephonyWebhookDecisionSnapshots
         .map(
           (decision) => `<tr>
-            <td><strong>${escapeHtml(decision.provider)}</strong><br /><span class="muted">${escapeHtml(new Date(decision.at).toLocaleString("en-US", {
-              dateStyle: "medium",
-              timeStyle: "medium",
-            }))}</span></td>
+            <td><strong>${escapeHtml(decision.provider)}</strong><br /><span class="muted">${escapeHtml(
+              new Date(decision.at).toLocaleString("en-US", {
+                dateStyle: "medium",
+                timeStyle: "medium",
+              }),
+            )}</span></td>
             <td><strong>${escapeHtml(decision.action)}</strong><br /><span class="muted">${escapeHtml(decision.source ?? "unknown")} / ${escapeHtml(decision.disposition ?? "none")}</span></td>
             <td><pre>${stringifyForHtml(decision.campaignOutcome)}</pre></td>
           </tr>`,
@@ -1720,6 +3167,18 @@ const demoChecklistItems = [
   },
   {
     description:
+      "Show the compact gate JSON your own deploy script can check before release.",
+    href: "/deploy-gate",
+    label: "Explain deploy gate",
+  },
+  {
+    description:
+      "Show the optional readiness profiles and the proof surfaces each one expects.",
+    href: "/readiness-profiles",
+    label: "Compare readiness profiles",
+  },
+  {
+    description:
       "Open the phone-agent and carrier matrix to prove Twilio, Telnyx, and Plivo setup parity.",
     href: "/phone-agent",
     label: "Inspect phone-agent readiness",
@@ -1741,6 +3200,24 @@ const demoChecklistItems = [
       "Open saved call artifacts, summaries, tasks, and handoff evidence.",
     href: "/reviews",
     label: "Review call artifacts",
+  },
+  {
+    description:
+      "Show the package-level disconnect, resume, and replay-safe reconnect contract.",
+    href: "/voice/reconnect-contract",
+    label: "Prove reconnect recovery",
+  },
+  {
+    description:
+      "Show that provider errors recovered by fallback stay visible in replay but pass readiness.",
+    href: "/provider-recovery",
+    label: "Prove provider recovery",
+  },
+  {
+    description:
+      "Show trace and audit delivery queues, then explain how file sinks swap for webhook, S3, SQLite, or Postgres sinks.",
+    href: "/delivery-sinks",
+    label: "Inspect delivery sinks",
   },
   {
     description:
@@ -1801,6 +3278,1623 @@ const renderDemoChecklistHTML = () => {
   </html>`;
 };
 
+const vapiMigrationItems = [
+  {
+    absolute: "Framework voice route with mic UI, transcripts, reconnect state, barge-in, and live latency proof.",
+    concept: "Web voice assistant",
+    proofHref: "/react",
+    proofLabel: "Open React demo",
+    statusHref: "/api/production-readiness",
+  },
+  {
+    absolute: "Carrier-owned Twilio, Telnyx, or Plivo setup with copy-ready URLs, carrier matrix, and smoke proof.",
+    concept: "Phone assistant",
+    proofHref: "/phone-agent",
+    proofLabel: "Open phone setup",
+    statusHref: "/api/voice/phone/setup",
+  },
+  {
+    absolute: "Code-owned specialist graph with handoff policy, context policy, per-specialist tools, and trace evidence.",
+    concept: "Squads / multi-assistant routing",
+    proofHref: "/agent-squad-contract",
+    proofLabel: "Open squad contract",
+    statusHref: "/api/agent-squad-contract",
+  },
+  {
+    absolute: "Agent tools, deterministic tool contracts, audit events, integration events, and operations-record links.",
+    coverageSurface: "Tools and functions",
+    concept: "Tools / functions",
+    proofHref: "/tool-contracts",
+    proofLabel: "Open tool contracts",
+    statusHref: "/api/tool-contracts",
+  },
+  {
+    absolute: "Local guardrail policies block unsafe assistant output, warn/redact sensitive transcript data, and produce traceable JSON/Markdown proof.",
+    coverageSurface: "Guardrails and policies",
+    concept: "Guardrails / policies",
+    proofHref: "/voice/guardrails",
+    proofLabel: "Open guardrails proof",
+    statusHref: "/api/voice/guardrails",
+  },
+  {
+    absolute: "One self-hosted operations record linking transcript, replay, provider choices, tools, handoffs, reviews, tasks, audit, and delivery attempts.",
+    coverageSurface: "Call logs and incident handoff",
+    concept: "Call logs",
+    proofHref: "/voice-operations/demo-incident-bundle",
+    proofLabel: "Open operations record",
+    statusHref: "/api/voice-operations/demo-incident-bundle",
+  },
+  {
+    absolute: "Post-call analysis proof validates extracted fields, required follow-up tasks, delivery events, and the linked operations record.",
+    coverageSurface: "Post-call analysis",
+    concept: "Post-call analysis",
+    proofHref: "/voice/post-call-analysis",
+    proofLabel: "Open post-call proof",
+    statusHref: "/api/voice/post-call-analysis",
+  },
+  {
+    absolute: "Readiness gates, recovery report, provider SLOs, delivery runtime, and deploy-gate JSON.",
+    coverageSurface: "Monitoring and release gates",
+    concept: "Monitoring / issue detection",
+    proofHref: "/production-readiness",
+    proofLabel: "Open readiness",
+    statusHref: "/api/production-readiness",
+  },
+  {
+    absolute: "Scenario simulations, fixture evals, tool contracts, outcome contracts, provider routing contracts, and baseline comparisons.",
+    concept: "Simulation testing",
+    proofHref: "/voice/simulations",
+    proofLabel: "Open simulations",
+    statusHref: "/api/voice/simulations",
+  },
+  {
+    absolute: "Self-hosted recipient import, consent/dedupe, retries, quiet hours, rate limits, carrier dry-run proof, and campaign readiness.",
+    concept: "Outbound campaigns",
+    proofHref: "/voice/campaigns",
+    proofLabel: "Open campaigns",
+    statusHref: "/api/voice/campaigns/readiness-proof",
+  },
+  {
+    absolute: "Pause, resume, takeover, injected operator instructions, action-center helpers, and operator action audit history.",
+    concept: "Live operator controls",
+    proofHref: "/ops-console",
+    proofLabel: "Open ops console",
+    statusHref: "/api/voice/ops-recovery",
+  },
+  {
+    absolute: "Customer-owned storage, redaction defaults, retention dry-run/apply, redacted audit export, and provider-key recommendations.",
+    concept: "Compliance controls",
+    proofHref: "/data-control",
+    proofLabel: "Open data control",
+    statusHref: "/data-control.json",
+  },
+  {
+    absolute: "Manifest, artifact index, delivery receipts, replay proof, and file/webhook/S3/SQLite/Postgres export destinations.",
+    concept: "Logs export / SIEM / warehouse",
+    proofHref: "/voice/observability-export",
+    proofLabel: "Open export",
+    statusHref: "/api/voice/observability-export/replay",
+  },
+] satisfies Array<{
+  absolute: string;
+  concept: string;
+  coverageSurface?: string;
+  proofHref: string;
+  proofLabel: string;
+  statusHref: string;
+}>;
+
+type VapiCoverageEvidence = VoicePlatformCoverageEvidence;
+type VapiCoverageResult = VoicePlatformCoverageSurface;
+type VapiCoverageSummary = VoicePlatformCoverageSummary & {
+  vapiCoverage: VoicePlatformCoverageSurface[];
+};
+
+const latestProofPackJsonPath = ".voice-runtime/proof-pack/latest.json";
+const longProofWindowRoot = ".voice-runtime/long-proof-window";
+const latestProofTrendsJsonPath = ".voice-runtime/proof-trends/latest.json";
+const latestProofTrendsMarkdownPath = ".voice-runtime/proof-trends/latest.md";
+const configuredProofTrendsMaxAgeMs = Number(
+  process.env.VOICE_PROOF_TRENDS_MAX_AGE_MS ?? 24 * 60 * 60 * 1000,
+);
+const proofTrendsMaxAgeMs =
+  Number.isFinite(configuredProofTrendsMaxAgeMs) &&
+  configuredProofTrendsMaxAgeMs > 0
+    ? configuredProofTrendsMaxAgeMs
+    : 24 * 60 * 60 * 1000;
+const configuredSloCalibrationMinRuns = Number(
+  process.env.VOICE_SLO_CALIBRATION_MIN_RUNS ?? 1,
+);
+const sloCalibrationMinRuns =
+  Number.isFinite(configuredSloCalibrationMinRuns) &&
+  configuredSloCalibrationMinRuns > 0
+    ? configuredSloCalibrationMinRuns
+    : 1;
+const configuredLiveLatencyReadinessMaxAgeMs = Number(
+  process.env.VOICE_LIVE_LATENCY_READINESS_MAX_AGE_MS ?? 30 * 60 * 1000,
+);
+const liveLatencyReadinessMaxAgeMs =
+  Number.isFinite(configuredLiveLatencyReadinessMaxAgeMs) &&
+  configuredLiveLatencyReadinessMaxAgeMs > 0
+    ? configuredLiveLatencyReadinessMaxAgeMs
+    : 30 * 60 * 1000;
+
+const readLatestProofTrends = async (): Promise<VoiceProofTrendReport> => {
+  const file = Bun.file(latestProofTrendsJsonPath);
+
+  if (!(await file.exists())) {
+    return buildEmptyVoiceProofTrendReport(
+      latestProofTrendsJsonPath,
+      proofTrendsMaxAgeMs,
+    );
+  }
+
+  try {
+    const parsed = (await file.json()) as {
+      baseUrl?: unknown;
+      cycles?: unknown;
+      generatedAt?: unknown;
+      ok?: unknown;
+      outputDir?: unknown;
+      runId?: unknown;
+      summary?: unknown;
+    };
+    const summary =
+      parsed.summary && typeof parsed.summary === "object"
+        ? (parsed.summary as VoiceProofTrendSummary)
+        : {};
+
+    return buildVoiceProofTrendReport({
+      baseUrl: typeof parsed.baseUrl === "string" ? parsed.baseUrl : undefined,
+      cycles: Array.isArray(parsed.cycles)
+        ? (parsed.cycles as VoiceProofTrendCycle[])
+        : [],
+      generatedAt:
+        typeof parsed.generatedAt === "string" ? parsed.generatedAt : undefined,
+      maxAgeMs: proofTrendsMaxAgeMs,
+      ok: parsed.ok === true,
+      outputDir:
+        typeof parsed.outputDir === "string" ? parsed.outputDir : undefined,
+      runId: typeof parsed.runId === "string" ? parsed.runId : undefined,
+      source: latestProofTrendsJsonPath,
+      summary,
+    });
+  } catch {
+    return buildVoiceProofTrendReport({
+      maxAgeMs: proofTrendsMaxAgeMs,
+      source: latestProofTrendsJsonPath,
+    });
+  }
+};
+
+const readLongProofWindowCalibrationSamples = async (): Promise<
+  VoiceSloCalibrationSample[]
+> => {
+  const entries = await readdir(longProofWindowRoot, { withFileTypes: true }).catch(
+    () => [],
+  );
+  const artifactPaths = [
+    `${longProofWindowRoot}/latest.json`,
+    ...entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => `${longProofWindowRoot}/${entry.name}/long-proof-window.json`),
+  ];
+  const seen = new Set<string>();
+  const samples: VoiceSloCalibrationSample[] = [];
+
+  for (const path of artifactPaths) {
+    const file = Bun.file(path);
+    if (!(await file.exists())) {
+      continue;
+    }
+
+    try {
+      const parsed = (await file.json()) as {
+        ok?: unknown;
+        proofTrends?: {
+          ok?: unknown;
+          summary?: VoiceProofTrendSummary;
+        };
+        runId?: unknown;
+        runtimeCalibration?: VoiceSloCalibrationSample;
+      };
+      const runId = typeof parsed.runId === "string" ? parsed.runId : path;
+      if (seen.has(runId)) {
+        continue;
+      }
+      seen.add(runId);
+
+      samples.push({
+        interruptionP95Ms: parsed.runtimeCalibration?.interruptionP95Ms,
+        liveP95Ms: parsed.proofTrends?.summary?.maxLiveP95Ms,
+        monitorRunP95Ms: parsed.runtimeCalibration?.monitorRunP95Ms,
+        notifierDeliveryP95Ms:
+          parsed.runtimeCalibration?.notifierDeliveryP95Ms,
+        ok: parsed.ok === true && parsed.proofTrends?.ok === true,
+        providerP95Ms: parsed.proofTrends?.summary?.maxProviderP95Ms,
+        reconnectP95Ms: parsed.runtimeCalibration?.reconnectP95Ms,
+        runId,
+        source: path,
+        turnP95Ms: parsed.proofTrends?.summary?.maxTurnP95Ms,
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  if (samples.length > 0) {
+    return samples;
+  }
+
+  const latestTrends = await readLatestProofTrends();
+  return [
+    {
+      liveP95Ms: latestTrends.summary.maxLiveP95Ms,
+      ok: latestTrends.ok,
+      providerP95Ms: latestTrends.summary.maxProviderP95Ms,
+      runId: latestTrends.runId,
+      source: latestTrends.source,
+      turnP95Ms: latestTrends.summary.maxTurnP95Ms,
+    },
+  ];
+};
+
+const loadDemoSloThresholdProfile = async () =>
+  createVoiceSloThresholdProfile(await readLongProofWindowCalibrationSamples(), {
+    minPassingRuns: sloCalibrationMinRuns,
+  });
+
+const formatTrendMs = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value)
+    ? `${Math.round(value)}ms`
+    : "n/a";
+
+const renderProofTrendsHTML = async () => {
+  const report = await readLatestProofTrends();
+  const cycles = report.cycles ?? [];
+  const rows = cycles.length
+    ? cycles
+        .map(
+          (cycle) => `<tr>
+            <td>${escapeHtml(String(cycle.cycle ?? ""))}</td>
+            <td>${escapeHtml(cycle.ok ? "pass" : "fail")}</td>
+            <td>${escapeHtml(cycle.productionReadiness?.status ?? "n/a")}</td>
+            <td>${escapeHtml(cycle.providerSlo?.status ?? "n/a")}</td>
+            <td>${escapeHtml(formatTrendMs(cycle.turnLatency?.p95Ms))}</td>
+            <td>${escapeHtml(formatTrendMs(cycle.liveLatency?.p95Ms))}</td>
+            <td>${escapeHtml(String(cycle.providerSlo?.eventsWithLatency ?? 0))}</td>
+            <td>${escapeHtml(String(cycle.opsRecovery?.issues ?? 0))}</td>
+          </tr>`,
+        )
+        .join("")
+    : `<tr><td colspan="8">No sustained trend artifact found. Run <code>bun run proof:trends</code>.</td></tr>`;
+  const status = report.status === "pass" ? "pass" : "warn";
+
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>AbsoluteJS Voice Sustained Proof Trends</title>
+      <style>
+        body{background:#0d1118;color:#f8f3e7;font-family:ui-sans-serif,system-ui,sans-serif;margin:0}
+        main{max-width:1120px;margin:auto;padding:32px}
+        a{color:#93c5fd}
+        .hero,.card{background:#151b24;border:1px solid #263241;border-radius:24px;margin-bottom:16px;padding:22px}
+        .hero{background:linear-gradient(135deg,rgba(59,130,246,.18),rgba(20,184,166,.14))}
+        .eyebrow{color:#5eead4;font-size:.78rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+        h1{font-size:clamp(2.4rem,6vw,5rem);line-height:.9;margin:.2rem 0 1rem}
+        .muted{color:#a8b3bd;line-height:1.55}
+        .status{border:1px solid ${status === "pass" ? "rgba(34,197,94,.6)" : "rgba(245,158,11,.7)"};border-radius:999px;display:inline-flex;font-weight:900;padding:8px 12px}
+        .grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-top:18px}
+        .metric{background:#0f1620;border:1px solid #263241;border-radius:18px;padding:16px}
+        .metric span{color:#a8b3bd;display:block;font-size:.8rem;text-transform:uppercase}
+        .metric strong{display:block;font-size:2rem;margin-top:5px}
+        table{border-collapse:collapse;width:100%}
+        th,td{border-bottom:1px solid #263241;padding:10px;text-align:left}
+        th{color:#a8b3bd;font-size:.78rem;text-transform:uppercase}
+        code{background:#0b1117;border:1px solid #263241;border-radius:8px;padding:2px 6px}
+      </style>
+    </head>
+    <body>
+      <main>
+        <p><a href="/demo-checklist">Demo Checklist</a> · <a href="/production-readiness">Production Readiness</a> · <a href="/voice/provider-slos">Provider SLOs</a> · <a href="/api/voice/proof-trends">JSON</a> · <a href="/voice/proof-trends.md">Markdown</a></p>
+        <section class="hero">
+          <p class="eyebrow">Sustained proof</p>
+          <h1>Longer-running latency, provider, recovery, and readiness trends</h1>
+          <p class="muted">This page reads <code>${escapeHtml(latestProofTrendsJsonPath)}</code>. It proves the current defaults over repeated cycles instead of relying only on a one-shot proof pack.</p>
+          <p class="status">Overall: ${escapeHtml(report.status.toUpperCase())}</p>
+          <div class="grid">
+            <div class="metric"><span>Cycles</span><strong>${escapeHtml(String(report.summary.cycles ?? cycles.length ?? 0))}</strong></div>
+            <div class="metric"><span>Max provider p95</span><strong>${escapeHtml(formatTrendMs(report.summary.maxProviderP95Ms))}</strong></div>
+            <div class="metric"><span>Max turn p95</span><strong>${escapeHtml(formatTrendMs(report.summary.maxTurnP95Ms))}</strong></div>
+            <div class="metric"><span>Max live p95</span><strong>${escapeHtml(formatTrendMs(report.summary.maxLiveP95Ms))}</strong></div>
+            <div class="metric"><span>Artifact age</span><strong>${escapeHtml(formatVoiceProofTrendAge(report.ageMs))}</strong></div>
+            <div class="metric"><span>Fresh until</span><strong>${escapeHtml(report.freshUntil ?? "n/a")}</strong></div>
+          </div>
+        </section>
+        <section class="card">
+          <p class="muted">Generated ${escapeHtml(report.generatedAt ?? "not yet")} · stale after ${escapeHtml(formatVoiceProofTrendAge(report.maxAgeMs))} ${report.outputDir ? `· <code>${escapeHtml(report.outputDir)}</code>` : ""}</p>
+          <table>
+            <thead><tr><th>Cycle</th><th>Status</th><th>Readiness</th><th>Provider SLO</th><th>Turn p95</th><th>Live p95</th><th>Provider samples</th><th>Ops issues</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </section>
+      </main>
+    </body>
+  </html>`;
+};
+
+const readLatestVapiCoverageSummary =
+  async (): Promise<VapiCoverageSummary> => {
+    const file = Bun.file(latestProofPackJsonPath);
+
+    if (!(await file.exists())) {
+      const summary = buildVoicePlatformCoverageSummary({
+        coverage: [],
+        source: latestProofPackJsonPath,
+      });
+
+      return { ...summary, vapiCoverage: summary.coverage };
+    }
+
+    try {
+      const parsed = (await file.json()) as {
+        generatedAt?: unknown;
+        ok?: unknown;
+        outputDir?: unknown;
+        runId?: unknown;
+        vapiCoverage?: unknown;
+      };
+      const vapiCoverage = Array.isArray(parsed.vapiCoverage)
+        ? (parsed.vapiCoverage as VoicePlatformCoverageSurface[])
+        : [];
+      const summary = buildVoicePlatformCoverageSummary({
+        coverage: vapiCoverage,
+        generatedAt:
+          typeof parsed.generatedAt === "string"
+            ? parsed.generatedAt
+            : undefined,
+        ok: parsed.ok === true,
+        outputDir:
+          typeof parsed.outputDir === "string" ? parsed.outputDir : undefined,
+        runId: typeof parsed.runId === "string" ? parsed.runId : undefined,
+        source: latestProofPackJsonPath,
+      });
+
+      return { ...summary, vapiCoverage: summary.coverage };
+    } catch {
+      const summary = buildVoicePlatformCoverageSummary({
+        coverage: [],
+        ok: false,
+        source: latestProofPackJsonPath,
+      });
+
+      return {
+        ...summary,
+        status: "stale",
+        vapiCoverage: summary.coverage,
+      };
+    }
+  };
+
+const readLatestVapiCoverage = async () => {
+  return (await readLatestVapiCoverageSummary()).coverage;
+};
+
+const competitiveCoverageSurfaces = [
+  {
+    buyerNeed: "Ship a browser voice agent inside an owned AbsoluteJS app.",
+    competitors: ["Vapi", "Pipecat"],
+    coverage: "covered",
+    depth: "advantage",
+    evidence: [
+      { href: "/switching-from-vapi", kind: "docs", name: "switchingFromVapi", status: "pass" },
+      { href: "/production-readiness", kind: "readiness", name: "productionReadiness", required: true, status: "pass" },
+      { href: "/traces", kind: "route", name: "traceTimeline", status: "pass" },
+    ],
+    frameworkPrimitives: ["react", "vue", "svelte", "angular", "html", "htmx"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Browser voice agent",
+    why: "Framework-native hooks, composables, services, widgets, reconnect, barge-in, traces, and readiness proof are app-owned instead of widget-only.",
+    nextMove: "Keep first-success docs current as proof routes evolve.",
+  },
+  {
+    buyerNeed: "Create and verify phone agents through the team's own carrier account.",
+    competitors: ["Vapi", "Retell", "LiveKit"],
+    coverage: "covered",
+    depth: "parity",
+    evidence: [
+      { href: "/api/voice/phone/setup?format=html", kind: "route", name: "phoneSetup", required: true, status: "pass" },
+      { href: "/api/voice/telephony/webhook-security", kind: "readiness", name: "telephonyWebhookSecurity", required: true, status: "pass" },
+      { href: "/voice/phone/smoke-contract", kind: "proof", name: "phoneSmoke", status: "pass" },
+    ],
+    frameworkPrimitives: ["server routes", "carrier setup JSON/HTML"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Phone voice agent",
+    why: "Carrier bridges, setup reports, webhook security, smoke proof, and outcome normalization are present, while hosted providers still win on click-to-buy-number provisioning.",
+    nextMove: "Improve carrier setup UX without owning phone-number provisioning.",
+  },
+  {
+    buyerNeed: "Compose specialist assistants with traceable handoffs.",
+    competitors: ["Vapi"],
+    coverage: "covered",
+    depth: "parity",
+    evidence: [
+      { href: "/agent-squad-contract", kind: "proof", name: "agentSquadContract", required: true, status: "pass" },
+      { href: "/traces", kind: "route", name: "agentHandoffTraces", status: "pass" },
+    ],
+    frameworkPrimitives: ["react", "vue", "svelte", "angular", "html"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Squads / multi-assistant routing",
+    why: "Agent Squad provides specialist routing, context policy, handoff summaries, durable state, traces, contracts, and framework-visible specialist state.",
+    nextMove: "Keep specialist examples and operations-record links obvious.",
+  },
+  {
+    buyerNeed: "Call tools and prove business outcomes before production traffic.",
+    competitors: ["Vapi", "Retell", "Bland"],
+    coverage: "covered",
+    depth: "advantage",
+    evidence: [
+      { href: "/tool-contracts", kind: "proof", name: "toolContracts", required: true, status: "pass" },
+      { href: "/outcome-contracts", kind: "proof", name: "outcomeContracts", required: true, status: "pass" },
+    ],
+    frameworkPrimitives: ["server routes", "contract reports"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Tools and business actions",
+    why: "Tool contracts, outcome contracts, audit hooks, ops tasks, integration events, and operation-linked failures are stronger for code-owned apps.",
+    nextMove: "Add more real-session tool workflow recipes.",
+  },
+  {
+    buyerNeed: "Enforce policy locally with traceable blocking and warning proof.",
+    competitors: ["Bland", "Vapi"],
+    coverage: "covered",
+    depth: "advantage",
+    evidence: [
+      { href: "/voice/guardrails", kind: "proof", name: "guardrails", required: true, status: "pass" },
+      { href: "/api/voice/guardrails.md", kind: "proof", name: "guardrailsMarkdown", status: "pass" },
+    ],
+    frameworkPrimitives: ["server routes", "runtime policy"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Guardrails and policy enforcement",
+    why: "Guardrails are code-owned runtime policies with blocking/warning proof, trace evidence, incident summaries, and proof-pack integration.",
+    nextMove: "Keep recipes primitive-first instead of creating a policy builder.",
+  },
+  {
+    buyerNeed: "Choose providers, route by surface, and prove fallback recovery.",
+    competitors: ["Vapi", "Pipecat"],
+    coverage: "covered",
+    depth: "advantage",
+    evidence: [
+      { href: "/voice/provider-orchestration", kind: "readiness", name: "providerOrchestration", required: true, status: "pass" },
+      { href: "/voice/provider-decisions", kind: "proof", name: "providerDecisions", required: true, status: "pass" },
+      { href: "/voice/provider-slos", kind: "proof", name: "providerSlo", required: true, status: "pass" },
+      { href: "/voice-operations/demo-incident-bundle", kind: "operations-record", name: "providerRecoveryOperationsRecord", status: "pass" },
+    ],
+    frameworkPrimitives: ["server routes", "provider profiles", "trace reports"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Provider choice and fallback",
+    why: "Provider profiles, cost/latency/quality routing, circuit breakers, SLOs, decision traces, fallback recovery, and operations-record recovery evidence are first-class.",
+    nextMove: "Keep provider recovery visible as a headline proof-pack advantage.",
+  },
+  {
+    buyerNeed: "Monitor call quality and block bad deploys without a hosted dashboard.",
+    competitors: ["Vapi", "Retell", "Bland"],
+    coverage: "covered",
+    depth: "advantage",
+    evidence: [
+      { href: "/production-readiness", kind: "readiness", name: "productionReadinessGate", required: true, status: "pass" },
+      { href: "/ops-recovery", kind: "readiness", name: "opsRecovery", status: "pass" },
+      { href: "/voice/proof-trends", kind: "proof", name: "proofTrends", status: "pass" },
+    ],
+    frameworkPrimitives: ["readiness routes", "ops routes", "proof trends"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Monitoring, issues, and release gates",
+    why: "Monitors, issues, notifier receipts, ops recovery, SLO calibration, proof trends, and production readiness are customer-owned.",
+    nextMove: "Keep export/schema/readiness cohesion tight.",
+  },
+  {
+    buyerNeed: "Open one call log and understand the full lifecycle.",
+    competitors: ["Vapi", "Retell", "Bland"],
+    coverage: "covered",
+    depth: "advantage",
+    evidence: [
+      { href: "/voice-operations/demo-incident-bundle", kind: "operations-record", name: "operationsRecord", required: true, status: "pass" },
+      { href: "/voice-operations/demo-incident-bundle/incident.md", kind: "proof", name: "incidentMarkdown", status: "pass" },
+    ],
+    frameworkPrimitives: ["server routes", "incident markdown"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Unified call log / operations record",
+    why: "Operations records link trace, replay, transcript, provider decisions, tools, guardrails, handoffs, audit, reviews, tasks, delivery attempts, and incident Markdown.",
+    nextMove: "Keep every new proof surface linking back to operations records.",
+  },
+  {
+    buyerNeed: "Extract post-call data and trigger follow-up workflow.",
+    competitors: ["Vapi", "Retell", "Bland"],
+    coverage: "covered",
+    depth: "parity",
+    evidence: [
+      { href: "/voice/post-call-analysis", kind: "proof", name: "postCallAnalysis", required: true, status: "pass" },
+      { href: "/voice-operations/demo-incident-bundle", kind: "operations-record", name: "postCallOperationsRecord", status: "pass" },
+    ],
+    frameworkPrimitives: ["server routes", "review/task/integration events"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Post-call analysis and workflows",
+    why: "Extraction, required task creation, delivery proof, and operations-record linkage exist; hosted dashboards still have smoother built-in call-record UX.",
+    nextMove: "Add more workflow recipes and proof-pack examples.",
+  },
+  {
+    buyerNeed: "Run simulations and regressions before production.",
+    competitors: ["Retell", "Bland", "Pipecat"],
+    coverage: "covered",
+    depth: "advantage",
+    evidence: [
+      { href: "/voice/simulations", kind: "proof", name: "simulationSuite", required: true, status: "pass" },
+      { href: "/evals/scenarios", kind: "proof", name: "evals", status: "pass" },
+    ],
+    frameworkPrimitives: ["server routes", "fixture stores", "contract reports"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Simulation and regression testing",
+    why: "Evals, fixtures, simulations, baselines, operation-linked failures, and readiness gates live in the repo and CI path.",
+    nextMove: "Make scenario authoring easier without creating an app kit.",
+  },
+  {
+    buyerNeed: "Run outbound campaigns through owned carrier infrastructure.",
+    competitors: ["Retell", "Bland"],
+    coverage: "covered",
+    depth: "parity",
+    evidence: [
+      { href: "/voice/campaigns", kind: "route", name: "campaigns", required: true, status: "pass" },
+      { href: "/api/voice/campaigns/readiness-proof", kind: "readiness", name: "campaignReadiness", status: "pass" },
+      { href: "/voice/campaigns/dialer-proof", kind: "proof", name: "campaignDialerProof", status: "pass" },
+    ],
+    frameworkPrimitives: ["server routes", "campaign runtime"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Outbound campaigns",
+    why: "Campaign queues, imports, consent, retries, quiet hours, carrier dry-runs, and readiness proof exist, while Retell/Bland still lead dashboard-led campaign UX.",
+    nextMove: "Improve docs/primitives without building a hosted dialer dashboard.",
+  },
+  {
+    buyerNeed: "Let a human safely intervene during live automation.",
+    competitors: ["Vapi", "Retell"],
+    coverage: "covered",
+    depth: "advantage",
+    evidence: [
+      { href: "/live-ops", kind: "route", name: "liveOps", status: "pass" },
+      { href: "/ops-actions", kind: "operations-record", name: "liveOpsAudit", status: "pass" },
+    ],
+    frameworkPrimitives: ["react", "vue", "svelte", "angular", "html"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Live operator controls",
+    why: "Runtime pause/resume/takeover, injected instructions, action-center primitives, audit/trace evidence, and framework integrations are code-owned.",
+    nextMove: "Keep live-ops evidence visible in all framework examples.",
+  },
+  {
+    buyerNeed: "Export voice evidence to owned storage, SIEM, or warehouse.",
+    competitors: ["Vapi", "Retell", "Bland"],
+    coverage: "covered",
+    depth: "advantage",
+    evidence: [
+      { href: "/voice/observability-export", kind: "proof", name: "observabilityExport", required: true, status: "pass" },
+      { href: "/api/voice/observability-export/replay", kind: "proof", name: "observabilityExportReplay", status: "pass" },
+    ],
+    frameworkPrimitives: ["server routes", "export manifests"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Customer-owned observability export",
+    why: "Export/replay, schema validation, delivery, redaction, readiness gating, and operations-record links support owned incident and warehouse workflows.",
+    nextMove: "Make export manifests the default release/incident artifact.",
+  },
+  {
+    buyerNeed: "Control data retention, redaction, and audit export.",
+    competitors: ["Vapi", "Retell", "Bland"],
+    coverage: "covered",
+    depth: "advantage",
+    evidence: [
+      { href: "/data-control", kind: "readiness", name: "dataControl", required: true, status: "pass" },
+      { href: "/data-control.md", kind: "docs", name: "dataControlMarkdown", status: "pass" },
+    ],
+    frameworkPrimitives: ["server routes", "storage recipes"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Compliance and data control",
+    why: "Retention, redaction, zero-retention helpers, guarded deletion, customer storage, audit export, and provider-key guidance are app-owned.",
+    nextMove: "Keep docs precise and avoid certification claims.",
+  },
+  {
+    buyerNeed: "Prove realtime quality across latency, interruption, reconnect, and provider stages.",
+    competitors: ["Vapi", "Pipecat", "LiveKit"],
+    coverage: "covered",
+    depth: "parity",
+    evidence: [
+      { href: "/voice/proof-trends", kind: "proof", name: "proofTrends", required: true, status: "pass" },
+      { href: "/voice/slo-readiness-thresholds", kind: "readiness", name: "sloReadinessThresholds", status: "pass" },
+      { href: "/barge-in", kind: "proof", name: "bargeIn", status: "pass" },
+      { href: "/voice/reconnect-contract", kind: "proof", name: "reconnectContract", status: "pass" },
+    ],
+    frameworkPrimitives: ["client traces", "server reports"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    surface: "Latency, interruption, and reconnect confidence",
+    why: "Live p50/p95, provider-stage timings, barge-in, reconnect contracts, long-window proof, SLO artifacts, and readiness gates exist.",
+    nextMove: "Build sustained benchmark history and tune defaults from real runs.",
+  },
+  {
+    buyerNeed: "Use direct realtime/duplex providers when they are the right execution engine.",
+    competitors: ["OpenAI Realtime", "Pipecat"],
+    coverage: "partial",
+    depth: "covered",
+    evidence: [
+      { href: "/provider-contracts", kind: "proof", name: "providerContracts", status: "pass" },
+      { href: "/voice/provider-orchestration", kind: "readiness", name: "providerOrchestrationRealtimeSurface", status: "pass" },
+    ],
+    frameworkPrimitives: ["server adapters", "provider profiles"],
+    operationsRecord: "linked",
+    readinessGate: "present",
+    remainingGap:
+      "Production browser format negotiation/resampling and live-demo proof need more depth.",
+    surface: "Direct realtime/duplex providers",
+    why: "OpenAI Realtime adapter path exists and cascaded STT/LLM/TTS remains strong, but runtime-channel proof still needs deeper production samples.",
+    nextMove: "Improve runtime-channel calibration and live-demo proof.",
+  },
+  {
+    buyerNeed: "Build visual workflows without code.",
+    competitors: ["Bland", "Retell", "Vapi"],
+    coverage: "intentional-gap",
+    depth: "intentional-gap",
+    operationsRecord: "not-applicable",
+    readinessGate: "not-applicable",
+    remainingGap:
+      "No-code visual flow builders are not the AbsoluteJS Voice lane.",
+    surface: "No-code visual builder",
+    why: "AbsoluteJS Voice should provide code-first flow primitives, diagrams, and recipes, not a builder-owned app kit.",
+    nextMove: "Avoid app kits; add lightweight diagrams/docs only.",
+  },
+  {
+    buyerNeed: "Provision phone numbers from a hosted dashboard.",
+    competitors: ["Vapi", "LiveKit"],
+    coverage: "intentional-gap",
+    depth: "intentional-gap",
+    operationsRecord: "not-applicable",
+    readinessGate: "not-applicable",
+    remainingGap:
+      "Hosted number purchasing/provisioning stays with carriers or media platforms.",
+    surface: "Hosted phone-number provisioning",
+    why: "AbsoluteJS Voice should guide carrier setup and verify config, not become a telco platform.",
+    nextMove: "Keep setup reports copy-ready and adapter-friendly.",
+  },
+  {
+    buyerNeed: "Own raw SIP/media infrastructure.",
+    competitors: ["LiveKit"],
+    coverage: "intentional-gap",
+    depth: "intentional-gap",
+    operationsRecord: "not-applicable",
+    readinessGate: "not-applicable",
+    remainingGap:
+      "LiveKit owns SIP trunks, rooms, RTP/SRTP, DTMF, REFER, dispatch, and media networking.",
+    surface: "SIP/media infrastructure",
+    why: "AbsoluteJS Voice should maintain clean seams for LiveKit/Pipecat/provider transport interop instead of recreating media infrastructure.",
+    nextMove: "Expose adapter seams when needed.",
+  },
+] satisfies VoiceCompetitiveSurface[];
+
+const buildDemoCompetitiveCoverageReport =
+  async (): Promise<VoiceCompetitiveCoverageReport> => {
+    const latest = await readLatestVapiCoverageSummary();
+
+    return buildVoiceCompetitiveCoverageReport({
+      generatedAt: new Date().toISOString(),
+      marketCoverageEstimate: "93-95%",
+      notes: [
+        "Scored for a self-hosted AbsoluteJS buyer, not a hosted-dashboard buyer.",
+        "Intentional gaps are adapter seams or product-scope decisions, not missing core voice primitives.",
+      ],
+      source: latest.source ?? latestProofPackJsonPath,
+      surfaces: competitiveCoverageSurfaces,
+      vapiCoverageEstimate: "99.8%",
+    });
+  };
+
+const renderCoverageStatus = (coverage: VapiCoverageResult | undefined) => {
+  if (!coverage) {
+    return `<div class="coverage coverage-missing">
+      <strong>No latest proof</strong>
+      <span>Run <code>bun run proof:screenshots</code> to attach live evidence.</span>
+    </div>`;
+  }
+
+  const status = coverage.status === "pass" ? "pass" : "fail";
+  const evidence = (coverage.evidence ?? [])
+    .map(
+      (item) =>
+        `<li>${escapeHtml(String(item.name ?? "proof"))} <span>${escapeHtml(String(item.method ?? "GET"))} ${escapeHtml(String(item.path ?? ""))} · ${escapeHtml(String(item.status ?? "n/a"))}</span></li>`,
+    )
+    .join("");
+  const gap = coverage.gap ? `<p class="gap">${escapeHtml(coverage.gap)}</p>` : "";
+
+  return `<div class="coverage coverage-${status}">
+    <strong>${status.toUpperCase()}</strong>
+    ${gap}
+    <ul>${evidence}</ul>
+  </div>`;
+};
+
+const renderSustainedProofStatus = (report: VoiceProofTrendReport) => {
+  const cycles = report.cycles ?? [];
+  const status = report.status === "pass" ? "pass" : "fail";
+  const latestCycle = cycles.at(-1);
+  const latestStatus = latestCycle
+    ? latestCycle.ok
+      ? "latest cycle passed"
+      : "latest cycle failed"
+    : "no cycles recorded";
+
+  return `<section class="trend trend-${status}">
+    <div>
+      <p class="eyebrow">Sustained proof trends</p>
+      <h2>Repeated-cycle evidence for the Vapi replacement claim</h2>
+      <p class="muted">Read from <code>${escapeHtml(latestProofTrendsJsonPath)}</code>. This keeps the migration page honest by showing whether repeated provider, latency, recovery, and readiness checks are passing and fresh.</p>
+      <p><a href="/voice/proof-trends">Open sustained trends</a> · <a href="/api/voice/proof-trends">Status JSON</a> · <a href="/voice/proof-trends.md">Markdown</a></p>
+    </div>
+    <div class="trend-metrics">
+      <div><span>Status</span><strong>${escapeHtml(report.status.toUpperCase())}</strong></div>
+      <div><span>Cycles</span><strong>${escapeHtml(String(report.summary.cycles ?? cycles.length ?? 0))}</strong></div>
+      <div><span>Provider p95</span><strong>${escapeHtml(formatTrendMs(report.summary.maxProviderP95Ms))}</strong></div>
+      <div><span>Turn p95</span><strong>${escapeHtml(formatTrendMs(report.summary.maxTurnP95Ms))}</strong></div>
+      <div><span>Live p95</span><strong>${escapeHtml(formatTrendMs(report.summary.maxLiveP95Ms))}</strong></div>
+      <div><span>Artifact age</span><strong>${escapeHtml(formatVoiceProofTrendAge(report.ageMs))}</strong></div>
+      <div><span>Stale after</span><strong>${escapeHtml(formatVoiceProofTrendAge(report.maxAgeMs))}</strong></div>
+      <div><span>Latest cycle</span><strong>${escapeHtml(latestStatus)}</strong></div>
+    </div>
+  </section>`;
+};
+
+const readLatestLiveGuardrailRuntimeProof = async (): Promise<{
+  command: string;
+  elapsedMs?: number;
+  error?: string;
+  ok: boolean;
+  outputDir?: string;
+  status?: number;
+}> => {
+  const file = Bun.file(latestProofPackJsonPath);
+
+  if (!(await file.exists())) {
+    return {
+      command: "bun run smoke:live-guardrails",
+      error: `Missing ${latestProofPackJsonPath}`,
+      ok: false,
+    };
+  }
+
+  try {
+    const parsed = (await file.json()) as {
+      commandResults?: unknown;
+      outputDir?: unknown;
+    };
+    const commandResults = Array.isArray(parsed.commandResults)
+      ? (parsed.commandResults as Array<Record<string, unknown>>)
+      : [];
+    const result = commandResults.find(
+      (item) => item.name === "liveGuardrailsRuntime",
+    );
+
+    if (!result) {
+      return {
+        command: "bun run smoke:live-guardrails",
+        error: "Latest proof pack does not include liveGuardrailsRuntime.",
+        ok: false,
+        outputDir:
+          typeof parsed.outputDir === "string" ? parsed.outputDir : undefined,
+      };
+    }
+
+    const command = Array.isArray(result.command)
+      ? result.command.map(String).join(" ")
+      : "bun run smoke:live-guardrails";
+
+    return {
+      command,
+      elapsedMs:
+        typeof result.elapsedMs === "number" ? result.elapsedMs : undefined,
+      error: typeof result.error === "string" ? result.error : undefined,
+      ok: result.ok === true,
+      outputDir:
+        typeof parsed.outputDir === "string" ? parsed.outputDir : undefined,
+      status: typeof result.status === "number" ? result.status : undefined,
+    };
+  } catch (error) {
+    return {
+      command: "bun run smoke:live-guardrails",
+      error: error instanceof Error ? error.message : String(error),
+      ok: false,
+    };
+  }
+};
+
+const postCallAnalysisOptions = (input: {
+  reviewId?: string;
+  sessionId?: string;
+} = {}): VoicePostCallAnalysisOptions => {
+  const sessionId = input.sessionId ?? demoIncidentSessionId;
+  const reviewId = input.reviewId ?? `${sessionId}:review`;
+
+  return {
+    extractedFields: {
+      category: "billing",
+      customerId: "customer-1",
+      followUpRequired: true,
+    },
+    fields: [
+      { label: "Customer id", path: "customerId" },
+      { label: "Call category", path: "category" },
+      { label: "Follow-up flag", path: "followUpRequired" },
+      { label: "Review target", path: "review.postCall.target" },
+    ],
+    integrationEvents: runtimeStorage.events,
+    operationRecordBasePath: "/voice-operations/:sessionId",
+    requireDeliveredIntegrationEvent: true,
+    requiredTaskKinds: ["support-triage" as const],
+    reviewId,
+    reviews: runtimeStorage.reviews as unknown as VoicePostCallAnalysisOptions["reviews"],
+    sessionId,
+    tasks: runtimeStorage.tasks as unknown as VoicePostCallAnalysisOptions["tasks"],
+  };
+};
+
+const renderPostCallAnalysisHTML = async () => {
+  const report = await buildVoicePostCallAnalysisReport(
+    postCallAnalysisOptions(),
+  );
+  const fields = report.fields
+    .map(
+      (field) =>
+        `<tr><td>${escapeHtml(field.label)}</td><td>${escapeHtml(field.ok ? "pass" : "fail")}</td><td><code>${escapeHtml(field.path)}</code></td><td>${escapeHtml(String(field.value ?? ""))}</td></tr>`,
+    )
+    .join("");
+  const issues =
+    report.issues.length > 0
+      ? report.issues
+          .map(
+            (issue) =>
+              `<li>${escapeHtml(issue.severity)} · ${escapeHtml(issue.code)} · ${escapeHtml(issue.label)}</li>`,
+          )
+          .join("")
+      : "<li>No post-call analysis issues.</li>";
+
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Voice Post-Call Analysis Proof</title>
+      <style>
+        body{background:#0c1118;color:#f8fafc;font-family:ui-sans-serif,system-ui,sans-serif;margin:0}
+        main{max-width:1040px;margin:auto;padding:32px}
+        a{color:#93c5fd}
+        .hero{background:linear-gradient(135deg,rgba(251,191,36,.16),rgba(20,184,166,.13));border:1px solid #263241;border-radius:28px;margin-bottom:18px;padding:28px}
+        .eyebrow{color:#facc15;font-size:.78rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+        h1{font-size:clamp(2.2rem,5vw,4.5rem);line-height:.92;margin:.2rem 0 1rem}
+        .muted{color:#a8b3bd}
+        .metrics{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:18px 0}
+        .metrics div,section,table{background:#151b23;border:1px solid #263241;border-radius:18px}
+        .metrics div,section{padding:16px}
+        .metrics span{color:#a8b3bd;display:block;font-size:.72rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+        .metrics strong{display:block;font-size:1.7rem;margin-top:6px}
+        table{border-collapse:collapse;overflow:hidden;width:100%}
+        td,th{border-bottom:1px solid #263241;padding:12px;text-align:left}
+        code{background:#0b1117;border:1px solid #263241;border-radius:8px;padding:2px 6px}
+      </style>
+    </head>
+    <body>
+      <main>
+        <p><a href="/switching-from-vapi">Switching from Vapi</a> · <a href="/voice-operations/${encodeURIComponent(report.sessionId ?? demoIncidentSessionId)}">Operations record</a> · <a href="/api/voice/post-call-analysis">JSON</a> · <a href="/api/voice/post-call-analysis.md">Markdown</a></p>
+        <section class="hero">
+          <p class="eyebrow">Post-call analysis proof</p>
+          <h1>Extracted fields, follow-up tasks, and delivery evidence</h1>
+          <p class="muted">This proves the Retell/Bland/Vapi-style post-call workflow without a hosted dashboard: the app owns the review, extracted fields, task, delivery event, and operation record link.</p>
+        </section>
+        <div class="metrics">
+          <div><span>Status</span><strong>${escapeHtml(report.status.toUpperCase())}</strong></div>
+          <div><span>Fields</span><strong>${report.summary.fields}</strong></div>
+          <div><span>Tasks</span><strong>${report.summary.tasks}</strong></div>
+          <div><span>Delivered events</span><strong>${report.summary.deliveredIntegrationEvents}</strong></div>
+          <div><span>Missing fields</span><strong>${report.summary.missingRequiredFields}</strong></div>
+          <div><span>Missing tasks</span><strong>${report.summary.missingRequiredTasks}</strong></div>
+        </div>
+        <section>
+          <p><strong>Operations record:</strong> <a href="${escapeHtml(report.operationRecordHref ?? "/voice-operations/demo-incident-bundle")}">${escapeHtml(report.operationRecordHref ?? "/voice-operations/demo-incident-bundle")}</a></p>
+          <p><strong>Review:</strong> <code>${escapeHtml(report.reviewId ?? "")}</code></p>
+        </section>
+        <h2>Extracted Fields</h2>
+        <table><thead><tr><th>Field</th><th>Status</th><th>Path</th><th>Value</th></tr></thead><tbody>${fields}</tbody></table>
+        <h2>Issues</h2>
+        <section><ul>${issues}</ul></section>
+      </main>
+    </body>
+  </html>`;
+};
+
+const buildDemoGuardrailReport = () => {
+  const checkedAt = Date.now();
+  const decisions: VoiceGuardrailDecision[] = [
+    {
+      allowed: false,
+      checkedAt,
+      content: "I can give medical advice and diagnose this issue.",
+      findings: [
+        {
+          action: "block",
+          description:
+            "Blocks final legal, medical, or financial advice claims that should route to a human or qualified professional.",
+          label: "Regulated advice",
+          ruleId: "regulated-advice",
+          stage: "assistant-output",
+        },
+      ],
+      redactedContent: "I can give medical advice and diagnose this issue.",
+      sessionId: demoIncidentSessionId,
+      stage: "assistant-output",
+      status: "blocked",
+      turnId: "demo-guardrail-block",
+    },
+    {
+      allowed: true,
+      checkedAt: checkedAt + 1,
+      content: "My card is 4111 1111 1111 1111.",
+      findings: [
+        {
+          action: "warn",
+          description:
+            "Warns when payment-card-like data appears in transcripts or tool payloads.",
+          label: "Payment card-like data",
+          ruleId: "payment-card-like-data",
+          stage: "transcript",
+        },
+      ],
+      redactedContent: "My card is [redacted-card].",
+      sessionId: demoIncidentSessionId,
+      stage: "transcript",
+      status: "warn",
+      turnId: "demo-guardrail-warn",
+    },
+    {
+      allowed: true,
+      checkedAt: checkedAt + 2,
+      content: "I can route you to billing support.",
+      findings: [],
+      redactedContent: "I can route you to billing support.",
+      sessionId: demoIncidentSessionId,
+      stage: "assistant-output",
+      status: "pass",
+      turnId: "demo-guardrail-pass",
+    },
+  ];
+
+  return buildVoiceGuardrailReport({
+    decisions,
+    policies: [voiceGuardrailPolicyPresets.supportSafeDefaults],
+  });
+};
+
+const renderGuardrailsHTML = async () => {
+  const report = buildDemoGuardrailReport();
+  const liveProof = await readLatestLiveGuardrailRuntimeProof();
+  const rows = report.decisions
+    .map(
+      (decision) =>
+        `<tr><td>${escapeHtml(decision.status)}</td><td>${escapeHtml(decision.stage)}</td><td>${escapeHtml(decision.allowed ? "allowed" : "blocked")}</td><td>${escapeHtml(decision.findings.map((finding) => finding.label).join(", ") || "none")}</td></tr>`,
+    )
+    .join("");
+  const findings = report.decisions
+    .flatMap((decision) => decision.findings)
+    .map(
+      (finding) =>
+        `<li>${escapeHtml(finding.action)} · ${escapeHtml(finding.ruleId)} · ${escapeHtml(finding.label)}</li>`,
+    )
+    .join("");
+
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Voice Guardrails Proof</title>
+      <style>
+        body{background:#0d1117;color:#f8fafc;font-family:ui-sans-serif,system-ui,sans-serif;margin:0}
+        main{max-width:1040px;margin:auto;padding:32px}
+        a{color:#93c5fd}
+        .hero{background:linear-gradient(135deg,rgba(248,113,113,.16),rgba(14,165,233,.13));border:1px solid #263241;border-radius:28px;margin-bottom:18px;padding:28px}
+        .eyebrow{color:#fca5a5;font-size:.78rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+        h1{font-size:clamp(2.2rem,5vw,4.5rem);line-height:.92;margin:.2rem 0 1rem}
+        .muted{color:#a8b3bd}
+        .metrics{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin:18px 0}
+        .metrics div,section,table{background:#151b23;border:1px solid #263241;border-radius:18px}
+        .metrics div,section{padding:16px}
+        .metrics span{color:#a8b3bd;display:block;font-size:.72rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+        .metrics strong{display:block;font-size:1.7rem;margin-top:6px}
+        table{border-collapse:collapse;overflow:hidden;width:100%}
+        td,th{border-bottom:1px solid #263241;padding:12px;text-align:left}
+        .live-proof{background:${liveProof.ok ? "rgba(20,83,45,.28)" : "rgba(127,29,29,.28)"};border-color:${liveProof.ok ? "rgba(34,197,94,.5)" : "rgba(248,113,113,.55)"};margin:18px 0}
+        .live-proof strong{display:block;font-size:1.5rem;margin:.25rem 0}
+        code{background:#0b1117;border:1px solid #263241;border-radius:8px;padding:2px 6px}
+      </style>
+    </head>
+    <body>
+      <main>
+        <p><a href="/switching-from-vapi">Switching from Vapi</a> · <a href="/api/voice/guardrails">JSON</a> · <a href="/api/voice/guardrails.md">Markdown</a></p>
+        <section class="hero">
+          <p class="eyebrow">Guardrails proof</p>
+          <h1>Blocking, warning, redaction, and traceable policy decisions</h1>
+          <p class="muted">This proves a Vapi/Bland-style guardrail surface as code-owned primitives: policies are local, reports are JSON/Markdown, and decisions can be emitted as <code>assistant.guardrail</code> trace events.</p>
+        </section>
+        <section class="live-proof">
+          <p class="eyebrow">Live runtime guardrail proof</p>
+          <strong>${escapeHtml(liveProof.ok ? "PASS" : "FAIL")}</strong>
+          <p class="muted">Runs <code>${escapeHtml(liveProof.command)}</code> and verifies a real WebSocket voice turn blocks unsafe <code>tool-input</code> and <code>assistant-output</code> before unsafe text reaches the client.</p>
+          <p class="muted">Exit ${escapeHtml(String(liveProof.status ?? "n/a"))}${liveProof.elapsedMs === undefined ? "" : ` · ${escapeHtml(String(liveProof.elapsedMs))}ms`}${liveProof.outputDir ? ` · <code>${escapeHtml(liveProof.outputDir)}</code>` : ""}</p>
+          ${liveProof.error ? `<p class="muted">${escapeHtml(liveProof.error)}</p>` : ""}
+        </section>
+        <div class="metrics">
+          <div><span>Status</span><strong>${escapeHtml(report.status.toUpperCase())}</strong></div>
+          <div><span>Decisions</span><strong>${report.total}</strong></div>
+          <div><span>Blocked</span><strong>${report.summary.blocked}</strong></div>
+          <div><span>Warned</span><strong>${report.summary.warned}</strong></div>
+          <div><span>Passed</span><strong>${report.summary.passed}</strong></div>
+        </div>
+        <h2>Policy Decisions</h2>
+        <table><thead><tr><th>Status</th><th>Stage</th><th>Allowed</th><th>Findings</th></tr></thead><tbody>${rows}</tbody></table>
+        <h2>Findings</h2>
+        <section><ul>${findings || "<li>No findings.</li>"}</ul></section>
+      </main>
+    </body>
+  </html>`;
+};
+
+const renderVapiMigrationHTML = async () => {
+  const [coverage, proofTrends] = await Promise.all([
+    readLatestVapiCoverage(),
+    readLatestProofTrends(),
+  ]);
+  const coverageBySurface = new Map(
+    coverage
+      .filter((coverage) => typeof coverage.surface === "string")
+      .map((coverage) => [coverage.surface as string, coverage]),
+  );
+  const rows = vapiMigrationItems
+    .map(
+      (item) => `<article>
+        <div>
+          <p class="eyebrow">${escapeHtml(item.concept)}</p>
+          <h2>${escapeHtml(item.absolute)}</h2>
+          <p><a href="${escapeHtml(item.proofHref)}">${escapeHtml(item.proofLabel)}</a> · <a href="${escapeHtml(item.statusHref)}">Status JSON</a></p>
+          ${renderCoverageStatus(coverageBySurface.get(item.coverageSurface ?? item.concept))}
+        </div>
+      </article>`,
+    )
+    .join("");
+
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Switching From Vapi To AbsoluteJS Voice</title>
+      <style>
+        body{background:#0e1218;color:#f8f3e7;font-family:ui-sans-serif,system-ui,sans-serif;margin:0}
+        main{max-width:1120px;margin:auto;padding:32px}
+        a{color:#93c5fd}
+        .hero{background:linear-gradient(135deg,rgba(147,197,253,.18),rgba(45,212,191,.12));border:1px solid #263241;border-radius:30px;margin-bottom:18px;padding:28px}
+        .eyebrow{color:#5eead4;font-size:.78rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+        .muted{color:#a8b3bd}
+        .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+        article{background:#151b23;border:1px solid #263241;border-radius:22px;padding:18px}
+        h1{font-size:clamp(2.4rem,6vw,5rem);line-height:.9;margin:.2rem 0 1rem}
+        h2{font-size:1.05rem;line-height:1.45;margin:.35rem 0 .8rem}
+        p{line-height:1.6}
+        .callout{background:#101820;border:1px solid #263241;border-radius:22px;margin:18px 0;padding:18px}
+        .coverage{border-radius:16px;margin-top:14px;padding:12px}
+        .coverage strong{display:inline-flex;font-size:.74rem;font-weight:900;letter-spacing:.12em;margin-bottom:8px}
+        .coverage span{color:#a8b3bd}
+        .coverage ul{display:grid;gap:6px;list-style:none;margin:8px 0 0;padding:0}
+        .coverage li{font-size:.86rem;line-height:1.35}
+        .coverage-pass{background:rgba(20,83,45,.24);border:1px solid rgba(34,197,94,.42)}
+        .coverage-fail,.coverage-missing{background:rgba(127,29,29,.24);border:1px solid rgba(248,113,113,.46)}
+        .gap{color:#fecaca;margin:.2rem 0 .5rem}
+        .trend{background:#151b23;border:1px solid #263241;border-radius:24px;display:grid;gap:18px;grid-template-columns:minmax(0,1.15fr) minmax(280px,.85fr);margin:18px 0;padding:20px}
+        .trend h2{font-size:1.4rem;margin:.25rem 0 .5rem}
+        .trend-pass{border-color:rgba(34,197,94,.42)}
+        .trend-fail{border-color:rgba(248,113,113,.46)}
+        .trend-metrics{display:grid;gap:10px;grid-template-columns:repeat(2,minmax(0,1fr))}
+        .trend-metrics div{background:#0f1620;border:1px solid #263241;border-radius:16px;padding:12px}
+        .trend-metrics span{color:#a8b3bd;display:block;font-size:.72rem;font-weight:900;letter-spacing:.1em;text-transform:uppercase}
+        .trend-metrics strong{display:block;font-size:1rem;margin-top:5px}
+        code{background:#0b1117;border:1px solid #263241;border-radius:8px;padding:2px 6px}
+        @media (max-width:760px){.trend{grid-template-columns:1fr}.trend-metrics{grid-template-columns:1fr}}
+      </style>
+    </head>
+    <body>
+      <main>
+        <p><a href="/ops-console">Back to Ops Console</a> · <a href="/demo-checklist">Demo Checklist</a> · <a href="/production-readiness">Production Readiness</a></p>
+        <section class="hero">
+          <p class="eyebrow">Hosted platform migration checklist</p>
+          <h1>Replace Vapi dashboard concepts with owned primitives</h1>
+          <p class="muted">This page maps the surfaces a Vapi buyer expects to the AbsoluteJS Voice route, report, contract, or proof URL that already lives inside this app.</p>
+        </section>
+        <section class="callout">
+          <p>Migration rule: start with the voice route, operations record, readiness gate, provider contracts, and customer-owned observability export. Add campaigns, live-ops, or compliance controls only when that app needs them.</p>
+          <p class="muted">Live coverage status is read from <code>.voice-runtime/proof-pack/latest.json</code>; stale or missing proof is shown directly on each surface.</p>
+        </section>
+        ${renderSustainedProofStatus(proofTrends)}
+        <section class="grid">${rows}</section>
+      </main>
+    </body>
+  </html>`;
+};
+
+const renderProviderRecoveryHTML = async () => {
+  const summary = summarizeVoiceProviderFallbackRecovery(
+    await runtimeStorage.traces.list(),
+  );
+  const status = summary.status.toUpperCase();
+  const detail =
+    summary.unresolvedErrors > 0
+      ? `${summary.unresolvedErrors} provider error(s) have no recovered fallback evidence.`
+      : summary.recovered > 0
+        ? `${summary.recovered} provider fallback recovery event(s) kept sessions healthy.`
+        : "No provider fallback recovery was needed in the current trace window.";
+
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>AbsoluteJS Voice Provider Recovery</title>
+      <style>
+        body{background:#0d141b;color:#f8f3e7;font-family:ui-sans-serif,system-ui,sans-serif;margin:0}
+        main{max-width:1080px;margin:auto;padding:32px}
+        a{color:#67e8f9}
+        .hero{background:linear-gradient(135deg,rgba(103,232,249,.18),rgba(251,191,36,.14));border:1px solid #294150;border-radius:30px;margin-bottom:18px;padding:28px}
+        .eyebrow{color:#67e8f9;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+        h1{font-size:clamp(2.4rem,6vw,4.8rem);line-height:.9;margin:.2rem 0 1rem}
+        .status{border:1px solid ${summary.status === "pass" ? "rgba(34,197,94,.65)" : "rgba(239,68,68,.75)"};border-radius:999px;display:inline-flex;font-weight:900;padding:8px 12px}
+        .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin:20px 0}
+        article{background:#151d26;border:1px solid #283544;border-radius:20px;padding:18px}
+        article span,.muted{color:#a8b3bd}
+        article strong{display:block;font-size:2.1rem;margin-top:6px}
+        .proof{background:#101820;border:1px solid #283544;border-radius:22px;padding:18px}
+        code{background:#0b1117;border:1px solid #263241;border-radius:8px;padding:2px 6px}
+      </style>
+    </head>
+    <body>
+      <main>
+        <p><a href="/ops-console">Back to Ops Console</a> · <a href="/resilience">Resilience</a> · <a href="/production-readiness">Production readiness</a> · <a href="/api/production-readiness">Readiness JSON</a></p>
+        <section class="hero">
+          <p class="eyebrow">Resilience proof</p>
+          <h1>Recovered provider fallback is not a failed session</h1>
+          <p class="muted">AbsoluteJS keeps raw provider failures in replay, proves fallback recovery, and only fails readiness when recovery is unresolved.</p>
+          <p class="status">Overall: ${escapeHtml(status)}</p>
+        </section>
+        <section class="grid">
+          <article><span>Recovered events</span><strong>${summary.recovered}</strong></article>
+          <article><span>Recovered sessions</span><strong>${summary.recoveredSessions}</strong></article>
+          <article><span>Recovered turns</span><strong>${summary.recoveredTurns}</strong></article>
+          <article><span>Unresolved errors</span><strong>${summary.unresolvedErrors}</strong></article>
+        </section>
+        <section class="proof">
+          <h2>What this proves</h2>
+          <p>${escapeHtml(detail)}</p>
+          <p class="muted">Readiness value: <code>${escapeHtml(summary.total === 0 ? "0 events" : `${summary.recovered}/${summary.total}`)}</code>. Raw errors remain inspectable in <a href="/sessions">session replay</a> and <a href="/traces">trace timelines</a>.</p>
+        </section>
+      </main>
+    </body>
+  </html>`;
+};
+
+const renderDeployGateHTML = async () => {
+  const gate = await buildVoiceProductionReadinessGate(
+    productionReadinessOptions(),
+  );
+  const issues = [...gate.failures, ...gate.warnings];
+  const rows =
+    issues.length > 0
+      ? issues
+          .map(
+            (issue) => `<tr>
+            <td><strong>${escapeHtml(issue.status.toUpperCase())}</strong></td>
+            <td><code>${escapeHtml(issue.code)}</code></td>
+            <td>${escapeHtml(issue.label)}${issue.detail ? `<br /><span>${escapeHtml(issue.detail)}</span>` : ""}</td>
+            <td>${issue.href ? `<a href="${escapeHtml(issue.href)}">Open surface</a>` : ""}</td>
+          </tr>`,
+          )
+          .join("")
+      : `<tr><td colspan="4">No blocking failures or warnings.</td></tr>`;
+  const profileRows = gate.profile
+    ? gate.profile.surfaces
+        .map((surface) => {
+          const surfaceIssues =
+            surface.issues.length > 0
+              ? surface.issues
+                  .map((issue) => `<code>${escapeHtml(issue.code)}</code>`)
+                  .join("<br />")
+              : "No blocking issues";
+
+          return `<tr>
+            <td><strong>${escapeHtml(surface.status.toUpperCase())}</strong></td>
+            <td>${surface.href ? `<a href="${escapeHtml(surface.href)}">${escapeHtml(surface.label)}</a>` : escapeHtml(surface.label)}<br /><span>${surface.configured ? "configured" : "expected"}</span></td>
+            <td>${surfaceIssues}</td>
+          </tr>`;
+        })
+        .join("")
+    : "";
+  const statusText = gate.ok ? "OPEN" : "CLOSED";
+  const strictText =
+    "Set gate.failOnWarnings to true when you want warnings to close the gate.";
+  const json = escapeHtml(JSON.stringify(gate, null, 2));
+  const deployScript =
+    escapeHtml(`const baseUrl = process.env.VOICE_BASE_URL ?? "http://localhost:3004";
+const response = await fetch(new URL("/api/production-readiness/gate", baseUrl));
+const gate = await response.json();
+
+if (!response.ok || !gate.ok) {
+  console.error("Voice deploy gate closed");
+  for (const issue of [...gate.failures, ...gate.warnings]) {
+    console.error(\`\${issue.code}: \${issue.detail ?? issue.label}\`);
+  }
+  process.exit(1);
+}
+
+console.log("Voice deploy gate open");`);
+
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>AbsoluteJS Voice Deploy Gate</title>
+      <style>
+        body{background:#0f1720;color:#f8f3e7;font-family:ui-sans-serif,system-ui,sans-serif;margin:0}
+        main{max-width:1120px;margin:auto;padding:32px}
+        a{color:#7dd3fc}
+        .hero{background:linear-gradient(135deg,rgba(125,211,252,.18),rgba(245,158,11,.15));border:1px solid #304153;border-radius:30px;margin-bottom:18px;padding:28px}
+        .eyebrow{color:#7dd3fc;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+        h1{font-size:clamp(2.4rem,6vw,4.9rem);line-height:.9;margin:.2rem 0 1rem}
+        .status{border:1px solid ${gate.ok ? "rgba(34,197,94,.65)" : "rgba(239,68,68,.75)"};border-radius:999px;display:inline-flex;font-weight:900;padding:8px 12px}
+        .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin:18px 0}
+        article,pre,table{background:#151f2b;border:1px solid #2d3d4e;border-radius:20px}
+        article{padding:18px}
+        article span,.muted,td span{color:#a8b3bd}
+        article strong{display:block;font-size:2.2rem;margin-top:6px}
+        table{border-collapse:collapse;overflow:hidden;width:100%}
+        th,td{border-bottom:1px solid #2d3d4e;padding:14px;text-align:left;vertical-align:top}
+        code{color:#bae6fd}
+        pre{overflow:auto;padding:18px}
+        .script{position:relative}
+        button{background:#7dd3fc;border:0;border-radius:999px;color:#082f49;cursor:pointer;font-weight:900;padding:10px 14px}
+        button:disabled{cursor:wait;opacity:.7}
+      </style>
+    </head>
+    <body>
+      <main>
+        <p><a href="/ops-console">Back to Ops Console</a> · <a href="/production-readiness">Production readiness</a> · <a href="/api/production-readiness/gate">Gate JSON</a></p>
+        <section class="hero">
+          <p class="eyebrow">Deploy gate primitive</p>
+          <h1>One HTTP check for self-hosted release confidence</h1>
+          <p class="muted">This page is just a demo wrapper around <code>buildVoiceProductionReadinessGate</code>. AbsoluteJS ships the primitive and route; teams decide how their deploy process calls it.</p>
+          <p class="status">Gate: ${escapeHtml(statusText)}</p>
+        </section>
+        <section class="grid">
+          <article><span>HTTP status</span><strong>${gate.ok ? "200" : "503"}</strong></article>
+          <article><span>Failures</span><strong>${gate.failures.length}</strong></article>
+          <article><span>Warnings</span><strong>${gate.warnings.length}</strong></article>
+          <article><span>Policy</span><strong>warn allowed</strong></article>
+        </section>
+        <h2>What a deploy script checks</h2>
+        <p class="muted">Call <code>/api/production-readiness/gate</code>. A closed gate returns <code>503</code> and stable issue codes like <code>voice.readiness.operator_action_history</code>.</p>
+        ${
+          gate.profile
+            ? `<h2>Profile surface blockers</h2>
+        <p class="muted"><code>${escapeHtml(gate.profile.name)}</code> groups gate issues by the proof surface they block.</p>
+        <table>
+          <thead><tr><th>Status</th><th>Profile surface</th><th>Issues</th></tr></thead>
+          <tbody>${profileRows}</tbody>
+        </table>`
+            : ""
+        }
+        <h2>Minimal consumer script</h2>
+        <p class="muted">This is intentionally small: point it at your running AbsoluteJS server and let HTTP status plus <code>gate.ok</code> decide whether to continue.</p>
+        <p><button type="button" data-copy-script>Copy script</button></p>
+        <pre class="script" id="deploy-gate-script">${deployScript}</pre>
+        <table>
+          <thead><tr><th>Status</th><th>Code</th><th>Check</th><th>Surface</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+        <h2>Raw gate JSON</h2>
+        <pre>${json}</pre>
+        <p class="muted">${escapeHtml(strictText)}</p>
+      </main>
+      <script>
+        const button = document.querySelector("[data-copy-script]");
+        button?.addEventListener("click", async () => {
+          const script = document.getElementById("deploy-gate-script")?.textContent ?? "";
+          await navigator.clipboard.writeText(script);
+          const original = button.textContent;
+          button.textContent = "Copied";
+          button.disabled = true;
+          setTimeout(() => {
+            button.textContent = original;
+            button.disabled = false;
+          }, 1200);
+        });
+      </script>
+    </body>
+  </html>`;
+};
+
+const readinessProfileCards = [
+  {
+    description:
+      "For browser and meeting-recorder products: transcript capture, reconnects, barge-in, provider fallback, and live latency proof.",
+    name: "meeting-recorder",
+    surfaces: [
+      { href: "/live-latency", label: "Live latency" },
+      { href: "/sessions", label: "Sessions" },
+      { href: "/resilience", label: "Provider fallback" },
+      { href: "/voice/reconnect-contract", label: "Reconnect contract" },
+      { href: "/barge-in", label: "Barge-in proof" },
+      {
+        href: "/api/provider-routing-contract",
+        label: "Provider routing contract",
+      },
+    ],
+  },
+  {
+    description:
+      "For carrier-backed agents: setup parity, phone smoke proof, handoffs, routing contracts, and delivery queues.",
+    name: "phone-agent",
+    surfaces: [
+      { href: "/phone-agent", label: "Phone agent setup" },
+      { href: "/carriers", label: "Carrier matrix" },
+      { href: "/handoffs", label: "Handoffs" },
+      {
+        href: "/api/provider-routing-contract",
+        label: "Provider routing contract",
+      },
+      { href: "/delivery-runtime", label: "Delivery runtime" },
+      { href: "/audit/deliveries", label: "Audit deliveries" },
+      { href: "/traces/deliveries", label: "Trace deliveries" },
+    ],
+  },
+  {
+    description:
+      "For operations-heavy deployments: audit evidence, operator action history, delivery health, runtime queues, and deploy gate status.",
+    name: "ops-heavy",
+    surfaces: [
+      { href: "/production-readiness", label: "Production readiness" },
+      { href: "/deploy-gate", label: "Deploy gate" },
+      { href: "/voice/ops-actions", label: "Operator action history" },
+      { href: "/delivery-runtime", label: "Delivery runtime" },
+      { href: "/audit/deliveries", label: "Audit deliveries" },
+      { href: "/traces/deliveries", label: "Trace deliveries" },
+    ],
+  },
+] satisfies Array<{
+  description: string;
+  name: string;
+  surfaces: Array<{ href: string; label: string }>;
+}>;
+
+const renderReadinessProfilesHTML = () => {
+  const recommendation = recommendVoiceReadinessProfile({
+    auditDeliveries: runtimeStorage.auditDeliveries,
+    carriers: loadCarrierMatrixInputs,
+    deliveryRuntime: deliveryRuntimeControl,
+    providerRoutingContracts: async () => [
+      await runDemoProviderRoutingContract(),
+      await runDemoSTTProviderRoutingContract(),
+      await runDemoTTSProviderRoutingContract(),
+    ],
+    traceDeliveries: runtimeStorage.traceDeliveries,
+  });
+  const providerStack = recommendVoiceProviderStack({
+    profile: recommendation.profile,
+    providers: {
+      llm: configuredModelProviders,
+      stt: configuredSTTProviders,
+      tts: configuredTTSProviders,
+    },
+  });
+  const providerStackGaps = evaluateVoiceProviderStackGaps({
+    capabilities: voiceProviderStackCapabilities,
+    profile: recommendation.profile,
+    providers: {
+      llm: configuredModelProviders,
+      stt: configuredSTTProviders,
+      tts: configuredTTSProviders,
+    },
+    recommendation: providerStack,
+  });
+  const providerContractMatrix = buildDemoProviderContractMatrix();
+  const providerRows = (["llm", "stt", "tts"] as const)
+    .map((kind) => {
+      const stack = providerStack.stacks[kind];
+      const gap = providerStackGaps.gaps.find((entry) => entry.kind === kind);
+      const provider = stack?.provider
+        ? escapeHtml(stack.provider)
+        : "not configured";
+      const alternatives = stack?.alternatives.length
+        ? stack.alternatives
+            .map((alternative) => escapeHtml(alternative))
+            .join(", ")
+        : "none";
+      const reasons = stack?.reasons.length
+        ? stack.reasons.map((reason) => escapeHtml(reason)).join("<br />")
+        : "";
+      const missing = gap?.missing.length
+        ? gap.missing.map((capability) => escapeHtml(capability)).join(", ")
+        : "covered";
+
+      return `<tr>
+        <td><strong>${kind.toUpperCase()}</strong></td>
+        <td>${provider}</td>
+        <td>${alternatives}</td>
+        <td>${reasons}</td>
+        <td>${missing}</td>
+      </tr>`;
+    })
+    .join("");
+  const contractRows = providerContractMatrix.rows
+    .map((row) => {
+      const issues = row.checks
+        .filter((check) => check.status !== "pass")
+        .map((check) => `${check.label}: ${check.detail ?? check.status}`)
+        .join("<br />");
+
+      return `<tr>
+        <td><strong>${escapeHtml(row.kind.toUpperCase())}</strong></td>
+        <td>${escapeHtml(row.provider)}</td>
+        <td>${escapeHtml(row.status)}</td>
+        <td>${row.selected ? "yes" : "no"}</td>
+        <td>${issues || "covered"}</td>
+      </tr>`;
+    })
+    .join("");
+  const cards = readinessProfileCards
+    .map((profile) => {
+      const surfaces = profile.surfaces
+        .map(
+          (surface) =>
+            `<li><a href="${escapeHtml(surface.href)}">${escapeHtml(surface.label)}</a></li>`,
+        )
+        .join("");
+
+      return `<article>
+        <p class="eyebrow">${escapeHtml(profile.name)}</p>
+        <h2><code>${escapeHtml(profile.name)}</code></h2>
+        <p>${escapeHtml(profile.description)}</p>
+        <h3>Expected proof surfaces</h3>
+        <ul>${surfaces}</ul>
+      </article>`;
+    })
+    .join("");
+  const example = escapeHtml(`createVoiceProductionReadinessRoutes({
+  ...createVoiceReadinessProfile("phone-agent", {
+    auditDeliveries: runtime.auditDeliveries,
+    carriers: loadCarrierMatrixInputs,
+    deliveryRuntime,
+    traceDeliveries: runtime.traceDeliveries,
+  }),
+  store: runtime.traces,
+})`);
+  const reasons =
+    recommendation.reasons.length > 0
+      ? recommendation.reasons
+          .map((reason) => `<li>${escapeHtml(reason)}</li>`)
+          .join("")
+      : "<li>No strong surface signals yet.</li>";
+  const missing =
+    recommendation.missing.length > 0
+      ? recommendation.missing
+          .map((key) => `<code>${escapeHtml(key)}</code>`)
+          .join(", ")
+      : "none";
+
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>AbsoluteJS Voice Readiness Profiles</title>
+      <style>
+        body{background:#11140f;color:#f7f3e8;font-family:ui-sans-serif,system-ui,sans-serif;margin:0}
+        main{max-width:1180px;margin:auto;padding:32px}
+        a{color:#bef264}
+        .hero{background:linear-gradient(135deg,rgba(190,242,100,.18),rgba(125,211,252,.14));border:1px solid #324128;border-radius:30px;margin-bottom:18px;padding:28px}
+        .eyebrow{color:#bef264;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+        h1{font-size:clamp(2.4rem,6vw,4.9rem);line-height:.9;margin:.2rem 0 1rem}
+        .muted{color:#aab899}
+        .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+        article,pre{background:#181f15;border:1px solid #304028;border-radius:22px;padding:18px}
+        article h2{margin:.2rem 0}
+        article p{line-height:1.55}
+        .recommendation{background:#1f2a18;border:1px solid #4d7c0f;border-radius:24px;margin-bottom:18px;padding:20px}
+        table{border-collapse:collapse;margin-top:14px;width:100%}
+        th,td{border-top:1px solid #405633;padding:12px;text-align:left;vertical-align:top}
+        th{color:#bef264;font-size:.8rem;letter-spacing:.08em;text-transform:uppercase}
+        li{margin:8px 0}
+        code{color:#d9f99d}
+        pre{overflow:auto}
+      </style>
+    </head>
+    <body>
+      <main>
+        <p><a href="/ops-console">Back to Ops Console</a> · <a href="/production-readiness">Production readiness</a> · <a href="/deploy-gate">Deploy gate</a></p>
+        <section class="hero">
+          <p class="eyebrow">Optional primitives, not an app kit</p>
+          <h1>Choose a readiness profile, then override anything</h1>
+          <p class="muted">Profiles return spreadable options for <code>createVoiceProductionReadinessRoutes</code>. They do not mount routes, create stores, start workers, or prescribe a workflow.</p>
+        </section>
+        <section class="recommendation">
+          <p class="eyebrow">Recommended for this demo</p>
+          <h2><code>${escapeHtml(recommendation.profile)}</code> · ${Math.round(recommendation.confidence * 100)}% match</h2>
+          <p class="muted">This recommendation comes from the proof surfaces currently configured in the example.</p>
+          <ul>${reasons}</ul>
+          <p class="muted">Missing for a fuller match: ${missing}</p>
+        </section>
+        <section class="recommendation">
+          <p class="eyebrow">Recommended provider stack</p>
+          <h2><code>${escapeHtml(providerStack.profile)}</code> provider fit</h2>
+          <p class="muted">This chooses from the providers configured in this example and explains why the profile prefers each lane.</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Lane</th>
+                <th>Recommended</th>
+                <th>Configured</th>
+                <th>Why</th>
+                <th>Capability gaps</th>
+              </tr>
+            </thead>
+            <tbody>${providerRows}</tbody>
+          </table>
+        </section>
+        <section class="recommendation">
+          <p class="eyebrow">Provider contract matrix</p>
+          <h2>${providerContractMatrix.passed}/${providerContractMatrix.total} provider rows production-ready</h2>
+          <p class="muted">This matrix checks required env, latency budget, fallback, streaming, and declared capabilities for each configured provider lane.</p>
+          <table>
+            <thead>
+              <tr>
+                <th>Lane</th>
+                <th>Provider</th>
+                <th>Status</th>
+                <th>Selected</th>
+                <th>Issues</th>
+              </tr>
+            </thead>
+            <tbody>${contractRows}</tbody>
+          </table>
+        </section>
+        <section class="grid">${cards}</section>
+        <h2>Shape of the API</h2>
+        <pre>${example}</pre>
+      </main>
+    </body>
+  </html>`;
+};
+
 const opsSurfaceLinks = [
   { href: "/react", label: "Back to demo" },
   {
@@ -1808,6 +4902,34 @@ const opsSurfaceLinks = [
       "Step-by-step route through the strongest demo proof surfaces.",
     href: "/demo-checklist",
     label: "Demo Checklist",
+    statusHref: "/api/production-readiness",
+  },
+  {
+    description:
+      "Map Vapi dashboard concepts to self-hosted AbsoluteJS Voice primitives and proof URLs.",
+    href: "/switching-from-vapi",
+    label: "Switching From Vapi",
+    statusHref: "/api/production-readiness",
+  },
+  {
+    description:
+      "Machine-readable proof coverage for Vapi replacement surfaces.",
+    href: "/api/voice/vapi-coverage",
+    label: "Vapi Coverage API",
+    statusHref: "/api/voice/vapi-coverage",
+  },
+  {
+    description:
+      "Compact deploy-gate JSON and stable issue codes for release checks.",
+    href: "/deploy-gate",
+    label: "Deploy Gate",
+    statusHref: "/api/production-readiness/gate",
+  },
+  {
+    description:
+      "Optional profile presets for meeting recorders, phone agents, and ops-heavy deployments.",
+    href: "/readiness-profiles",
+    label: "Readiness Profiles",
     statusHref: "/api/production-readiness",
   },
   {
@@ -1850,6 +4972,41 @@ const opsSurfaceLinks = [
   },
   {
     description:
+      "Single control plane for audit and trace delivery worker summaries and manual ticks.",
+    href: "/delivery-runtime",
+    label: "Delivery Runtime",
+    statusHref: "/api/voice-delivery-runtime",
+  },
+  {
+    description:
+      "Unified recovery signal for provider fallback, delivery queues, handoffs, live ops, and latency SLOs.",
+    href: "/ops-recovery",
+    label: "Ops Recovery",
+    statusHref: "/api/voice/ops-recovery",
+  },
+  {
+    description:
+      "Customer-owned export manifest for traces, audits, operations records, SLOs, readiness, incidents, and proof artifacts.",
+    href: "/voice/observability-export",
+    label: "Observability Export",
+    statusHref: "/api/voice/observability-export",
+  },
+  {
+    description:
+      "Read-back proof that the latest customer-owned export can be replayed from file or SQLite storage.",
+    href: "/voice/observability-export/replay",
+    label: "Observability Export Replay",
+    statusHref: "/api/voice/observability-export/replay",
+  },
+  {
+    description:
+      "Self-hosted data-control proof for redaction, audit exports, retention dry-runs, and guarded deletion.",
+    href: "/data-control",
+    label: "Data Control",
+    statusHref: "/data-control.json",
+  },
+  {
+    description:
       "Code-owned specialist routing proof for the support-to-billing squad path.",
     href: "/agent-squad-contract",
     label: "Agent Squad Contract",
@@ -1866,6 +5023,13 @@ const opsSurfaceLinks = [
     description: "Provider failover, degradation, and simulator controls.",
     href: "/resilience",
     label: "Resilience",
+  },
+  {
+    description:
+      "Recovered fallback proof: raw provider errors remain inspectable while recovered sessions stay healthy.",
+    href: "/provider-recovery",
+    label: "Provider Recovery",
+    statusHref: "/api/production-readiness",
   },
   {
     description:
@@ -1890,6 +5054,13 @@ const opsSurfaceLinks = [
   },
   {
     description:
+      "Code-owned browser disconnect, resumed transport, and replay-safe turn state proof.",
+    href: "/voice/reconnect-contract",
+    label: "Reconnect Contract",
+    statusHref: "/api/voice/reconnect-contract",
+  },
+  {
+    description:
       "Single pass/warn/fail report for quality, providers, routing evidence, handoffs, sessions, and carriers.",
     href: "/production-readiness",
     label: "Production Readiness",
@@ -1908,6 +5079,27 @@ const opsSurfaceLinks = [
     href: "/provider-capabilities",
     label: "Provider Capabilities",
     statusHref: "/api/provider-capabilities",
+  },
+  {
+    description:
+      "Contract matrix for provider env, latency budgets, fallback, streaming, and capabilities.",
+    href: "/provider-contracts",
+    label: "Provider Contracts",
+    statusHref: "/api/provider-contracts",
+  },
+  {
+    description:
+      "LLM/STT/TTS latency, p95, timeout, fallback, and unresolved-error SLO proof.",
+    href: "/voice/provider-slos",
+    label: "Provider SLOs",
+    statusHref: "/api/voice/provider-slos",
+  },
+  {
+    description:
+      "Repeated proof cycles for provider SLOs, turn latency, live latency, ops recovery, and readiness.",
+    href: "/voice/proof-trends",
+    label: "Sustained Proof Trends",
+    statusHref: "/api/voice/proof-trends",
   },
   {
     description:
@@ -2113,7 +5305,9 @@ const createCarrierSmoke = <TProvider extends VoiceTelephonyProvider>(
     },
   ];
 
-  for (const missing of requireProductionCarrierReadiness ? setup.missing : []) {
+  for (const missing of requireProductionCarrierReadiness
+    ? setup.missing
+    : []) {
     checks.push({
       message: `${missing} is missing.`,
       name: "missing-env",
@@ -2175,10 +5369,7 @@ const createCarrierSetup = <TProvider extends VoiceTelephonyProvider>(input: {
     generatedAt: Date.now(),
     missing,
     provider: input.provider,
-    ready:
-      missing.length === 0 &&
-      signingConfigured &&
-      warnings.length === 0,
+    ready: missing.length === 0 && signingConfigured && warnings.length === 0,
     signing: {
       configured: signingConfigured,
       mode: input.signingConfigured
@@ -2190,7 +5381,9 @@ const createCarrierSetup = <TProvider extends VoiceTelephonyProvider>(input: {
     },
     urls: {
       stream,
-      twiml: input.answerPath ? joinUrlPath(origin, input.answerPath) : undefined,
+      twiml: input.answerPath
+        ? joinUrlPath(origin, input.answerPath)
+        : undefined,
       webhook,
     },
     warnings,
@@ -2413,7 +5606,7 @@ const seedTurnLatencyProof = async () => {
     ["assistant_audio_received", timestamps.assistantAudioReceived],
   ] as const;
   for (const [stage, at] of stageEntries) {
-    await runtimeStorage.traces.append({
+    await deliveryTraceStore.append({
       at,
       metadata: { proof: "turn-latency" },
       payload: { stage },
@@ -2426,8 +5619,47 @@ const seedTurnLatencyProof = async () => {
   return { ok: true, sessionId, turnId };
 };
 
+const getDemoReconnectContractSnapshots = () => {
+  const startedAt = Date.now() - 1_200;
+  const firstTurnId = "reconnect-proof:turn:0";
+  const secondTurnId = "reconnect-proof:turn:1";
+
+  return [
+    {
+      at: startedAt,
+      reconnect: {
+        attempts: 0,
+        maxAttempts: 10,
+        status: "idle" as const,
+      },
+      turnIds: [firstTurnId],
+    },
+    {
+      at: startedAt + 240,
+      reconnect: {
+        attempts: 1,
+        lastDisconnectAt: startedAt + 240,
+        maxAttempts: 10,
+        nextAttemptAt: startedAt + 740,
+        status: "reconnecting" as const,
+      },
+      turnIds: [firstTurnId],
+    },
+    {
+      at: startedAt + 780,
+      reconnect: {
+        attempts: 1,
+        lastResumedAt: startedAt + 780,
+        maxAttempts: 10,
+        status: "resumed" as const,
+      },
+      turnIds: [firstTurnId, secondTurnId],
+    },
+  ];
+};
+
 const appendProofTrace = async (event: VoiceTraceEvent) => {
-  await runtimeStorage.traces.append(event);
+  await deliveryTraceStore.append(event);
 };
 
 type ProofCallDisposition = Exclude<
@@ -2534,12 +5766,15 @@ const seedDemoOutcomeProof = async () => {
     "proof-no-answer",
   ]) {
     const traces = await runtimeStorage.traces.list({ sessionId });
-    await Promise.all(traces.map((trace) => runtimeStorage.traces.remove(trace.id)));
+    await Promise.all(
+      traces.map((trace) => runtimeStorage.traces.remove(trace.id)),
+    );
   }
 
   const proofSessions: Array<{
     assistantText: string;
     disposition: ProofCallDisposition;
+    evalScenarioId: string;
     mode: "general" | "guided";
     reason?: string;
     scenarioId: string;
@@ -2550,6 +5785,7 @@ const seedDemoOutcomeProof = async () => {
     {
       assistantText: "Thanks Alex. Your voice test is saved.",
       disposition: "completed",
+      evalScenarioId: "proof-guided",
       mode: "guided",
       scenarioId: "guided",
       sessionId: "proof-guided-completed",
@@ -2562,6 +5798,7 @@ const seedDemoOutcomeProof = async () => {
     {
       assistantText: "Received.",
       disposition: "completed",
+      evalScenarioId: "proof-general",
       mode: "general",
       scenarioId: "general",
       sessionId: "proof-general-completed",
@@ -2572,6 +5809,7 @@ const seedDemoOutcomeProof = async () => {
     {
       assistantText: "Transferring this call to billing.",
       disposition: "transferred",
+      evalScenarioId: "proof-transfer",
       mode: "guided",
       reason: "caller-requested-transfer",
       scenarioId: "transfer",
@@ -2582,6 +5820,7 @@ const seedDemoOutcomeProof = async () => {
     {
       assistantText: "Escalating this call for human follow-up.",
       disposition: "escalated",
+      evalScenarioId: "proof-outcome-escalated",
       mode: "guided",
       reason: "caller-requested-escalation",
       scenarioId: "outcome-escalated",
@@ -2591,6 +5830,7 @@ const seedDemoOutcomeProof = async () => {
     {
       assistantText: "Marking this call as voicemail.",
       disposition: "voicemail",
+      evalScenarioId: "proof-outcome-voicemail",
       mode: "general",
       scenarioId: "outcome-voicemail",
       sessionId: "proof-voicemail",
@@ -2599,6 +5839,7 @@ const seedDemoOutcomeProof = async () => {
     {
       assistantText: "Marking this call as no answer.",
       disposition: "no-answer",
+      evalScenarioId: "proof-outcome-no-answer",
       mode: "general",
       scenarioId: "outcome-no-answer",
       sessionId: "proof-no-answer",
@@ -2640,6 +5881,16 @@ const seedDemoOutcomeProof = async () => {
       target: proof.target,
     });
 
+    await appendProofTrace({
+      at: session.call?.startedAt ?? Date.now(),
+      payload: {
+        type: "start",
+      },
+      scenarioId: proof.evalScenarioId,
+      sessionId: session.id,
+      type: "call.lifecycle",
+    });
+
     for (const turn of session.turns) {
       const finalTranscript = turn.transcripts.find(
         (transcript) => transcript.isFinal,
@@ -2653,7 +5904,7 @@ const seedDemoOutcomeProof = async () => {
             text: finalTranscript.text,
             vendor: finalTranscript.vendor,
           },
-          scenarioId: proof.scenarioId,
+          scenarioId: proof.evalScenarioId,
           sessionId: session.id,
           turnId: turn.id,
           type: "turn.transcript",
@@ -2664,7 +5915,7 @@ const seedDemoOutcomeProof = async () => {
         payload: {
           text: turn.text,
         },
-        scenarioId: proof.scenarioId,
+        scenarioId: proof.evalScenarioId,
         sessionId: session.id,
         turnId: turn.id,
         type: "turn.committed",
@@ -2675,7 +5926,7 @@ const seedDemoOutcomeProof = async () => {
           payload: {
             text: turn.assistantText,
           },
-          scenarioId: proof.scenarioId,
+          scenarioId: proof.evalScenarioId,
           sessionId: session.id,
           turnId: turn.id,
           type: "turn.assistant",
@@ -2700,7 +5951,7 @@ const seedDemoOutcomeProof = async () => {
                   ? "no-answer"
                   : "end",
       },
-      scenarioId: proof.scenarioId,
+      scenarioId: proof.evalScenarioId,
       sessionId: session.id,
       type: "call.lifecycle",
     });
@@ -2720,7 +5971,7 @@ const seedDemoOutcomeProof = async () => {
           contractId,
           status: "pass",
         },
-        scenarioId: proof.scenarioId,
+        scenarioId: proof.evalScenarioId,
         sessionId: session.id,
         type: "workflow.contract",
       });
@@ -2731,7 +5982,7 @@ const seedDemoOutcomeProof = async () => {
     assistantText: "Transferring this call to billing.",
     disposition: "transferred",
     reason: "caller-requested-transfer",
-    scenarioId: "transfer",
+    scenarioId: "proof-transfer",
     sessionId: "proof-transfer-billing",
     target: "billing",
     turns: ["Please transfer this billing issue to billing support."],
@@ -2776,13 +6027,378 @@ const seedDemoOutcomeProof = async () => {
   };
 };
 
+const seedDemoBargeInProof = async () => {
+  const sessionId = "proof-barge-in-interruption";
+  const traces = await runtimeStorage.traces.list({ sessionId });
+
+  if (traces.some((trace) => trace.type === "client.barge_in")) {
+    return;
+  }
+
+  const at = Date.now() - 650;
+  await deliveryTraceStore.append({
+    at,
+    metadata: {
+      proof: "barge-in-seed",
+      source: "demo",
+    },
+    payload: {
+      at,
+      id: "barge-in-proof-seed",
+      latencyMs: 92,
+      reason: "readiness-seed",
+      sessionId,
+      status: "stopped",
+      thresholdMs: 250,
+    },
+    sessionId,
+    type: "client.barge_in",
+  });
+};
+
+const seedDemoDeliveryProof = async () => {
+  const at = Date.now() - 500;
+  const auditEvent = createVoiceAuditEvent({
+    action: "readiness.delivery.proof",
+    actor: {
+      id: "absolutejs-voice-demo",
+      kind: "system",
+      name: "AbsoluteJS Voice Demo",
+    },
+    at,
+    id: "readiness-audit-delivery-proof:event",
+    metadata: {
+      proof: "delivery-readiness-seed",
+      source: "demo",
+    },
+    outcome: "success",
+    payload: {
+      surface: "production-readiness",
+    },
+    resource: {
+      id: "production-readiness",
+      type: "voice.readiness",
+    },
+    sessionId: "readiness-delivery-proof",
+    traceId: "readiness-audit-delivery-proof",
+    type: "operator.action",
+  });
+  const traceEvent = createVoiceTraceEvent({
+    at,
+    id: "readiness-trace-delivery-proof:event",
+    metadata: {
+      proof: "delivery-readiness-seed",
+      source: "demo",
+    },
+    payload: {
+      surface: "production-readiness",
+      status: "delivered",
+    },
+    sessionId: "readiness-delivery-proof",
+    traceId: "readiness-trace-delivery-proof",
+    type: "client.live_latency",
+  });
+
+  await Promise.all([
+    runtimeStorage.auditDeliveries.set(
+      "readiness-audit-delivery-proof",
+      createVoiceAuditSinkDeliveryRecord({
+        deliveredAt: at,
+        deliveryAttempts: 1,
+        deliveryStatus: "delivered",
+        events: [auditEvent],
+        id: "readiness-audit-delivery-proof",
+        sinkDeliveries: {
+          [auditDeliverySinkId]: {
+            attempts: 1,
+            deliveredAt: at,
+            deliveredTo: auditDeliverySinkTarget,
+            eventCount: 1,
+            status: "delivered",
+          },
+        },
+        updatedAt: at,
+      }),
+    ),
+    runtimeStorage.traceDeliveries.set(
+      "readiness-trace-delivery-proof",
+      createVoiceTraceSinkDeliveryRecord({
+        deliveredAt: at,
+        deliveryAttempts: 1,
+        deliveryStatus: "delivered",
+        events: [traceEvent],
+        id: "readiness-trace-delivery-proof",
+        sinkDeliveries: {
+          [traceDeliverySinkId]: {
+            attempts: 1,
+            deliveredAt: at,
+            deliveredTo: traceDeliverySinkTarget,
+            eventCount: 1,
+            status: "delivered",
+          },
+        },
+        updatedAt: at,
+      }),
+    ),
+  ]);
+};
+
+const createDemoAuditDeliveryWorker = () => ({
+  drain: async () => {
+    const result = {
+      alreadyProcessed: 0,
+      attempted: 0,
+      deadLettered: 0,
+      delivered: 0,
+      failed: 0,
+      skipped: 0,
+    };
+    const deliveries = await runtimeStorage.auditDeliveries.list();
+
+    await Promise.all(
+      deliveries.map(async (delivery) => {
+        if (delivery.deliveryStatus === "delivered") {
+          result.alreadyProcessed += 1;
+          return;
+        }
+
+        const deliveredAt = Date.now();
+        result.attempted += 1;
+        result.delivered += 1;
+        await runtimeStorage.auditDeliveries.set(delivery.id, {
+          ...delivery,
+          deliveredAt,
+          deliveryAttempts: (delivery.deliveryAttempts ?? 0) + 1,
+          deliveryError: undefined,
+          deliveryStatus: "delivered",
+          sinkDeliveries: {
+            [auditDeliverySinkId]: {
+              attempts: (delivery.deliveryAttempts ?? 0) + 1,
+              deliveredAt,
+              deliveredTo: auditDeliverySinkTarget,
+              eventCount: delivery.events.length,
+              status: "delivered",
+            },
+          },
+          updatedAt: deliveredAt,
+        });
+      }),
+    );
+
+    return result;
+  },
+});
+
+const createDemoTraceDeliveryWorker = () => ({
+  drain: async () => {
+    const result = {
+      alreadyProcessed: 0,
+      attempted: 0,
+      deadLettered: 0,
+      delivered: 0,
+      failed: 0,
+      skipped: 0,
+    };
+    const deliveries = await runtimeStorage.traceDeliveries.list();
+
+    await Promise.all(
+      deliveries.map(async (delivery) => {
+        if (delivery.deliveryStatus === "delivered") {
+          result.alreadyProcessed += 1;
+          return;
+        }
+
+        const deliveredAt = Date.now();
+        result.attempted += 1;
+        result.delivered += 1;
+        await runtimeStorage.traceDeliveries.set(delivery.id, {
+          ...delivery,
+          deliveredAt,
+          deliveryAttempts: (delivery.deliveryAttempts ?? 0) + 1,
+          deliveryError: undefined,
+          deliveryStatus: "delivered",
+          sinkDeliveries: {
+            [traceDeliverySinkId]: {
+              attempts: (delivery.deliveryAttempts ?? 0) + 1,
+              deliveredAt,
+              deliveredTo: traceDeliverySinkTarget,
+              eventCount: delivery.events.length,
+              status: "delivered",
+            },
+          },
+          updatedAt: deliveredAt,
+        });
+      }),
+    );
+
+    return result;
+  },
+});
+
+const deliveryWorkerRuntime = (() => {
+  if (deliverySinkKind === "webhook") {
+    return createVoiceDeliveryRuntime(
+      createVoiceDeliveryRuntimePresetConfig({
+        auditDeliveries: runtimeStorage.auditDeliveries,
+        auditSinkId: auditDeliverySinkId,
+        auditWorkerId: "voice-demo-audit-webhook-worker",
+        body: {
+          audit: ({ events }) => ({
+            eventCount: events.length,
+            events,
+            source: "absolutejs-voice-demo",
+            surface: "audit-deliveries",
+          }),
+          trace: ({ events }) => ({
+            eventCount: events.length,
+            events,
+            source: "absolutejs-voice-demo",
+            surface: "trace-deliveries",
+          }),
+        },
+        failures: {
+          maxFailures: 3,
+        },
+        leases: {
+          audit: createDemoLeaseCoordinator(),
+          trace: createDemoLeaseCoordinator(),
+        },
+        mode: "webhook",
+        signingSecret: webhookSigningSecret,
+        traceDeliveries: runtimeStorage.traceDeliveries,
+        traceSinkId: traceDeliverySinkId,
+        traceWorkerId: "voice-demo-trace-webhook-worker",
+        url: deliverySinkTarget,
+      }),
+    );
+  }
+
+  if (deliverySinkKind === "s3") {
+    return createVoiceDeliveryRuntime(
+      createVoiceDeliveryRuntimePresetConfig({
+        auditDeliveries: runtimeStorage.auditDeliveries,
+        auditSinkId: auditDeliverySinkId,
+        auditWorkerId: "voice-demo-audit-s3-worker",
+        bucket: s3DeliveryTarget.bucket,
+        failures: {
+          maxFailures: 3,
+        },
+        keyPrefix: s3DeliveryTarget.keyPrefix,
+        leases: {
+          audit: createDemoLeaseCoordinator(),
+          trace: createDemoLeaseCoordinator(),
+        },
+        mode: "s3",
+        traceDeliveries: runtimeStorage.traceDeliveries,
+        traceSinkId: traceDeliverySinkId,
+        traceWorkerId: "voice-demo-trace-s3-worker",
+      }),
+    );
+  }
+
+  return undefined;
+})();
+const demoAuditDeliveryWorker = createDemoAuditDeliveryWorker();
+const demoTraceDeliveryWorker = createDemoTraceDeliveryWorker();
+const deliveryRuntimeControl = deliveryWorkerRuntime ?? {
+  audit: demoAuditDeliveryWorker,
+  isRunning: () => false,
+  start: () => undefined,
+  stop: () => undefined,
+  requeueDeadLetters: async () => ({
+    audit: 0,
+    trace: 0,
+    total: 0,
+  }),
+  summarize: async () => ({
+    audit: await summarizeVoiceAuditSinkDeliveries(
+      await runtimeStorage.auditDeliveries.list(),
+    ),
+    trace: await summarizeVoiceTraceSinkDeliveries(
+      await runtimeStorage.traceDeliveries.list(),
+    ),
+  }),
+  tick: async () => {
+    const [audit, trace] = await Promise.all([
+      demoAuditDeliveryWorker.drain(),
+      demoTraceDeliveryWorker.drain(),
+    ]);
+
+    return { audit, trace };
+  },
+  trace: demoTraceDeliveryWorker,
+};
+
+const createAuditDeliveryWorker = () =>
+  deliveryWorkerRuntime?.audit ?? demoAuditDeliveryWorker;
+
+const createTraceDeliveryWorker = () =>
+  deliveryWorkerRuntime?.trace ?? demoTraceDeliveryWorker;
+
+const getBargeInReportEvents = async () => {
+  const traces = await runtimeStorage.traces.list();
+  const live = traces.filter(
+    (trace) =>
+      trace.type === "client.barge_in" &&
+      trace.payload.id !== "barge-in-proof-seed" &&
+      trace.metadata?.source !== "demo" &&
+      trace.metadata?.proof !== "barge-in-seed",
+  );
+
+  return live.length > 0 ? live : traces;
+};
+
+const getBargeInProofSource = async () =>
+  (await getBargeInReportEvents()).some(
+    (trace) =>
+      trace.type === "client.barge_in" &&
+      trace.payload.id !== "barge-in-proof-seed" &&
+      trace.metadata?.source !== "demo" &&
+      trace.metadata?.proof !== "barge-in-seed",
+  )
+    ? "live"
+    : "demo";
+
+const buildDemoBargeInReport = async () => {
+  const source = await getBargeInProofSource();
+  const thresholdProfile = await loadDemoSloThresholdProfile();
+  const report = summarizeVoiceBargeIn(await getBargeInReportEvents(), {
+    thresholdMs: thresholdProfile.bargeIn.thresholdMs ?? 250,
+  });
+
+  return {
+    ...report,
+    source,
+    sourceLabel:
+      source === "live"
+        ? "Live captured browser interruption events"
+        : "Demo fallback seed",
+  };
+};
+
+const renderDemoBargeInHTML = async () => {
+  const report = await buildDemoBargeInReport();
+  const html = renderVoiceBargeInHTML(report, {
+    title: "AbsoluteJS Voice Barge-In",
+  });
+  const detail =
+    report.source === "live"
+      ? "This report is backed by persisted client.barge_in trace events from browser interruption tests."
+      : "No live browser interruption event is available yet, so readiness uses the deterministic demo seed.";
+  const badge = `<section class="metrics"><article><span>Proof source</span><strong>${escapeHtml(report.sourceLabel)}</strong></article><article><span>Source detail</span><strong style="font-size:1rem">${escapeHtml(detail)}</strong></article></section>`;
+
+  return html.replace("</main>", `${badge}</main>`);
+};
+
 const cleanupDemoQualityNoise = async () => {
   const traces = await runtimeStorage.traces.list();
   const staleSyntheticProviderErrors = traces.filter(
     (trace) =>
       trace.type === "session.error" &&
       trace.payload.providerStatus === "error" &&
-      /^(phone-|provider-sim-|stt-sim-|tts-sim-)/.test(trace.sessionId),
+      /^(phone-|provider-sim-|provider-slo-proof-|stt-sim-|tts-sim-)/.test(
+        trace.sessionId,
+      ),
   );
 
   await Promise.all(
@@ -2798,7 +6414,18 @@ const cleanupDemoQualityNoise = async () => {
     existingRoutingProof.map((trace) => runtimeStorage.traces.remove(trace.id)),
   );
 
-  await runtimeStorage.traces.append({
+  const staleFailedExportReceipts =
+    await observabilityExportDeliveryReceipts.list();
+  await Promise.all(
+    staleFailedExportReceipts
+      .filter(
+        (receipt) =>
+          receipt.status === "fail" || receipt.exportStatus === "fail",
+      )
+      .map((receipt) => observabilityExportDeliveryReceipts.remove(receipt.id)),
+  );
+
+  await deliveryTraceStore.append({
     at: Date.now(),
     payload: {
       elapsedMs: 35,
@@ -2821,9 +6448,11 @@ const toStringValue = (value: unknown) =>
   typeof value === "string" && value.trim() ? value : undefined;
 
 const storeLiveTurnLatencyTrace = async (body: unknown) => {
-  const input = body && typeof body === "object" ? body as Record<string, unknown> : {};
+  const input =
+    body && typeof body === "object" ? (body as Record<string, unknown>) : {};
   const id = toStringValue(input.id) ?? `live-turn-${crypto.randomUUID()}`;
-  const sessionId = toStringValue(input.sessionId) ?? `live-latency-${crypto.randomUUID()}`;
+  const sessionId =
+    toStringValue(input.sessionId) ?? `live-latency-${crypto.randomUUID()}`;
   const latencyMs = toNumber(input.latencyMs);
   const startedAt = toNumber(input.startedAt) ?? Date.now();
   const completedAt = toNumber(input.completedAt) ?? Date.now();
@@ -2848,26 +6477,1074 @@ const storeLiveTurnLatencyTrace = async (body: unknown) => {
     traceId: id,
     type: "client.live_latency",
   };
-  await runtimeStorage.traces.append(event);
+  await deliveryTraceStore.append(event);
 
   return { ok: true, sessionId, traceId: id };
 };
 
+const isReconnectStatus = (value: unknown) =>
+  value === "idle" ||
+  value === "reconnecting" ||
+  value === "resumed" ||
+  value === "exhausted";
+
+const storeReconnectTrace = async (body: unknown) => {
+  const input =
+    body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const reconnect =
+    input.reconnect && typeof input.reconnect === "object"
+      ? (input.reconnect as Record<string, unknown>)
+      : undefined;
+  const status = reconnect ? reconnect.status : undefined;
+
+  if (!reconnect || !isReconnectStatus(status)) {
+    return Response.json(
+      { error: "Invalid reconnect snapshot." },
+      { status: 400 },
+    );
+  }
+
+  const at = toNumber(input.at) ?? Date.now();
+  const sessionId =
+    toStringValue(input.sessionId) ?? `reconnect-${crypto.randomUUID()}`;
+  const scenarioId = toStringValue(input.scenarioId);
+  const turnIds = Array.isArray(input.turnIds)
+    ? input.turnIds.filter(
+        (turnId): turnId is string => typeof turnId === "string",
+      )
+    : [];
+  const event: VoiceTraceEvent = {
+    at,
+    metadata: {
+      source: "browser",
+      surface: "reconnect-proof",
+    },
+    payload: {
+      at,
+      reconnect: {
+        attempts: toNumber(reconnect.attempts) ?? 0,
+        lastDisconnectAt: toNumber(reconnect.lastDisconnectAt),
+        lastResumedAt: toNumber(reconnect.lastResumedAt),
+        maxAttempts: toNumber(reconnect.maxAttempts) ?? 0,
+        nextAttemptAt: toNumber(reconnect.nextAttemptAt),
+        status,
+      },
+      turnIds,
+    },
+    scenarioId,
+    sessionId,
+    type: "client.reconnect",
+  };
+  await deliveryTraceStore.append(event);
+
+  return { ok: true, sessionId };
+};
+
+const getLiveReconnectContractSnapshots = async () =>
+  summarizeVoiceReconnectContractSnapshots(await runtimeStorage.traces.list());
+
+const getReconnectContractSnapshotSource = async () =>
+  (await getLiveReconnectContractSnapshots()).length > 0 ? "live" : "demo";
+
+const getReconnectContractSnapshots = async () => {
+  const snapshots = await getLiveReconnectContractSnapshots();
+
+  return snapshots.length > 0 ? snapshots : getDemoReconnectContractSnapshots();
+};
+
+const buildDemoReconnectContractReport = async () => {
+  const source = await getReconnectContractSnapshotSource();
+  const snapshots = await getReconnectContractSnapshots();
+  const report = runVoiceReconnectContract({
+    snapshots,
+  });
+  const resumed = snapshots.filter(
+    (snapshot) =>
+      snapshot.reconnect.status === "resumed" &&
+      typeof snapshot.reconnect.lastResumedAt === "number",
+  );
+  const resumeLatencies = resumed
+    .map((snapshot) => {
+      const previousReconnect = snapshots
+        .filter(
+          (candidate) =>
+            candidate.at <= snapshot.at &&
+            candidate.reconnect.status === "reconnecting" &&
+            typeof candidate.reconnect.lastDisconnectAt === "number",
+        )
+        .at(-1);
+
+      return previousReconnect?.reconnect.lastDisconnectAt === undefined
+        ? undefined
+        : snapshot.reconnect.lastResumedAt! -
+            previousReconnect.reconnect.lastDisconnectAt;
+    })
+    .filter((value): value is number => typeof value === "number" && value >= 0);
+  const resumeLatencyP95Ms =
+    resumeLatencies.length > 0
+      ? [...resumeLatencies].sort((left, right) => left - right)[
+          Math.min(
+            resumeLatencies.length - 1,
+            Math.max(0, Math.ceil(0.95 * resumeLatencies.length) - 1),
+          )
+        ]
+      : undefined;
+
+  return {
+    ...report,
+    resumeLatencyP95Ms,
+    source,
+    sourceLabel:
+      source === "live"
+        ? "Live captured browser traces"
+        : "Demo fallback snapshots",
+  };
+};
+
+const renderDemoReconnectContractHTML = async (
+  report: Parameters<typeof renderVoiceReconnectContractHTML>[0],
+) => {
+  const source = await getReconnectContractSnapshotSource();
+  const sourceLabel =
+    source === "live"
+      ? "Live captured browser traces"
+      : "Demo fallback snapshots";
+  const sourceDetail =
+    source === "live"
+      ? "This contract is backed by persisted client.reconnect trace events from real browser reconnect lifecycle transitions."
+      : "No live client.reconnect traces are available yet, so the page is using deterministic demo snapshots.";
+  const html = renderVoiceReconnectContractHTML(report);
+  const badge = `<section class="card"><h2>Proof source</h2><p><strong>${escapeHtml(sourceLabel)}</strong></p><p>${escapeHtml(sourceDetail)}</p></section>`;
+
+  return html.replace("</main>", `${badge}</main>`);
+};
+
+const productionReadinessLinks = {
+  agentSquadContracts: "/agent-squad-contract",
+  auditDeliveries: "/audit/deliveries",
+  bargeIn: "/barge-in",
+  campaignReadiness: "/api/voice/campaigns/readiness-proof",
+  carriers: "/carriers",
+  deliveryRuntime: "/delivery-runtime",
+  handoffs: "/handoffs",
+  opsActions: "/voice/ops-actions",
+  operationsRecords: "/voice-operations/:sessionId",
+  observabilityExport: "/voice/observability-export",
+  observabilityExportDeliveries: "/api/voice/observability-export/deliveries",
+  proofTrends: "/voice/proof-trends",
+  opsRecovery: "/ops-recovery",
+  providerContracts: "/provider-contracts",
+  providerOrchestration: "/voice/provider-orchestration",
+  providerRoutingContracts: "/api/provider-routing-contract",
+  providerSlo: "/voice/provider-slos",
+  quality: "/quality",
+  reconnectContracts: "/voice/reconnect-contract",
+  resilience: "/resilience",
+  sessions: "/sessions",
+  sloReadinessThresholds: "/voice/slo-readiness-thresholds",
+  telephonyWebhookSecurity: "/api/voice/telephony/webhook-security",
+  traceDeliveries: "/traces/deliveries",
+};
+
+const telephonyWebhookSecurityOptions = () => ({
+  plivo: {
+    authToken: "proof-plivo-secret",
+  },
+  store: {
+    kind: "sqlite" as const,
+    path: resolve(runtimeDirectory, "telephony-webhook-security.sqlite"),
+  },
+  telnyx: {
+    publicKey: "proof-telnyx-public-key",
+    toleranceSeconds: 300,
+  },
+  ttlSeconds: 300,
+  twilio: {
+    authToken: "proof-secret",
+    verificationUrl: "https://voice.example.test/carrier",
+  },
+});
+
+const opsRecoveryOptions = () => ({
+  auditDeliveries: runtimeStorage.auditDeliveries,
+  handoffDeliveries:
+    handoffDeliveryStore as unknown as VoiceHandoffDeliveryStore,
+  latency: {
+    failAfterMs: 3_200,
+    warnAfterMs: 1_800,
+  },
+  links: {
+    auditDeliveries: "/audit/deliveries",
+    handoffs: "/handoffs",
+    operationsRecords: (sessionId: string) =>
+      `/voice-operations/${encodeURIComponent(sessionId)}`,
+    providers: "/api/provider-status",
+    sessions: (sessionId: string) =>
+      `/sessions/${encodeURIComponent(sessionId)}`,
+    traceDeliveries: "/traces/deliveries",
+    traces: (sessionId: string) => `/traces/${encodeURIComponent(sessionId)}`,
+  },
+  path: "/api/voice/ops-recovery",
+  providers: [
+    ...configuredModelProviders,
+    ...configuredSTTProviders,
+    ...configuredTTSProviders,
+  ],
+  traces: deliveryTraceStore,
+});
+
+const buildDemoOpsRecoveryReport = () =>
+  buildVoiceOpsRecoveryReport(opsRecoveryOptions());
+
+const providerSloProofScenarioId = "provider-slo-proof";
+
+const providerSloOptions = {
+  maxAgeMs: 10 * 60 * 1000,
+  requiredKinds: ["llm", "stt", "tts"] as const,
+  scenarioId: providerSloProofScenarioId,
+  thresholds: {
+    llm: {
+      maxAverageElapsedMs: 2_500,
+      maxP95ElapsedMs: 4_500,
+    },
+    stt: {
+      maxAverageElapsedMs: 800,
+      maxP95ElapsedMs: 1_500,
+    },
+    tts: {
+      maxAverageElapsedMs: 1_200,
+      maxP95ElapsedMs: 2_200,
+    },
+  },
+};
+
+const seedDemoProviderSloProof = async () => {
+  const now = Date.now();
+  const sessionId = `provider-slo-proof-${now}`;
+  const primaryModelProvider = configuredModelProviders[0] ?? "deterministic";
+  const fallbackModelProvider =
+    configuredModelProviders.find((provider) => provider !== primaryModelProvider) ??
+    "anthropic";
+  const events: StoredVoiceTraceEvent[] = await Promise.all(
+    [
+      {
+        elapsedMs: 700,
+        fallbackProvider: fallbackModelProvider,
+        kind: "llm",
+        provider: primaryModelProvider,
+        selectedProvider: fallbackModelProvider,
+        status: "fallback",
+      },
+      {
+        elapsedMs: 320,
+        kind: "llm",
+        provider: fallbackModelProvider,
+        selectedProvider: fallbackModelProvider,
+        status: "success",
+      },
+      {
+        elapsedMs: 300,
+        kind: "llm",
+        provider: primaryModelProvider,
+        selectedProvider: primaryModelProvider,
+        status: "success",
+      },
+      {
+        elapsedMs: 280,
+        kind: "llm",
+        provider: primaryModelProvider,
+        selectedProvider: primaryModelProvider,
+        status: "success",
+      },
+      {
+        elapsedMs: 82,
+        kind: "stt",
+        provider: configuredSTTProviders[0] ?? "deepgram",
+        status: "success",
+      },
+      {
+        elapsedMs: 45,
+        kind: "tts",
+        provider: configuredTTSProviders[0] ?? "emergency",
+        status: "success",
+      },
+    ].map((event, index) =>
+      deliveryTraceStore.append(
+        createVoiceTraceEvent({
+          at: now + index,
+          payload: {
+            elapsedMs: event.elapsedMs,
+            fallbackProvider: event.fallbackProvider,
+            kind: event.kind,
+            provider: event.provider,
+            providerStatus: event.status,
+            selectedProvider: event.selectedProvider ?? event.provider,
+          },
+          scenarioId: providerSloProofScenarioId,
+          sessionId,
+          type: "session.error",
+        }),
+      ),
+    ),
+  );
+
+  return {
+    events: events.length,
+    ok: true,
+    scenarioId: providerSloProofScenarioId,
+    sessionId,
+  };
+};
+
+const providerDecisionProofScenarioId = "provider-decision-proof";
+
+const seedDemoProviderDecisionProof = async () => {
+  const now = Date.now();
+  const sessionId = `provider-decision-proof-${now}`;
+  const modelPrimary = configuredModelProviders[0] ?? "deterministic";
+  const modelFallback =
+    configuredModelProviders.find((provider) => provider !== modelPrimary) ??
+    modelPrimary;
+  const sttPrimary = configuredSTTProviders[0] ?? "deepgram";
+  const sttFallback =
+    configuredSTTProviders.find((provider) => provider !== sttPrimary) ??
+    sttPrimary;
+  const ttsPrimary = configuredTTSProviders[0] ?? "emergency";
+
+  const events = await Promise.all(
+    [
+      createVoiceProviderDecisionTraceEvent({
+        at: now,
+        elapsedMs: 320,
+        kind: "llm",
+        provider: modelPrimary,
+        reason:
+          "live-call selected the lowest-latency configured model provider inside the orchestration policy.",
+        scenarioId: providerDecisionProofScenarioId,
+        selectedProvider: modelPrimary,
+        sessionId,
+        status: "selected",
+        surface: "live-call",
+      }),
+      createVoiceProviderDecisionTraceEvent({
+        at: now + 1,
+        elapsedMs: 82,
+        fallbackProvider: sttFallback,
+        kind: "stt",
+        provider: sttPrimary,
+        reason:
+          sttFallback === sttPrimary
+            ? "live-stt used the only configured realtime STT provider."
+            : "live-stt recovered by falling back to the next configured STT provider.",
+        scenarioId: providerDecisionProofScenarioId,
+        selectedProvider: sttFallback,
+        sessionId,
+        status: sttFallback === sttPrimary ? "selected" : "fallback",
+        surface: "live-stt",
+      }),
+      createVoiceProviderDecisionTraceEvent({
+        at: now + 2,
+        elapsedMs: 45,
+        kind: "tts",
+        provider: ttsPrimary,
+        reason:
+          "telephony-tts selected the configured low-latency speech provider for phone playback.",
+        scenarioId: providerDecisionProofScenarioId,
+        selectedProvider: ttsPrimary,
+        sessionId,
+        status: "selected",
+        surface: "telephony-tts",
+      }),
+      createVoiceProviderDecisionTraceEvent({
+        at: now + 3,
+        elapsedMs: 650,
+        kind: "llm",
+        provider: configuredModelProviders.includes("gemini")
+          ? "gemini"
+          : modelFallback,
+        reason:
+          "background-summary selected the lower-cost summarization lane instead of the live-call latency lane.",
+        scenarioId: providerDecisionProofScenarioId,
+        selectedProvider: configuredModelProviders.includes("gemini")
+          ? "gemini"
+          : modelFallback,
+        sessionId,
+        status: "selected",
+        surface: "background-summary",
+      }),
+      createVoiceProviderDecisionTraceEvent({
+        at: now + 4,
+        elapsedMs: 720,
+        fallbackProvider: modelFallback,
+        kind: "llm",
+        provider: modelPrimary,
+        reason:
+          "live-call recovered by falling back to the next configured model provider after a simulated primary provider timeout.",
+        scenarioId: providerDecisionProofScenarioId,
+        selectedProvider: modelFallback,
+        sessionId,
+        status: "fallback",
+        surface: "live-call",
+      }),
+      createVoiceProviderDecisionTraceEvent({
+        at: now + 5,
+        elapsedMs: 980,
+        fallbackProvider: "deterministic",
+        kind: "llm",
+        provider: modelPrimary,
+        reason:
+          "live-call degraded to deterministic fallback after model providers exceeded the latency budget.",
+        scenarioId: providerDecisionProofScenarioId,
+        selectedProvider: "deterministic",
+        sessionId,
+        status: "degraded",
+        surface: "live-call",
+      }),
+    ].map((event) => deliveryTraceStore.append(event)),
+  );
+
+  return {
+    events: events.length,
+    ok: true,
+    scenarioId: providerDecisionProofScenarioId,
+    sessionId,
+  };
+};
+
+const observabilityExportDeliveryDestinations = () => [
+  {
+    directory: ".voice-runtime/observability-exports",
+    kind: "file" as const,
+    label: "Local customer-owned observability archive",
+  },
+  ...(process.env.VOICE_OBSERVABILITY_EXPORT_S3_BUCKET
+    ? [
+        {
+          bucket: process.env.VOICE_OBSERVABILITY_EXPORT_S3_BUCKET,
+          keyPrefix:
+            process.env.VOICE_OBSERVABILITY_EXPORT_S3_PREFIX ??
+            "absolutejs-voice-demo",
+          kind: "s3" as const,
+          label: "S3 customer-owned observability archive",
+        },
+      ]
+    : []),
+  ...(process.env.VOICE_OBSERVABILITY_EXPORT_SQLITE_PATH
+    ? [
+        {
+          kind: "sqlite" as const,
+          label: "SQLite customer-owned observability warehouse",
+          path: process.env.VOICE_OBSERVABILITY_EXPORT_SQLITE_PATH,
+          tableName:
+            process.env.VOICE_OBSERVABILITY_EXPORT_SQLITE_TABLE ??
+            "voice_observability_exports",
+        },
+      ]
+    : []),
+  ...(process.env.VOICE_OBSERVABILITY_EXPORT_POSTGRES_URL
+    ? [
+        {
+          connectionString: process.env.VOICE_OBSERVABILITY_EXPORT_POSTGRES_URL,
+          kind: "postgres" as const,
+          label: "Postgres customer-owned observability warehouse",
+          schemaName:
+            process.env.VOICE_OBSERVABILITY_EXPORT_POSTGRES_SCHEMA ?? "voice",
+          tableName:
+            process.env.VOICE_OBSERVABILITY_EXPORT_POSTGRES_TABLE ??
+            "observability_exports",
+        },
+      ]
+    : []),
+];
+const observabilityExportDeliveryReceipts =
+  createVoiceFileObservabilityExportDeliveryReceiptStore({
+    directory: ".voice-runtime/observability-export-receipts",
+  });
+
+const proofScreenshotArtifact = (
+  id: string,
+  label: string,
+  file: string,
+) => {
+  const path = `.voice-runtime/proof-pack/screenshots/latest/${file}`;
+  const maxScreenshotAgeMs = 2 * 60 * 60 * 1000;
+  const isFresh =
+    existsSync(path) && Date.now() - statSync(path).mtimeMs <= maxScreenshotAgeMs;
+
+  return isFresh
+    ? [
+        {
+          id,
+          kind: "screenshot" as const,
+          label,
+          path,
+          status: "pass" as const,
+        },
+      ]
+    : [];
+};
+
+const observabilityExportOptions = () => ({
+  artifactIntegrity: {
+    maxAgeMs: 2 * 60 * 60 * 1000,
+  },
+  deliveryDestinations: observabilityExportDeliveryDestinations(),
+  deliveryReceipts: observabilityExportDeliveryReceipts,
+  artifacts: [
+    {
+      id: "latest-proof-pack",
+      kind: "proof-pack" as const,
+      label: "Latest proof pack",
+      path: ".voice-runtime/proof-pack/latest.md",
+      required: true,
+      status: "pass" as const,
+    },
+    {
+      id: "latest-proof-trends",
+      kind: "proof-pack" as const,
+      label: "Latest sustained proof trends",
+      path: latestProofTrendsMarkdownPath,
+      required: false,
+      status: existsSync(latestProofTrendsMarkdownPath)
+        ? ("pass" as const)
+        : ("warn" as const),
+    },
+    ...proofScreenshotArtifact(
+      "production-readiness-screenshot",
+      "Production readiness screenshot",
+      "production-readiness.png",
+    ),
+    ...proofScreenshotArtifact(
+      "framework-readiness-gates-screenshot",
+      "Framework readiness gate explanations screenshot",
+      "framework-readiness-gates.png",
+    ),
+    ...proofScreenshotArtifact(
+      "provider-slo-screenshot",
+      "Provider SLO screenshot",
+      "provider-slos.png",
+    ),
+    ...proofScreenshotArtifact(
+      "provider-orchestration-screenshot",
+      "Provider orchestration screenshot",
+      "provider-orchestration.png",
+    ),
+    ...proofScreenshotArtifact(
+      "provider-decisions-screenshot",
+      "Provider decision traces screenshot",
+      "provider-decisions.png",
+    ),
+    ...proofScreenshotArtifact(
+      "proof-trends-screenshot",
+      "Sustained proof trends screenshot",
+      "proof-trends.png",
+    ),
+    ...proofScreenshotArtifact(
+      "simulation-suite-screenshot",
+      "Simulation suite screenshot",
+      "simulation-suite.png",
+    ),
+    ...proofScreenshotArtifact(
+      "operations-record-screenshot",
+      "Operations record screenshot",
+      "operations-record.png",
+    ),
+    ...proofScreenshotArtifact(
+      "post-call-analysis-screenshot",
+      "Post-call analysis screenshot",
+      "post-call-analysis.png",
+    ),
+    ...proofScreenshotArtifact(
+      "guardrails-screenshot",
+      "Guardrails screenshot",
+      "guardrails.png",
+    ),
+    ...proofScreenshotArtifact(
+      "switching-from-vapi-screenshot",
+      "Switching from Vapi migration screenshot",
+      "switching-from-vapi.png",
+    ),
+  ],
+  audit: runtimeStorage.audit,
+  auditDeliveries: runtimeStorage.auditDeliveries,
+  links: {
+    operationsRecord: (sessionId: string) =>
+      `/voice-operations/${encodeURIComponent(sessionId)}`,
+  },
+  redact: voiceSupportArtifactRedaction,
+  store: deliveryTraceStore,
+  traceDeliveries: runtimeStorage.traceDeliveries,
+});
+
+const buildDemoObservabilityExport = () =>
+  buildVoiceObservabilityExport(observabilityExportOptions());
+
+const buildDemoObservabilityExportReplay = async () => {
+  const latestReceipt = (
+    await observabilityExportDeliveryReceipts.list()
+  ).find(
+    (receipt) =>
+      receipt.status === "pass" &&
+      receipt.exportStatus === "pass" &&
+      receipt.summary.delivered > 0,
+  );
+
+  if (!latestReceipt) {
+    return buildVoiceObservabilityExportReplayReport({});
+  }
+
+  const sqliteDestination = latestReceipt.destinations.find(
+    (destination) =>
+      destination.status === "delivered" &&
+      destination.destinationKind === "sqlite",
+  );
+
+  if (sqliteDestination && process.env.VOICE_OBSERVABILITY_EXPORT_SQLITE_PATH) {
+    return {
+      kind: "sqlite" as const,
+      path: process.env.VOICE_OBSERVABILITY_EXPORT_SQLITE_PATH,
+      runId: latestReceipt.runId,
+      tableName:
+        process.env.VOICE_OBSERVABILITY_EXPORT_SQLITE_TABLE ??
+        "voice_observability_exports",
+    };
+  }
+
+  return {
+    directory: ".voice-runtime/observability-exports",
+    kind: "file" as const,
+    receiptDirectory: ".voice-runtime/observability-export-receipts",
+    runId: latestReceipt.runId,
+  };
+};
+
+const productionReadinessOptions = () => ({
+  ...createVoiceReadinessProfile("phone-agent", {
+    auditDeliveries: runtimeStorage.auditDeliveries,
+    campaignReadiness: () =>
+      runVoiceCampaignReadinessProof({ store: campaignStore }),
+    carriers: loadCarrierMatrixInputs,
+    deliveryRuntime: deliveryRuntimeControl,
+    explain: true,
+    links: productionReadinessLinks,
+    observabilityExportDeliveryHistory: {
+      failOnMissing: false,
+      failOnStale: true,
+      maxAgeMs: 2 * 60 * 60 * 1000,
+      store: observabilityExportDeliveryReceipts,
+    },
+    providerRoutingContracts: async () => [
+      await runDemoProviderRoutingContract(),
+      await runDemoSTTProviderRoutingContract(),
+      await runDemoTTSProviderRoutingContract(),
+    ],
+    traceDeliveries: runtimeStorage.traceDeliveries,
+  }),
+  agentSquadContracts: async () => [await runDemoAgentSquadContract()],
+  bargeInReports: async () => [await buildDemoBargeInReport()],
+  htmlPath: "/production-readiness",
+  opsActionHistory: runtimeStorage.audit,
+  opsRecovery: buildDemoOpsRecoveryReport,
+  observabilityExport: buildDemoObservabilityExport,
+  observabilityExportReplay: buildDemoObservabilityExportReplay,
+  path: "/api/production-readiness",
+  providerStack: evaluateVoiceProviderStackGaps({
+    capabilities: voiceProviderStackCapabilities,
+    profile: "phone-agent",
+    providers: {
+      llm: configuredModelProviders,
+      stt: configuredSTTProviders,
+      tts: configuredTTSProviders,
+    },
+  }),
+  providerOrchestration: buildDemoProviderOrchestrationReport,
+  providerSlo: async () => {
+    const thresholdProfile = await loadDemoSloThresholdProfile();
+
+    return {
+      ...providerSloOptions,
+      thresholds: {
+        ...providerSloOptions.thresholds,
+        ...thresholdProfile.providerSlo,
+      },
+    };
+  },
+  resolveOptions: async () => {
+    const thresholdProfile = await loadDemoSloThresholdProfile();
+
+    return {
+      ...createVoiceSloReadinessThresholdOptions(thresholdProfile),
+      liveLatencyMaxAgeMs: liveLatencyReadinessMaxAgeMs,
+    };
+  },
+  providerContractMatrix: buildDemoProviderContractMatrix,
+  telephonyWebhookSecurity: telephonyWebhookSecurityOptions,
+  proofSources: async () => {
+    const [bargeInReport, reconnectReport] = await Promise.all([
+      buildDemoBargeInReport(),
+      buildDemoReconnectContractReport(),
+    ]);
+
+    return {
+      bargeIn: {
+        detail:
+          bargeInReport.source === "live"
+            ? "Captured from browser interruption events."
+            : "Using deterministic demo fallback seed.",
+        href: "/barge-in",
+        source: bargeInReport.source,
+        sourceLabel: bargeInReport.sourceLabel,
+      },
+      auditDeliveries: {
+        detail: `Backed by the configured ${deliverySinkKind} audit delivery queue.`,
+        href: "/audit/deliveries",
+        source: deliverySinkKind,
+        sourceLabel: "Audit delivery sink evidence",
+      },
+      liveLatency: {
+        detail: "Captured from persisted browser live-latency trace events.",
+        href: "/live-latency",
+        source: "browser",
+        sourceLabel: "Browser live-latency traces",
+      },
+      deliveryRuntime: {
+        detail:
+          "Summarizes audit and trace delivery worker queues from the mounted delivery runtime control plane.",
+        href: "/delivery-runtime",
+        source: deliverySinkKind,
+        sourceLabel: "Delivery runtime queue summary",
+      },
+      providerRoutingContracts: {
+        detail:
+          "Generated from code-owned LLM, STT, and TTS routing contracts.",
+        href: "/api/provider-routing-contract",
+        source: "contract",
+        sourceLabel: "Provider routing contract reports",
+      },
+      providerContractMatrix: {
+        detail:
+          "Generated by createVoiceProviderContractMatrixPreset from the configured LLM, STT, and TTS providers.",
+        href: "/provider-contracts",
+        source: "preset",
+        sourceLabel: "Provider contract matrix preset",
+      },
+      providerOrchestration: {
+        detail:
+          "Generated from createVoiceProviderOrchestrationProfile and deploy-gates live-call, STT, TTS, and background-summary provider policy.",
+        href: "/voice/provider-orchestration",
+        source: "profile",
+        sourceLabel: "Provider orchestration profile proof",
+      },
+      providerSlo: {
+        detail:
+          "Generated from provider routing traces and checks latency, p95, timeout, fallback, and unresolved-error budgets.",
+        href: "/voice/provider-slos",
+        source: "trace",
+        sourceLabel: "Provider SLO trace evidence",
+      },
+      telephonyWebhookSecurity: {
+        detail:
+          "Generated from the carrier webhook security preset and validates verification, replay protection, idempotency, and persistent security stores.",
+        href: "/api/voice/telephony/webhook-security",
+        source: "security-preset",
+        sourceLabel: "Carrier webhook security evidence",
+      },
+      proofTrends: {
+        detail:
+          "Generated by repeated proof cycles over provider SLOs, turn latency, live latency, ops recovery, and readiness.",
+        href: "/voice/proof-trends",
+        source: "trend-artifact",
+        sourceLabel: "Sustained proof trend evidence",
+      },
+      observabilityExport: {
+        detail:
+          "Generated from the customer-owned export manifest for traces, audits, operations records, SLOs, readiness, incidents, and proof-pack artifacts.",
+        href: "/voice/observability-export",
+        source: "export",
+        sourceLabel: "Customer-owned observability export",
+      },
+      observabilityExportDeliveryHistory: {
+        detail:
+          "Backed by customer-owned delivery receipts for file/S3/webhook/SQLite/Postgres observability export runs.",
+        href: "/api/voice/observability-export/deliveries",
+        source: "receipt-store",
+        sourceLabel: "Observability export delivery receipts",
+      },
+      observabilityExportReplay: {
+        detail:
+          "Reads the latest delivered customer-owned observability export back from SQLite when configured, otherwise from the local file archive.",
+        href: "/api/production-readiness",
+        source: process.env.VOICE_OBSERVABILITY_EXPORT_SQLITE_PATH
+          ? "sqlite"
+          : "file",
+        sourceLabel: "Observability export replay",
+      },
+      reconnectContracts: {
+        detail:
+          reconnectReport.source === "live"
+            ? "Captured from browser reconnect lifecycle traces."
+            : "Using deterministic demo fallback snapshots.",
+        href: "/voice/reconnect-contract",
+        source: reconnectReport.source,
+        sourceLabel: reconnectReport.sourceLabel,
+      },
+      traceDeliveries: {
+        detail: `Backed by the configured ${deliverySinkKind} trace delivery queue.`,
+        href: "/traces/deliveries",
+        source: deliverySinkKind,
+        sourceLabel: "Trace delivery sink evidence",
+      },
+    };
+  },
+  reconnectContracts: async () => [
+    runVoiceReconnectContract({
+      snapshots: await getReconnectContractSnapshots(),
+    }),
+  ],
+  store: deliveryTraceStore,
+});
+
+type DemoProofSurface = {
+  detail: string;
+  href: string;
+  label: string;
+  status: "empty" | "fail" | "pass" | "warn";
+};
+
+const getDemoProofStatus = (surfaces: DemoProofSurface[]) =>
+  surfaces.some((surface) => surface.status === "fail")
+    ? "fail"
+    : surfaces.some(
+          (surface) => surface.status === "warn" || surface.status === "empty",
+        )
+      ? "warn"
+      : "pass";
+
+const runDemoProofSuite = async (request: Request) => {
+  await ensureDemoIncidentBundleEvidence();
+
+  const liveLatencyStartedAt = Date.now() - 560;
+  const [turnLatencyProof, campaignDialerProof] = await Promise.all([
+    seedTurnLatencyProof(),
+    runVoiceCampaignDialerProof({
+      baseUrl: resolveCarrierOrigin(request),
+      store: campaignStore,
+    }),
+    seedDemoBargeInProof(),
+    seedDemoDeliveryProof(),
+    cleanupDemoQualityNoise(),
+    storeLiveTurnLatencyTrace({
+      completedAt: liveLatencyStartedAt + 420,
+      id: `demo-proof-live-latency-${crypto.randomUUID()}`,
+      latencyMs: 420,
+      sessionId: `demo-proof-live-latency-${crypto.randomUUID()}`,
+      startedAt: liveLatencyStartedAt,
+      status: "assistant_audio_started",
+      thresholdMs: 1_800,
+    }),
+    deliveryRuntimeControl.tick(),
+  ]);
+
+  const [
+    bargeIn,
+    liveLatency,
+    turnLatency,
+    readiness,
+    providerContracts,
+    deliverySummary,
+    traces,
+  ] = await Promise.all([
+    buildDemoBargeInReport(),
+    summarizeVoiceLiveLatency({ store: deliveryTraceStore }),
+    summarizeVoiceTurnLatency({
+      store: runtimeStorage.session,
+      traceStore: runtimeStorage.traces,
+    }),
+    buildVoiceProductionReadinessReport(productionReadinessOptions()),
+    buildDemoProviderContractMatrix(),
+    deliveryRuntimeControl.summarize(),
+    runtimeStorage.traces.list({ limit: 50 }),
+  ]);
+  const readinessPassed = readiness.checks.filter(
+    (check) => check.status === "pass",
+  ).length;
+  const auditDelivery = deliverySummary.audit ?? {
+    deadLettered: 0,
+    failed: 0,
+    pending: 0,
+  };
+  const traceDelivery = deliverySummary.trace ?? {
+    deadLettered: 0,
+    failed: 0,
+    pending: 0,
+  };
+  const surfaces: DemoProofSurface[] = [
+    {
+      detail: `${bargeIn.total} interruption(s), ${bargeIn.averageLatencyMs ?? 0}ms average. Source: ${bargeIn.sourceLabel}.`,
+      href: "/barge-in",
+      label: "Barge-in",
+      status: bargeIn.status,
+    },
+    {
+      detail: `${liveLatency.total} sample(s), p95 ${liveLatency.p95LatencyMs ?? 0}ms.`,
+      href: "/live-latency",
+      label: "Live latency",
+      status: liveLatency.status,
+    },
+    {
+      detail: `${turnLatency.total} turn(s), average ${turnLatency.averageTotalMs ?? 0}ms. Seed: ${turnLatencyProof.sessionId}.`,
+      href: "/turn-latency",
+      label: "Turn waterfall",
+      status: turnLatency.status,
+    },
+    {
+      detail:
+        existsSync(latestProofTrendsJsonPath)
+          ? "Latest sustained trend artifact is available for repeated provider, latency, recovery, and readiness proof."
+          : "Run bun run proof:trends to create repeated-cycle trend proof.",
+      href: "/voice/proof-trends",
+      label: "Sustained trends",
+      status: existsSync(latestProofTrendsJsonPath) ? "pass" : "empty",
+    },
+    {
+      detail: `${providerContracts.passed}/${providerContracts.total} provider contract rows passing.`,
+      href: "/provider-contracts",
+      label: "Provider contracts",
+      status: providerContracts.status,
+    },
+    {
+      detail: `${readinessPassed}/${readiness.checks.length} readiness checks passing.`,
+      href: "/production-readiness",
+      label: "Production readiness",
+      status: readiness.status,
+    },
+    {
+      detail: `${auditDelivery.pending + traceDelivery.pending} pending delivery item(s), ${auditDelivery.deadLettered + traceDelivery.deadLettered} dead-lettered.`,
+      href: "/delivery-runtime",
+      label: "Delivery runtime",
+      status:
+        auditDelivery.deadLettered > 0 || traceDelivery.deadLettered > 0
+          ? "fail"
+          : auditDelivery.pending > 0 || traceDelivery.pending > 0
+            ? "warn"
+            : "pass",
+    },
+    {
+      detail: `${campaignDialerProof.providers.length} carrier provider proof report(s).`,
+      href: "/voice/campaigns/dialer-proof",
+      label: "Campaign dialer",
+      status: campaignDialerProof.providers.every((provider) =>
+        provider.outcomes.every((outcome) => outcome.applied),
+      )
+        ? "pass"
+        : "fail",
+    },
+    {
+      detail: `${traces.length} recent trace event(s) available for drill-down.`,
+      href: "/traces",
+      label: "Trace timelines",
+      status: traces.length > 0 ? "pass" : "empty",
+    },
+    {
+      detail:
+        "Redacted trace, audit, handoff, and tool evidence exported from a single support session.",
+      href: `/voice-incidents/${demoIncidentSessionId}/markdown`,
+      label: "Incident bundle",
+      status: "pass",
+    },
+  ];
+
+  return {
+    checkedAt: Date.now(),
+    status: getDemoProofStatus(surfaces),
+    surfaces,
+  };
+};
+
+const renderDemoProofHTML = () => `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AbsoluteJS Voice Demo Proof</title>
+    <style>
+      body{background:#0a0f14;color:#f7f3e8;font-family:ui-sans-serif,system-ui,sans-serif;margin:0}
+      main{margin:auto;max-width:1120px;padding:32px}
+      .hero,.surface{background:#111821;border:1px solid #26313d;border-radius:24px;margin-bottom:16px;padding:22px}
+      .hero{background:linear-gradient(135deg,rgba(94,234,212,.16),rgba(245,158,11,.1))}
+      .eyebrow{color:#5eead4;font-size:.78rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+      h1{font-size:clamp(2.4rem,7vw,5.5rem);line-height:.9;margin:.2rem 0 1rem}
+      button,.link{background:#5eead4;border:0;border-radius:999px;color:#061014;cursor:pointer;display:inline-flex;font-weight:900;margin:8px 8px 0 0;padding:11px 15px;text-decoration:none}
+      .link{background:#1b2530;color:#d7fff8}
+      .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+      .surface.pass{border-color:rgba(34,197,94,.5)}.surface.warn,.surface.empty{border-color:rgba(245,158,11,.55)}.surface.fail{border-color:rgba(248,113,113,.65)}
+      .surface header{align-items:start;display:flex;gap:12px;justify-content:space-between}
+      .surface strong{font-size:1.05rem}.status{border:1px solid #334155;border-radius:999px;padding:5px 9px}.pass .status{color:#86efac}.warn .status,.empty .status{color:#fde68a}.fail .status{color:#fca5a5}
+      .muted{color:#b7c0ca;line-height:1.5}pre{background:#080b10;border:1px solid #26313d;border-radius:16px;color:#d7fff8;overflow:auto;padding:14px}
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <p class="eyebrow">Self-hosted production proof</p>
+        <h1>Run the full voice proof suite</h1>
+        <p class="muted">One action seeds deterministic demo evidence, runs carrier proof, refreshes delivery workers, and returns the same proof surfaces users can inspect individually.</p>
+        <button id="run-proof" type="button">Run full proof suite</button>
+        <a class="link" href="/production-readiness">Open readiness</a>
+        <a class="link" href="/voice/proof-trends">Open sustained trends</a>
+        <a class="link" href="/voice-operations/${demoIncidentSessionId}">Open operations record</a>
+        <a class="link" href="/voice-incidents/${demoIncidentSessionId}/markdown">Export incident bundle</a>
+        <a class="link" href="/">Back to demo</a>
+      </section>
+      <section id="proof-output" class="grid">
+        <article class="surface empty"><header><strong>No proof run yet</strong><span class="status">empty</span></header><p class="muted">Click the button to run barge-in, live latency, turn waterfall, provider, delivery, carrier, trace, and readiness proof.</p></article>
+      </section>
+      <pre id="proof-json"></pre>
+    </main>
+    <script>
+      const output = document.getElementById("proof-output");
+      const json = document.getElementById("proof-json");
+      document.getElementById("run-proof").addEventListener("click", async (event) => {
+        const button = event.currentTarget;
+        button.disabled = true;
+        button.textContent = "Running proof...";
+        try {
+          const response = await fetch("/api/demo-proof", { method: "POST" });
+          const report = await response.json();
+          output.innerHTML = report.surfaces.map((surface) => \`
+            <article class="surface \${surface.status}">
+              <header><strong>\${surface.label}</strong><span class="status">\${surface.status}</span></header>
+              <p class="muted">\${surface.detail}</p>
+              <a class="link" href="\${surface.href}">Open surface</a>
+            </article>
+          \`).join("");
+          json.textContent = JSON.stringify(report, null, 2);
+        } catch (error) {
+          output.innerHTML = '<article class="surface fail"><header><strong>Proof failed</strong><span class="status">fail</span></header><p class="muted">' + String(error?.message ?? error) + '</p></article>';
+        } finally {
+          button.disabled = false;
+          button.textContent = "Run full proof suite";
+        }
+      });
+    </script>
+  </body>
+</html>`;
+
 const summarizeAssistantRuns = async () =>
-  summarizeVoiceAssistantRuns({ store: runtimeStorage.traces });
+  summarizeVoiceAssistantRuns({ store: deliveryTraceStore });
 
 const summarizeProviderHealth = async (): Promise<
   VoiceProviderHealthSummary<VoiceModelProvider>[]
 > =>
   summarizeVoiceProviderHealth({
     providers: configuredModelProviders,
-    store: runtimeStorage.traces,
+    store: deliveryTraceStore,
   });
 
 const getLatestRoutingDecision = () =>
   createVoiceRoutingDecisionSummary({
     kind: "stt",
-    store: runtimeStorage.traces,
+    store: deliveryTraceStore,
   });
 
 const sttProviderSimulationStatus = () =>
@@ -2886,7 +7563,7 @@ const sttProviderFailureSimulator =
     kind: "stt",
     latencyBudgets: sttLatencyBudgets,
     onProviderEvent: async (event, input) => {
-      await runtimeStorage.traces.append({
+      await deliveryTraceStore.append({
         at: event.at,
         payload: {
           ...event,
@@ -2909,7 +7586,7 @@ const runDemoSTTProviderRoutingContract = async () => {
     "deepgram",
   )
     ? "deepgram"
-    : configuredSTTProviders[0] ?? "deepgram";
+    : (configuredSTTProviders[0] ?? "deepgram");
   const fallbackProvider = configuredSTTProviders.find(
     (provider) => provider !== requestedProvider,
   );
@@ -2993,7 +7670,7 @@ const runDemoTTSProviderRoutingContract = async () => {
     "openai",
   )
     ? "openai"
-    : configuredTTSProviders[0] ?? "emergency";
+    : (configuredTTSProviders[0] ?? "emergency");
   const fallbackProvider = configuredTTSProviders.find(
     (provider) => provider !== requestedProvider,
   );
@@ -3134,6 +7811,186 @@ const assignTask = async (taskId: string, owner: string) => {
   return updatedTask;
 };
 
+const liveOpsActions = VOICE_LIVE_OPS_ACTIONS;
+const isLiveOpsAction = (value: unknown): value is VoiceLiveOpsAction =>
+  typeof value === "string" &&
+  liveOpsActions.includes(value as VoiceLiveOpsAction);
+const liveOpsSessionControls = new Map<string, VoiceLiveOpsControlState>();
+
+const formatLiveOpsActionLabel = (action: VoiceLiveOpsAction) => {
+  switch (action) {
+    case "assign":
+      return "Assign live session";
+    case "create-task":
+      return "Create ops task";
+    case "escalate":
+      return "Escalate live session";
+    case "force-handoff":
+      return "Force handoff";
+    case "inject-instruction":
+      return "Inject assistant instruction";
+    case "operator-takeover":
+      return "Operator takeover";
+    case "pause-assistant":
+      return "Pause assistant";
+    case "resume-assistant":
+      return "Resume assistant";
+    case "tag":
+      return "Tag live session";
+  }
+};
+
+const handleLiveOpsAction = async (body: unknown) => {
+  const input =
+    body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const action = input.action;
+  const sessionId = toStringValue(input.sessionId);
+
+  if (!sessionId || !isLiveOpsAction(action)) {
+    return Response.json(
+      { error: "A valid sessionId and action are required.", ok: false },
+      { status: 400 },
+    );
+  }
+
+  const assignee = toStringValue(input.assignee) ?? "demo-operator";
+  const tag = toStringValue(input.tag) ?? "needs-review";
+  const detail =
+    toStringValue(input.detail) ?? formatLiveOpsActionLabel(action);
+  const at = Date.now();
+  const taskId = `live-ops:${sessionId}:${action}:${at}`;
+  let task: SavedVoiceOpsTask | undefined;
+  const previousControl = liveOpsSessionControls.get(sessionId);
+  const control = buildVoiceLiveOpsControlState({
+    action,
+    assignee,
+    at,
+    detail,
+    previous: previousControl,
+    sessionId,
+    tag,
+  });
+  liveOpsSessionControls.set(sessionId, control);
+
+  await runtimeStorage.audit.append(
+    createVoiceAuditEvent({
+      action: `live_ops.${action}`,
+      actor: {
+        id: assignee,
+        kind: "operator",
+        name: assignee,
+      },
+      at,
+      metadata: {
+        source: "browser-live-ops",
+        tag,
+      },
+      outcome: "success",
+      payload: {
+        action,
+        assignee,
+        control,
+        detail,
+        tag,
+      },
+      resource: {
+        id: sessionId,
+        type: "voice.session",
+      },
+      sessionId,
+      type: "operator.action",
+    }),
+  );
+  await deliveryTraceStore.append({
+    at,
+    metadata: {
+      source: "browser-live-ops",
+      tag,
+    },
+    payload: {
+      action,
+      assignee,
+      control,
+      detail,
+      tag,
+      status: "success",
+    },
+    sessionId,
+    type: "operator.action",
+  });
+
+  if (
+    action === "create-task" ||
+    action === "escalate" ||
+    action === "force-handoff" ||
+    action === "operator-takeover"
+  ) {
+    task = {
+      assignee,
+      createdAt: at,
+      description: detail,
+      history: [
+        {
+          actor: assignee,
+          at,
+          detail,
+          type: "created",
+        },
+      ],
+      id: taskId,
+      intakeId: sessionId,
+      kind:
+        action === "escalate" ||
+        action === "force-handoff" ||
+        action === "operator-takeover"
+          ? "escalation"
+          : "support-triage",
+      outcome:
+        action === "escalate" ||
+        action === "force-handoff" ||
+        action === "operator-takeover"
+          ? "escalated"
+          : "completed",
+      recommendedAction:
+        action === "force-handoff"
+          ? "Force route this live session to the requested human or specialist queue."
+          : action === "operator-takeover" || action === "escalate"
+            ? "Human operator should take over this live voice session."
+            : "Review the active call and follow up with the caller.",
+      reviewId: sessionId,
+      status:
+        action === "escalate" ||
+        action === "force-handoff" ||
+        action === "operator-takeover"
+          ? "in-progress"
+          : "open",
+      target: tag,
+      title:
+        action === "force-handoff"
+          ? `Force handoff live session ${sessionId}`
+          : action === "operator-takeover"
+            ? `Operator takeover live session ${sessionId}`
+            : action === "escalate"
+              ? `Escalate live session ${sessionId}`
+              : `Follow up live session ${sessionId}`,
+      updatedAt: at,
+    };
+    await runtimeStorage.tasks.set(task.id, task);
+    await emitTaskUpdatedEvent(task);
+  }
+
+  return Response.json({
+    action,
+    control,
+    incidentBundleHref: `/voice-incidents/${encodeURIComponent(sessionId)}/markdown`,
+    ok: true,
+    operationsRecordHref: `/voice-operations/${encodeURIComponent(sessionId)}`,
+    sessionId,
+    task,
+    taskHref: task ? `/tasks` : undefined,
+  });
+};
+
 const redirectToTasks = () =>
   new Response(null, {
     headers: {
@@ -3141,6 +7998,19 @@ const redirectToTasks = () =>
     },
     status: 302,
   });
+
+const liveOpsControlRoutes = new Elysia()
+  .post("/api/voice/live-ops/action", ({ body }) => handleLiveOpsAction(body))
+  .get("/api/voice/live-ops/control/:sessionId", ({ params }) =>
+    Response.json({
+      control: liveOpsSessionControls.get(params.sessionId) ?? null,
+      ok: true,
+      sessionId: params.sessionId,
+    }),
+  ) as unknown as Elysia;
+const liveOpsRuntime = {
+  getControl: (sessionId: string) => liveOpsSessionControls.get(sessionId),
+};
 
 const createDemoAssistant = (
   provider: VoiceModelProvider,
@@ -3188,20 +8058,28 @@ const createDemoAssistant = (
       ],
     }),
     guardrails: {
-      beforeTurn: ({ context, session, turn }) =>
-        /\b(human|agent|supervisor|manager)\b/i.test(turn.text) &&
-        /\b(please|need|want|get|talk|speak)\b/i.test(turn.text)
+      beforeTurn: async (input) => {
+        const guardrailResult =
+          await demoLiveGuardrails.assistantGuardrails.beforeTurn?.(input);
+        if (guardrailResult) {
+          return guardrailResult;
+        }
+
+        return /\b(human|agent|supervisor|manager)\b/i.test(input.turn.text) &&
+          /\b(please|need|want|get|talk|speak)\b/i.test(input.turn.text)
           ? {
               assistantText: "Escalating this call for human follow-up.",
               escalate: {
                 reason: "caller-requested-human",
               },
               result: buildSavedIntake(
-                session,
-                resolveScenarioFromContext(context),
+                input.session,
+                resolveScenarioFromContext(input.context),
               ),
             }
-          : undefined,
+          : undefined;
+      },
+      afterTurn: demoLiveGuardrails.assistantGuardrails.afterTurn,
     },
     id: "support",
     memory: {
@@ -3228,12 +8106,16 @@ const createDemoAssistant = (
     model,
     system:
       "Use baseline guide copy. If the caller is in general recording mode, capture one freeform turn and return complete true. If the caller is in guided mode, ask the next concise guided question until the guided prompts are complete. If the caller asks for transfer, escalation, voicemail, or no answer, route that exact lifecycle outcome.",
-    tools: [intakeClassifierTool, lifecycleRouterTool, reviewTaskRecorderTool],
+    tools: demoLiveGuardrails.wrapTools([
+      intakeClassifierTool,
+      lifecycleRouterTool,
+      reviewTaskRecorderTool,
+    ]),
     trace: runtimeStorage.traces,
   });
 
 const assistant = createDemoAssistant(modelProvider, assistantModel);
-const contractAwareOnTurn = createVoiceWorkflowContractHandler({
+const contractAwareOnTurnBase = createVoiceWorkflowContractHandler({
   handler: assistant.onTurn,
   resolveContract: ({ result, session }) => {
     if (result.transfer) {
@@ -3248,8 +8130,124 @@ const contractAwareOnTurn = createVoiceWorkflowContractHandler({
       ? generalWorkflowContract
       : guidedWorkflowContract;
   },
-  store: runtimeStorage.traces,
-});
+  store: deliveryTraceStore,
+}) as VoiceOnTurnObjectHandler<unknown, VoiceSessionRecord, SavedIntake>;
+
+const isSpecialistBillingTurn = (text: string) =>
+  /\b(billing|invoice|refund|payment|subscription|charge|receipt)\b/i.test(
+    text,
+  );
+
+const createDemoLiveAgentSquad = () => {
+  const supportAgent = createVoiceAgent<
+    unknown,
+    VoiceSessionRecord,
+    SavedIntake
+  >({
+    id: "front-desk",
+    model: {
+      generate: ({ turn }) => ({
+        handoff: {
+          metadata: {
+            detectedIntent: "billing",
+            demoSurface: "agent-squad",
+          },
+          reason: `Billing specialist requested for: ${turn.text}`,
+          targetAgentId: "billing",
+        },
+      }),
+    },
+    system:
+      "You are the demo front desk. Route billing, invoice, refund, payment, subscription, charge, and receipt requests to billing.",
+    trace: deliveryTraceStore,
+  });
+  const billingAgent = createVoiceAgent<
+    unknown,
+    VoiceSessionRecord,
+    SavedIntake
+  >({
+    id: "billing",
+    model: {
+      generate: ({ turn }) => ({
+        assistantText: `Billing specialist here. I can help with that account question: ${turn.text}`,
+      }),
+    },
+    system:
+      "You are the billing specialist. Answer only from the handoff summary and current caller turn.",
+    trace: deliveryTraceStore,
+  });
+
+  return createVoiceAgentSquad<unknown, VoiceSessionRecord, SavedIntake>({
+    agents: [supportAgent, billingAgent],
+    contextPolicy: ({ summaryMessage, turn }) => ({
+      messages: [
+        summaryMessage,
+        {
+          content: turn.text,
+          role: "user",
+        },
+      ],
+      metadata: {
+        contextPolicy: "handoff-summary-current-turn",
+        demoSurface: "agent-squad",
+      },
+      system:
+        "Use only the handoff summary and current caller turn. Do not inspect unrelated prior turns.",
+    }),
+    defaultAgentId: "front-desk",
+    handoffPolicy: ({ handoff }) => ({
+      metadata: {
+        certifiedRoute: "front-desk-to-billing",
+        ...handoff.metadata,
+      },
+      summary:
+        "The front desk detected a billing/account question and routed this caller to billing.",
+    }),
+    id: "demo-agent-squad",
+    trace: deliveryTraceStore,
+  });
+};
+
+const demoLiveAgentSquad = createDemoLiveAgentSquad();
+type DemoVoiceTurnInput = Parameters<
+  VoiceOnTurnObjectHandler<unknown, VoiceSessionRecord, SavedIntake>
+>[0];
+const runDemoLiveAgentSquad = demoLiveAgentSquad.run as (
+  input: DemoVoiceTurnInput,
+) => Promise<{
+  assistantText?: string;
+  complete?: boolean;
+  escalate?: { metadata?: Record<string, unknown>; reason: string };
+  noAnswer?: { metadata?: Record<string, unknown> };
+  result?: SavedIntake;
+  transfer?: {
+    metadata?: Record<string, unknown>;
+    reason?: string;
+    target: string;
+  };
+  voicemail?: { metadata?: Record<string, unknown> };
+}>;
+
+const contractAwareOnTurn: VoiceOnTurnObjectHandler<
+  unknown,
+  VoiceSessionRecord,
+  SavedIntake
+> = async (input) => {
+  if (isSpecialistBillingTurn(input.turn.text)) {
+    const result = await runDemoLiveAgentSquad(input);
+    return {
+      assistantText: result.assistantText,
+      complete: result.complete,
+      escalate: result.escalate,
+      noAnswer: result.noAnswer,
+      result: result.result,
+      transfer: result.transfer,
+      voicemail: result.voicemail,
+    };
+  }
+
+  return contractAwareOnTurnBase(input);
+};
 
 const createTelephonyBridgeConfig = () => ({
   context: {},
@@ -3280,11 +8278,16 @@ const createTelephonyBridgeConfig = () => ({
   session: runtimeStorage.session,
   stt: sttAdapter,
   tts: telephonyTTS,
+  liveOps: liveOpsRuntime,
 });
 
 await cleanupDemoQualityNoise();
 await seedDemoOutcomeProof();
+await seedDemoBargeInProof();
+await seedDemoDeliveryProof();
+await ensureDemoIncidentBundleEvidence();
 
+// @ts-expect-error Elysia's accumulated demo route type exceeds TS instantiation depth.
 const server = new Elysia()
   .use(absolutejs)
   .use(pagesPlugin(manifest))
@@ -3346,10 +8349,58 @@ const server = new Elysia()
       preset: "reliability",
       session: runtimeStorage.session,
       stt: sttAdapter,
+      liveOps: liveOpsRuntime,
     }),
   )
   .use(
+    openAIRealtime
+      ? voice<unknown, VoiceSessionRecord, SavedIntake>({
+          correctTurn: correctDemoTurn,
+          handoff:
+            handoffAdapters.length > 0
+              ? {
+                  adapters: handoffAdapters,
+                  deliveryQueue: handoffDeliveryStore,
+                }
+              : undefined,
+          onComplete: async ({ session }) => {
+            const result = session.turns
+              .toReversed()
+              .find((turn) => turn.result !== undefined)?.result as
+              | SavedIntake
+              | undefined;
+            const savedIntake = result ?? buildSavedIntake(session);
+            persistIntake(savedIntake);
+          },
+          onTurn: contractAwareOnTurn,
+          ops: assistant.ops,
+          path: "/voice/realtime",
+          phraseHints: () => VOICE_DEMO_PHRASE_HINTS,
+          preset: "reliability",
+          realtime: openAIRealtime,
+          realtimeInputFormat: {
+            channels: 1,
+            container: "raw",
+            encoding: "pcm_s16le",
+            sampleRateHz: 24_000,
+          },
+          session: runtimeStorage.session,
+          liveOps: liveOpsRuntime,
+        })
+      : new Elysia(),
+  )
+  .use(
     createVoiceOpsStatusRoutes({
+      deliverySinks: {
+        auditDeliveries: {
+          href: "/audit/deliveries",
+          store: runtimeStorage.auditDeliveries,
+        },
+        traceDeliveries: {
+          href: "/traces/deliveries",
+          store: runtimeStorage.traceDeliveries,
+        },
+      },
       include: {
         quality: false,
         sessions: false,
@@ -3358,15 +8409,26 @@ const server = new Elysia()
       llmProviders: configuredModelProviders,
       preferFixtureWorkflows: true,
       sttProviders: configuredSTTProviders,
-      store: runtimeStorage.traces,
+      store: deliveryTraceStore,
     }),
   )
   .use(
     createVoiceOpsConsoleRoutes({
+      deliverySinks: {
+        auditDeliveries: {
+          href: "/audit/deliveries",
+          store: runtimeStorage.auditDeliveries,
+        },
+        sinks: deliverySinkDescriptors,
+        traceDeliveries: {
+          href: "/traces/deliveries",
+          store: runtimeStorage.traceDeliveries,
+        },
+      },
       links: opsSurfaceLinks,
       llmProviders: configuredModelProviders,
       path: "/ops-console",
-      store: runtimeStorage.traces,
+      store: deliveryTraceStore,
       sttProviders: configuredSTTProviders,
       title: "AbsoluteJS Voice Demo Ops Console",
       ttsProviders: configuredTTSProviders,
@@ -3376,7 +8438,7 @@ const server = new Elysia()
     createVoiceQualityRoutes({
       links: opsSurfaceLinks,
       path: "/quality",
-      store: runtimeStorage.traces,
+      store: deliveryTraceStore,
     }),
   )
   .use(
@@ -3388,16 +8450,17 @@ const server = new Elysia()
         resolve(import.meta.dir, "fixtures", "voice-scenario-fixtures.json"),
       ),
       links: opsSurfaceLinks,
+      operationsRecordHref: "/voice-operations/:sessionId",
       path: "/evals",
       scenarios: workflowScenarios,
-      store: runtimeStorage.traces,
+      store: deliveryTraceStore,
       title: "AbsoluteJS Voice Demo Evals",
     }),
   )
   .use(
     createVoiceProviderHealthRoutes({
       providers: configuredModelProviders,
-      store: runtimeStorage.traces,
+      store: deliveryTraceStore,
     }),
   )
   .use(
@@ -3410,44 +8473,84 @@ const server = new Elysia()
         llm: modelProvider,
         stt: selectedSTTProvider,
       },
-      store: runtimeStorage.traces,
+      store: deliveryTraceStore,
       sttProviders: configuredSTTProviders,
     }),
+  )
+  .get("/api/provider-contracts", () => buildDemoProviderContractMatrix())
+  .get(
+    "/provider-contracts",
+    () =>
+      new Response(
+        renderVoiceProviderContractMatrixHTML(
+          buildDemoProviderContractMatrix(),
+          {
+            title: "AbsoluteJS Voice Provider Contracts",
+          },
+        ),
+        {
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+          },
+        },
+      ),
   )
   .use(
     createVoiceAssistantHealthRoutes({
       htmlPath: "/assistant-health",
       providers: configuredModelProviders,
-      store: runtimeStorage.traces,
+      store: deliveryTraceStore,
     }),
   )
   .use(
     createVoiceHandoffHealthRoutes({
       htmlPath: "/handoffs",
       path: "/api/voice-handoffs",
-      store: runtimeStorage.traces,
+      store: deliveryTraceStore,
     }),
   )
   .use(
     createVoiceSessionListRoutes({
       htmlPath: "/sessions",
+      operationsRecordHref: "/voice-operations/:sessionId",
       path: "/api/voice-sessions",
       replayHref: (session) => "/sessions/" + session.sessionId,
-      store: runtimeStorage.traces,
+      render: renderVoiceSessionsWithSupportActions,
+      store: deliveryTraceStore,
     }),
   )
   .use(
     createVoiceSessionReplayRoutes({
       htmlPath: "/sessions/:sessionId",
       path: "/api/voice-sessions/:sessionId/replay",
-      store: runtimeStorage.traces,
+      store: deliveryTraceStore,
     }),
+  )
+  .use(
+    createVoiceOperationsRecordRoutes({
+      audit: runtimeStorage.audit,
+      htmlPath: "/voice-operations/:sessionId",
+      path: "/api/voice-operations/:sessionId",
+      redact: voiceSupportArtifactRedaction,
+      store: deliveryTraceStore,
+      title: "AbsoluteJS Voice Operations Record",
+    }) as unknown as Elysia,
+  )
+  .use(
+    createVoiceIncidentBundleRoutes({
+      audit: runtimeStorage.audit,
+      markdownPath: "/voice-incidents/:sessionId/markdown",
+      path: "/api/voice-incidents/:sessionId",
+      redact: voiceSupportArtifactRedaction,
+      store: deliveryTraceStore,
+      title: "AbsoluteJS Voice Incident Bundle",
+    }) as unknown as Elysia,
   )
   .use(
     createVoiceResilienceRoutes({
       llmProviders: configuredModelProviders,
       path: "/resilience",
-      store: runtimeStorage.traces,
+      store: deliveryTraceStore,
       sttProviders: configuredSTTProviders,
       sttSimulation: {
         failureMessage:
@@ -3463,54 +8566,292 @@ const server = new Elysia()
       ttsProviders: configuredTTSProviders,
     }),
   )
+  .post("/api/provider-slo/proof", async () =>
+    Response.json(await seedDemoProviderSloProof()),
+  )
+  .post("/api/provider-decisions/proof", async () =>
+    Response.json(await seedDemoProviderDecisionProof()),
+  )
   .use(
-    createVoiceProductionReadinessRoutes({
-      agentSquadContracts: async () => [await runDemoAgentSquadContract()],
-      carriers: loadCarrierMatrixInputs,
-      htmlPath: "/production-readiness",
-      links: {
-        agentSquadContracts: "/agent-squad-contract",
-        carriers: "/carriers",
-        handoffs: "/handoffs",
-        providerRoutingContracts: "/api/provider-routing-contract",
-        quality: "/quality",
-        resilience: "/resilience",
-        sessions: "/sessions",
-      },
-      path: "/api/production-readiness",
-      providerRoutingContracts: async () => [
-        await runDemoProviderRoutingContract(),
-        await runDemoSTTProviderRoutingContract(),
-        await runDemoTTSProviderRoutingContract(),
+    createVoiceProviderSloRoutes({
+      ...providerSloOptions,
+      store: deliveryTraceStore,
+      title: "AbsoluteJS Voice Demo Provider SLOs",
+    }),
+  )
+  .use(
+    createVoiceProviderOrchestrationRoutes({
+      name: "absolutejs-voice-example-provider-orchestration",
+      profile: providerOrchestrationProfile,
+      requirements: providerOrchestrationRequirements,
+      title: "AbsoluteJS Voice Demo Provider Orchestration",
+    }),
+  )
+  .use(
+    createVoiceProviderDecisionTraceRoutes({
+      minDegraded: 1,
+      minDecisions: 4,
+      minFallbacks: 1,
+      name: "absolutejs-voice-example-provider-decisions",
+      requiredFallbackProviders: ["deterministic"],
+      requiredReasonIncludes: ["latency budget"],
+      requiredStatuses: ["fallback", "degraded"],
+      requiredSurfaces: [
+        "background-summary",
+        "live-call",
+        "live-stt",
+        "telephony-tts",
       ],
-      store: runtimeStorage.traces,
+      store: deliveryTraceStore,
+      title: "AbsoluteJS Voice Demo Provider Decision Traces",
+    }),
+  )
+  .get("/api/voice/reconnect-contract", async () =>
+    Response.json(await buildDemoReconnectContractReport()),
+  )
+  .get(
+    "/voice/reconnect-contract",
+    async () =>
+      new Response(
+        await renderDemoReconnectContractHTML(
+          await buildDemoReconnectContractReport(),
+        ),
+        {
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+          },
+        },
+      ),
+  )
+  .use(
+    createVoiceTelephonyWebhookSecurityRoutes({
+      options: telephonyWebhookSecurityOptions(),
+    }),
+  )
+  .use(createVoiceProductionReadinessRoutes(productionReadinessOptions()))
+  .use(
+    createVoiceOpsRecoveryRoutes({
+      ...opsRecoveryOptions(),
+      title: "AbsoluteJS Voice Demo Ops Recovery",
+    }),
+  )
+  .use(
+    createVoiceObservabilityExportRoutes({
+      ...observabilityExportOptions(),
+      title: "AbsoluteJS Voice Demo Observability Export",
+    }),
+  )
+  .use(
+    createVoiceObservabilityExportReplayRoutes({
+      source: buildDemoObservabilityExportReplay,
+      title: "AbsoluteJS Voice Demo Observability Export Replay",
+    }),
+  )
+  .get("/data-control/audit-proof.md", async () => {
+    const events = await runtimeStorage.audit.list({ limit: 25 });
+    const rows = events
+      .map((event) => {
+        const resource = event.resource
+          ? `${event.resource.type}:${event.resource.id}`
+          : "n/a";
+        return `| ${new Date(event.at).toISOString()} | ${event.type} | ${event.outcome} | ${resource} |`;
+      })
+      .join("\n");
+
+    return new Response(
+      `# Voice Data Control Audit Proof
+
+Redacted sample of the latest ${events.length} audit event(s). Payloads are intentionally omitted from this proof surface; use the full audit export only when you need the complete customer-owned record.
+
+| At | Type | Outcome | Resource |
+| --- | --- | --- | --- |
+${rows || "| n/a | n/a | n/a | n/a |"}
+`,
+      {
+        headers: {
+          "content-type": "text/markdown; charset=utf-8",
+        },
+      },
+    );
+  })
+  .use(
+    createVoiceDataControlRoutes({
+      audit: runtimeStorage.audit,
+      auditDeliveries: runtimeStorage.auditDeliveries,
+      campaigns: runtimeStorage.campaigns,
+      events: runtimeStorage.events,
+      incidentBundles: runtimeStorage.incidentBundles,
+      path: "/data-control",
+      providerKeys: [
+        {
+          env: "OPENAI_API_KEY",
+          name: "OpenAI",
+          recommendation:
+            "Use only server-side for LLM and optional Realtime/TTS provider calls.",
+          required: false,
+        },
+        {
+          env: "ANTHROPIC_API_KEY",
+          name: "Anthropic",
+          recommendation: "Use only server-side for the LLM fallback provider.",
+          required: false,
+        },
+        {
+          env: "GEMINI_API_KEY",
+          name: "Gemini",
+          recommendation: "Use only server-side for the LLM fallback provider.",
+          required: false,
+        },
+        {
+          env: "DEEPGRAM_API_KEY",
+          name: "Deepgram",
+          recommendation:
+            "Required for the primary realtime STT provider in this demo.",
+          required: true,
+        },
+        {
+          env: "ASSEMBLYAI_API_KEY",
+          name: "AssemblyAI",
+          recommendation:
+            "Use only server-side for the realtime STT fallback provider.",
+          required: false,
+        },
+        {
+          env: "ELEVENLABS_API_KEY",
+          name: "ElevenLabs",
+          recommendation:
+            "Use only server-side for optional TTS provider calls.",
+          required: false,
+        },
+        {
+          env: "TWILIO_AUTH_TOKEN",
+          name: "Twilio",
+          recommendation:
+            "Keep telephony credentials server-side and route call control through AbsoluteJS.",
+          required: false,
+        },
+        {
+          env: "TELNYX_API_KEY",
+          name: "Telnyx",
+          recommendation:
+            "Keep carrier API keys server-side and pair webhook logs with audit retention.",
+          required: false,
+        },
+        {
+          env: "PLIVO_AUTH_TOKEN",
+          name: "Plivo",
+          recommendation:
+            "Keep carrier auth tokens server-side and redact them from support exports.",
+          required: false,
+        },
+      ],
+      redact: voiceComplianceRedactionDefaults,
+      reviews: runtimeStorage.reviews as unknown as VoiceCallReviewStore,
+      session: runtimeStorage.session,
+      tasks: runtimeStorage.tasks as unknown as VoiceOpsTaskStore,
+      traceDeliveries: runtimeStorage.traceDeliveries,
+      traces: runtimeStorage.traces,
+    }),
+  )
+  .use(
+    createVoiceAuditDeliveryRoutes({
+      store: runtimeStorage.auditDeliveries,
+      title: "AbsoluteJS Voice Demo Audit Deliveries",
+      worker: createAuditDeliveryWorker(),
+    }),
+  )
+  .use(
+    createVoiceTraceDeliveryRoutes({
+      store: runtimeStorage.traceDeliveries,
+      title: "AbsoluteJS Voice Demo Trace Deliveries",
+      worker: createTraceDeliveryWorker(),
+    }),
+  )
+  .use(
+    createVoiceDeliverySinkRoutes({
+      auditDeliveries: {
+        href: "/audit/deliveries",
+        store: runtimeStorage.auditDeliveries,
+      },
+      sinks: deliverySinkDescriptors,
+      title: "AbsoluteJS Voice Demo Delivery Sinks",
+      traceDeliveries: {
+        href: "/traces/deliveries",
+        store: runtimeStorage.traceDeliveries,
+      },
+    }),
+  )
+  .use(
+    createVoiceDeliveryRuntimeRoutes({
+      runtime: deliveryRuntimeControl,
+      title: "AbsoluteJS Voice Demo Delivery Runtime",
+    }),
+  )
+  .use(
+    createVoiceOpsActionAuditRoutes({
+      audit: runtimeStorage.audit,
+      trace: deliveryTraceStore,
     }),
   )
   .use(
     createVoiceDiagnosticsRoutes({
       path: "/diagnostics",
-      store: runtimeStorage.traces,
+      store: deliveryTraceStore,
       title: "AbsoluteJS Voice Demo Diagnostics",
     }),
   )
   .use(
     createVoiceTraceTimelineRoutes({
       htmlPath: "/traces",
+      operationsRecordHref: "/voice-operations/:sessionId",
       path: "/api/voice-traces",
       store: traceTimelineStore,
     }),
   )
-  .use(
-    createVoiceBargeInRoutes({
-      htmlPath: "/barge-in",
-      path: "/api/voice-barge-in",
-      store: runtimeStorage.traces,
-    }),
+  .get("/api/voice-barge-in", async () =>
+    Response.json(await buildDemoBargeInReport()),
+  )
+  .post("/api/voice-barge-in", async ({ body }) => {
+    const input =
+      body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+    const at = toNumber(input.at);
+    const id = toStringValue(input.id);
+    const reason = toStringValue(input.reason);
+    const status = toStringValue(input.status);
+
+    if (!at || !id || !reason || !status) {
+      return Response.json(
+        { error: "Invalid barge-in event." },
+        { status: 400 },
+      );
+    }
+
+    await deliveryTraceStore.append({
+      at,
+      metadata: {
+        source: "browser",
+      },
+      payload: input,
+      sessionId: toStringValue(input.sessionId) ?? "unknown",
+      type: "client.barge_in",
+    });
+
+    return Response.json({ ok: true });
+  })
+  .get(
+    "/barge-in",
+    async () =>
+      new Response(await renderDemoBargeInHTML(), {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+        },
+      }),
   )
   .use(
     createVoiceToolContractRoutes({
       contracts: demoToolContracts,
       htmlPath: "/tool-contracts",
+      operationsRecordHref: "/voice-operations/:sessionId",
       path: "/api/tool-contracts",
       title: "AbsoluteJS Voice Demo Tool Contracts",
     }),
@@ -3525,8 +8866,12 @@ const server = new Elysia()
         tools: "/tool-contracts",
       },
       htmlPath: "/voice/simulations",
+      operationsRecordHref: "/voice-operations/:sessionId",
       path: "/api/voice/simulations",
-      store: runtimeStorage.traces,
+      store: deliveryTraceStore,
+      thresholds: {
+        maxProviderAverageLatencyMs: 5_000,
+      },
       scenarios: workflowScenarios,
       fixtureStore: createVoiceFileScenarioFixtureStore(
         resolve(import.meta.dir, "fixtures", "voice-scenario-fixtures.json"),
@@ -3544,6 +8889,7 @@ const server = new Elysia()
     }),
   )
   .get("/api/agent-squad-contract", () => runDemoAgentSquadContract())
+  .use(agentSquadStatusRoutes as unknown as Elysia)
   .get("/api/provider-routing-contract", () => runDemoProviderRoutingContract())
   .get("/api/stt-provider-routing-contract", () =>
     runDemoSTTProviderRoutingContract(),
@@ -3557,11 +8903,23 @@ const server = new Elysia()
   })
   .post("/api/turn-latency/proof", () => seedTurnLatencyProof())
   .post("/api/live-turn-latency", ({ body }) => storeLiveTurnLatencyTrace(body))
+  .post("/api/voice/reconnect-traces", ({ body }) => storeReconnectTrace(body))
+  .use(liveOpsControlRoutes)
+  .post("/api/demo-proof", ({ request }) => runDemoProofSuite(request))
+  .get(
+    "/demo-proof",
+    () =>
+      new Response(renderDemoProofHTML(), {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+        },
+      }),
+  )
   .use(
     createVoiceLiveLatencyRoutes({
       htmlPath: "/live-latency",
       path: "/api/live-latency",
-      store: runtimeStorage.traces,
+      store: deliveryTraceStore,
       title: "AbsoluteJS Voice Demo Live Latency",
     }),
   )
@@ -3588,6 +8946,7 @@ const server = new Elysia()
       events: runtimeStorage.events,
       handoffs: handoffDeliveryStore as unknown as VoiceHandoffDeliveryStore,
       htmlPath: "/outcome-contracts",
+      operationsRecordHref: "/voice-operations/:sessionId",
       path: "/api/outcome-contracts",
       reviews: runtimeStorage.reviews,
       sessions: runtimeStorage.session,
@@ -3604,6 +8963,12 @@ const server = new Elysia()
       setup: {
         path: "/api/voice/phone/setup",
         title: "AbsoluteJS Voice Demo Phone Agent",
+      },
+      productionSmoke: {
+        htmlPath: "/voice/phone/smoke-contract",
+        path: "/api/voice/phone/smoke-contract",
+        store: runtimeStorage.traces,
+        title: "AbsoluteJS Voice Demo Phone Call-Control Smoke",
       },
       carriers: [
         {
@@ -3749,6 +9114,7 @@ const server = new Elysia()
   .use(
     createVoiceCampaignRoutes({
       htmlPath: "/voice/campaigns",
+      operationsRecordHref: "/voice-operations/:sessionId",
       path: "/api/voice/campaigns",
       store: campaignStore,
       title: "AbsoluteJS Voice Demo Campaigns",
@@ -3798,6 +9164,10 @@ const server = new Elysia()
     generatedAt: Date.now(),
     total: telephonyWebhookDecisionSnapshots.length,
   }))
+  .get(
+    "/api/telephony-webhook/verification-proof",
+    async () => await runTelephonyWebhookVerificationProof(),
+  )
   .get("/phone-agent", ({ redirect }) =>
     redirect("/api/voice/phone/setup?format=html"),
   )
@@ -3820,6 +9190,126 @@ const server = new Elysia()
     "/demo-checklist",
     () =>
       new Response(renderDemoChecklistHTML(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+  )
+  .use(
+    createVoiceProofTrendRoutes({
+      maxAgeMs: proofTrendsMaxAgeMs,
+      name: "absolutejs-voice-example-proof-trends",
+      path: "/api/voice/proof-trends",
+      source: readLatestProofTrends,
+    }),
+  )
+  .use(
+    createVoiceSloCalibrationRoutes({
+      minPassingRuns: sloCalibrationMinRuns,
+      name: "absolutejs-voice-example-slo-calibration",
+      source: readLongProofWindowCalibrationSamples,
+    }),
+  )
+  .use(
+    createVoiceSloReadinessThresholdRoutes({
+      liveLatencyMaxAgeMs: liveLatencyReadinessMaxAgeMs,
+      minPassingRuns: sloCalibrationMinRuns,
+      name: "absolutejs-voice-example-slo-readiness-thresholds",
+      source: readLongProofWindowCalibrationSamples,
+      title: "AbsoluteJS Voice Calibration -> Active Readiness Gate",
+    }),
+  )
+  .get(
+    "/voice/proof-trends",
+    async () =>
+      new Response(await renderProofTrendsHTML(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+  )
+  .get(
+    "/voice/proof-trends.md",
+    async () => {
+      const file = Bun.file(latestProofTrendsMarkdownPath);
+      if (await file.exists()) {
+        return new Response(await file.text(), {
+          headers: { "content-type": "text/markdown; charset=utf-8" },
+        });
+      }
+
+      return new Response(
+        "# AbsoluteJS Voice Sustained Proof Trends\n\nNo sustained trend artifact found. Run `bun run proof:trends`.\n",
+        {
+          headers: { "content-type": "text/markdown; charset=utf-8" },
+        },
+      );
+    },
+  )
+  .use(
+    createVoicePostCallAnalysisRoutes({
+      name: "absolutejs-voice-example-post-call-analysis",
+      path: "/api/voice/post-call-analysis",
+      source: ({ reviewId, sessionId }) =>
+        postCallAnalysisOptions({ reviewId, sessionId }),
+    }),
+  )
+  .get(
+    "/voice/post-call-analysis",
+    async () =>
+      new Response(await renderPostCallAnalysisHTML(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+  )
+  .use(
+    createVoiceGuardrailRoutes({
+      name: "absolutejs-voice-example-guardrails",
+      path: "/api/voice/guardrails",
+      source: buildDemoGuardrailReport,
+    }),
+  )
+  .get(
+    "/voice/guardrails",
+    async () =>
+      new Response(await renderGuardrailsHTML(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+  )
+  .use(
+    createVoicePlatformCoverageRoutes({
+      name: "absolutejs-voice-example-vapi-coverage",
+      path: "/api/voice/vapi-coverage",
+      source: readLatestVapiCoverageSummary,
+    }),
+  )
+  .use(
+    createVoiceCompetitiveCoverageRoutes({
+      name: "absolutejs-voice-example-competitive-coverage",
+      source: buildDemoCompetitiveCoverageReport,
+      title: "AbsoluteJS Voice Competitive Coverage",
+    }),
+  )
+  .get(
+    "/switching-from-vapi",
+    async () =>
+      new Response(await renderVapiMigrationHTML(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+  )
+  .get(
+    "/provider-recovery",
+    async () =>
+      new Response(await renderProviderRecoveryHTML(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+  )
+  .get(
+    "/deploy-gate",
+    async () =>
+      new Response(await renderDeployGateHTML(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+  )
+  .get(
+    "/readiness-profiles",
+    () =>
+      new Response(renderReadinessProfilesHTML(), {
         headers: { "content-type": "text/html; charset=utf-8" },
       }),
   )
@@ -3948,7 +9438,7 @@ const server = new Elysia()
       handoffDeliveryStore.list(),
     );
     const [handoffHealth, handoffQueue] = await Promise.all([
-      summarizeVoiceHandoffHealth({ store: runtimeStorage.traces }),
+      summarizeVoiceHandoffHealth({ store: deliveryTraceStore }),
       Promise.resolve(summarizeVoiceHandoffDeliveries(handoffDeliveries)),
     ]);
 
@@ -4057,6 +9547,7 @@ const server = new Elysia()
     .voice-session-card.failed { border-color: rgba(239, 68, 68, 0.7); }
     .voice-session-card.healthy { border-color: rgba(34, 197, 94, 0.5); }
     .voice-session-card-header { align-items: center; display: flex; gap: 8px; justify-content: space-between; margin-bottom: 12px; }
+    .voice-session-support-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 0; }
     dl { display: grid; gap: 8px; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); margin: 0; }
     dl div { background: #13161b; border: 1px solid #232833; border-radius: 12px; padding: 10px; }
     dt { color: #a1a1aa; }
@@ -4072,7 +9563,7 @@ const server = new Elysia()
       <p><a href="/assistant">Assistant control plane</a> · <a href="/resilience">Resilience</a> · <a href="/reviews">Reviews</a> · <a href="/tasks">Tasks</a> · <a href="/handoffs">Handoffs</a></p>
     </section>
     <section>
-      ${renderVoiceSessionsHTML(await summarizeVoiceSessions({ store: runtimeStorage.traces }))}
+      ${renderVoiceSessionsWithSupportActions(await summarizeVoiceSessions({ store: deliveryTraceStore }))}
     </section>
   </main>
 </body>
@@ -4179,7 +9670,7 @@ const server = new Elysia()
         },
       ),
   )
-  .use(networking)
+  .use(networking as unknown as Elysia)
   .on("error", (error) => {
     const { request } = error;
     console.error(

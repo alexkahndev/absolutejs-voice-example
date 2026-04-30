@@ -4,41 +4,54 @@ import type { VoiceTurnRecord } from "@absolutejs/voice";
 import {
   useVoiceStream,
   useVoiceCampaignDialerProof,
+  VoiceDeliveryRuntime,
+  VoiceOpsActionCenter,
   VoiceOpsStatus,
+  VoicePlatformCoverage,
+  VoiceProofTrends,
   VoiceProviderCapabilities,
+  VoiceProviderContracts,
   VoiceProviderSimulationControls,
   VoiceProviderStatus,
+  VoiceReadinessFailures,
   VoiceRoutingStatus,
   VoiceTraceTimeline,
   VoiceTurnLatency,
   VoiceTurnQuality,
 } from "@absolutejs/voice/react";
 import {
+  createVoiceOpsActionCenterActions,
+  mountVoiceOpsActionHistory,
+} from "@absolutejs/voice/client";
+import {
   createInitialVoiceWaveLevels,
   createVoiceWavePath,
   createDemoBargeInEvidence,
   createDemoLiveTurnLatencyEvidence,
   createDemoMicrophone,
+  fetchAgentSquadDemoStatus,
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
+  formatReconnectState,
   mountDemoBargeInProof,
+  mountVoiceLiveOpsPanel,
   pushVoiceWaveLevel,
   renderDemoLiveTurnLatencyHTML,
 } from "../../shared/browser";
 import {
   FRAMEWORKS,
   FRAMEWORK_DESCRIPTIONS,
-  getInitialVoiceModelProvider,
-  getInitialVoiceRoutingMode,
   getVoiceLeadMessage,
   getVoiceModeLabel,
   getVoiceModePrompt,
   getVoiceProviderLabel,
   getVoiceRoutingLabel,
   getVoiceRoutePath,
+  getVoiceSpeechEngineSampleRate,
   rememberVoiceModelProvider,
   rememberVoiceRoutingMode,
+  rememberVoiceSpeechEngine,
   VOICE_ASSISTANT_CONFIG,
   VOICE_DEMO_GUIDE_STEPS,
   VOICE_DEMO_GUIDE_TITLE,
@@ -49,15 +62,22 @@ import {
   VOICE_DEMO_STOP_LABEL,
   VOICE_CALL_CONTROL_ACTIONS,
   VOICE_MODEL_PROVIDERS,
+  VOICE_PROOF_DASHBOARDS,
   VOICE_ROUTING_MODES,
+  VOICE_SPEECH_ENGINES,
   type VoiceDemoMode,
   type VoiceModelProvider,
   type VoiceRoutingMode,
+  type VoiceSpeechEngine,
+  type VoiceAgentSquadDemoStatus,
   type SavedIntake,
 } from "../../../shared/demo";
 
 type ReactVoiceDemoProps = {
   cssPath?: string;
+  initialModelProvider?: VoiceModelProvider;
+  initialRoutingMode?: VoiceRoutingMode;
+  initialSpeechEngine?: VoiceSpeechEngine;
 };
 
 type ReactVoiceDemoStream = ReturnType<typeof useVoiceStream<SavedIntake>>;
@@ -82,6 +102,11 @@ const EMPTY_VOICE: ReactVoiceDemoStream = {
   error: null as string | null,
   isConnected: false,
   partial: "",
+  reconnect: {
+    attempts: 0,
+    maxAttempts: 0,
+    status: "idle",
+  },
   scenarioId: null as string | null,
   sendAudio: (_audio: Uint8Array | ArrayBuffer) => {},
   sessionId: "",
@@ -89,10 +114,17 @@ const EMPTY_VOICE: ReactVoiceDemoStream = {
   turns: [] as VoiceTurnRecord<SavedIntake>[],
 };
 
-export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
+export const ReactVoiceDemo = ({
+  cssPath,
+  initialModelProvider = "deterministic",
+  initialRoutingMode = "balanced",
+  initialSpeechEngine = "cascaded",
+}: ReactVoiceDemoProps) => {
   const microphoneRef = useRef<ReturnType<typeof createDemoMicrophone> | null>(
     null,
   );
+  const opsActionHistoryRef = useRef<HTMLDivElement | null>(null);
+  const liveOpsPanelRef = useRef<HTMLDivElement | null>(null);
   const bargeInProofRef = useRef<HTMLDivElement | null>(null);
   const bargeInRef = useRef<ReturnType<typeof createDemoBargeInEvidence> | null>(
     null,
@@ -102,20 +134,19 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
   > | null>(null);
   const activeModeRef = useRef<VoiceDemoMode | null>(null);
   const voicesRef = useRef({ general: EMPTY_VOICE, guided: EMPTY_VOICE });
-  const [modelProvider, setModelProvider] = useState<VoiceModelProvider>(
-    getInitialVoiceModelProvider,
-  );
-  const [routingMode, setRoutingMode] = useState<VoiceRoutingMode>(
-    getInitialVoiceRoutingMode,
-  );
+  const [modelProvider] = useState<VoiceModelProvider>(initialModelProvider);
+  const [routingMode] = useState<VoiceRoutingMode>(initialRoutingMode);
+  const [speechEngine] = useState<VoiceSpeechEngine>(initialSpeechEngine);
   const guidedVoice =
     useVoiceStream<SavedIntake>(
-      getVoiceRoutePath("guided", modelProvider, routingMode),
+      getVoiceRoutePath("guided", modelProvider, routingMode, speechEngine),
+      { reconnectReportPath: "/api/voice/reconnect-traces" },
     ) ??
     EMPTY_VOICE;
   const generalVoice =
     useVoiceStream<SavedIntake>(
-      getVoiceRoutePath("general", modelProvider, routingMode),
+      getVoiceRoutePath("general", modelProvider, routingMode, speechEngine),
+      { reconnectReportPath: "/api/voice/reconnect-traces" },
     ) ??
     EMPTY_VOICE;
   voicesRef.current = { general: generalVoice, guided: guidedVoice };
@@ -132,6 +163,8 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
   });
   const [micError, setMicError] = useState<string | null>(null);
   const [savedIntakes, setSavedIntakes] = useState<SavedIntake[]>([]);
+  const [agentSquadStatus, setAgentSquadStatus] =
+    useState<VoiceAgentSquadDemoStatus | null>(null);
   const [waveLevels, setWaveLevels] = useState(createInitialVoiceWaveLevels);
   const [liveLatencyHTML, setLiveLatencyHTML] = useState(() =>
     renderDemoLiveTurnLatencyHTML(
@@ -165,6 +198,21 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
     };
   }, []);
 
+  useEffect(() => {
+    const refresh = () => {
+      void fetchAgentSquadDemoStatus(currentVoice.sessionId || undefined).then(
+        setAgentSquadStatus,
+      );
+    };
+
+    refresh();
+    const intervalId = window.setInterval(refresh, 3_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [currentVoice.sessionId]);
+
   useEffect(
     () => () => {
       microphoneRef.current?.stop();
@@ -178,6 +226,55 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
 
     const proof = mountDemoBargeInProof(bargeInProofRef.current);
     return () => proof.close();
+  }, []);
+  useEffect(() => {
+    if (!opsActionHistoryRef.current) {
+      return;
+    }
+
+    const history = mountVoiceOpsActionHistory(
+      opsActionHistoryRef.current,
+      "/api/voice/ops-actions/history",
+      { intervalMs: 5_000 },
+    );
+    return () => history.close();
+  }, []);
+  useEffect(() => {
+    if (!liveOpsPanelRef.current) {
+      return;
+    }
+
+    const panel = mountVoiceLiveOpsPanel(liveOpsPanelRef.current, {
+      getSessionId: () =>
+        activeModeRef.current === "general"
+          ? voicesRef.current.general.sessionId
+          : voicesRef.current.guided.sessionId,
+      onControl: ({ action, detail, tag }) => {
+        const voice =
+          activeModeRef.current === "general"
+            ? voicesRef.current.general
+            : voicesRef.current.guided;
+        if (action === "force-handoff") {
+          voice.callControl({
+            action: "transfer",
+            metadata: { source: "live-ops" },
+            reason: detail,
+            target: tag,
+          });
+          stopMic();
+        } else if (action === "escalate" || action === "operator-takeover") {
+          voice.callControl({
+            action: "escalate",
+            metadata: { source: "live-ops", takeover: action === "operator-takeover" },
+            reason: detail,
+          });
+          stopMic();
+        } else if (action === "pause-assistant") {
+          stopMic();
+        }
+      },
+    });
+    return () => panel.close();
   }, []);
 
   const startMic = async () => {
@@ -205,6 +302,9 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
           (level) => {
             setWaveLevels((current) => pushVoiceWaveLevel(current, level));
           },
+          {
+            sampleRateHz: getVoiceSpeechEngineSampleRate(speechEngine),
+          },
         );
       microphoneRef.current = microphone;
       await microphone.start();
@@ -221,6 +321,7 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
 
   const stopMic = () => {
     microphoneRef.current?.stop();
+    microphoneRef.current = null;
     setIsCapturing(false);
     setWaveLevels(createInitialVoiceWaveLevels());
   };
@@ -237,7 +338,9 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
     activeModeRef.current = null;
     setActiveMode(null);
     rememberVoiceModelProvider(provider);
-    setModelProvider(provider);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("provider", provider);
+    window.location.href = nextUrl.toString();
   };
 
   const changeRoutingMode = (routing: VoiceRoutingMode) => {
@@ -245,7 +348,19 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
     activeModeRef.current = null;
     setActiveMode(null);
     rememberVoiceRoutingMode(routing);
-    setRoutingMode(routing);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("routing", routing);
+    window.location.href = nextUrl.toString();
+  };
+
+  const changeSpeechEngine = (engine: VoiceSpeechEngine) => {
+    stopMic();
+    activeModeRef.current = null;
+    setActiveMode(null);
+    rememberVoiceSpeechEngine(engine);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("engine", engine);
+    window.location.href = nextUrl.toString();
   };
 
   const startMode = async (mode: VoiceDemoMode) => {
@@ -406,16 +521,117 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                   ))}
                 </select>
               </label>
+              <label className="voice-provider-select">
+                <span>Speech engine</span>
+                <select
+                  value={speechEngine}
+                  onChange={(event) =>
+                    changeSpeechEngine(
+                      event.currentTarget.value as VoiceSpeechEngine,
+                    )
+                  }
+                >
+                  {VOICE_SPEECH_ENGINES.map((engine) => (
+                    <option key={engine.id} value={engine.id}>
+                      {engine.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <p className="voice-footnote">
-                {VOICE_ROUTING_MODES.find((item) => item.id === routingMode)
-                  ?.description ?? ""}
+                {VOICE_SPEECH_ENGINES.find((item) => item.id === speechEngine)
+                  ?.description ??
+                  VOICE_ROUTING_MODES.find((item) => item.id === routingMode)
+                    ?.description ??
+                  ""}
               </p>
             </article>
+
+            <article className="voice-card voice-proof-dashboard-card">
+              <span className="voice-framework-pill">Proof dashboards</span>
+              <h2>Open the production evidence</h2>
+              <p className="voice-footnote">
+                The same trace-backed package routes work in every framework:
+                interruption, live timing, turn waterfalls, readiness, and
+                provider contracts.
+              </p>
+              <div className="voice-proof-links">
+                {VOICE_PROOF_DASHBOARDS.map((dashboard) => (
+                  <a href={dashboard.href} key={dashboard.href}>
+                    <strong>{dashboard.label}</strong>
+                    <span>{dashboard.description}</span>
+                  </a>
+                ))}
+              </div>
+            </article>
+
+            <VoicePlatformCoverage
+              className="voice-card voice-provider-health-card"
+              description="React renders the package coverage component against the same proof-backed route used by the server."
+              intervalMs={10_000}
+              limit={4}
+              path="/api/voice/vapi-coverage"
+              title="Vapi Replacement Coverage"
+            />
+
+            <VoiceProofTrends
+              className="voice-card voice-provider-health-card"
+              description="React renders sustained proof freshness, provider p95, turn p95, and live p95 from the package proof-trends widget."
+              intervalMs={10_000}
+              path="/api/voice/proof-trends"
+              title="Sustained Proof Trends"
+            />
+
+            <VoiceReadinessFailures
+              className="voice-card voice-provider-health-card"
+              description="React renders structured deploy-gate explanations from production readiness JSON when calibrated gates warn or fail."
+              intervalMs={10_000}
+              path="/api/production-readiness"
+              title="Readiness Gate Explanations"
+            />
 
             <VoiceRoutingStatus
               className="voice-card voice-routing-card"
               intervalMs={4_000}
             />
+
+            <article className="voice-card voice-agent-squad-card">
+              <span className="voice-framework-pill">Agent Squad</span>
+              <h2>Specialist routing is live</h2>
+              <p className="voice-footnote">
+                Say “I have a billing question about my invoice” to route from
+                the front desk to billing with a compact context policy.
+              </p>
+              <div className="voice-routing-grid">
+                <div>
+                  <span>Current specialist</span>
+                  <strong>{agentSquadStatus?.currentAgentId ?? "front-desk"}</strong>
+                </div>
+                <div>
+                  <span>Context policy</span>
+                  <strong>
+                    {agentSquadStatus?.contextPolicy ??
+                      "handoff-summary-current-turn"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Handoffs</span>
+                  <strong>{agentSquadStatus?.handoffCount ?? 0}</strong>
+                </div>
+                <div>
+                  <span>Messages sent</span>
+                  <strong>{agentSquadStatus?.messageCount ?? "ready"}</strong>
+                </div>
+              </div>
+              <p className="voice-footnote">
+                {agentSquadStatus?.lastHandoff
+                  ? `${agentSquadStatus.lastHandoff.fromAgentId} → ${agentSquadStatus.lastHandoff.targetAgentId}: ${agentSquadStatus.lastHandoff.summary ?? agentSquadStatus.lastHandoff.reason ?? "handoff applied"}`
+                  : "No specialist handoff in this session yet."}
+              </p>
+              <p className="voice-footnote">
+                <a href="/agent-squad-contract">Open squad contract proof</a>
+              </p>
+            </article>
 
             <VoiceProviderStatus
               className="voice-card voice-provider-health-card"
@@ -423,6 +639,11 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
             />
 
             <VoiceProviderCapabilities
+              className="voice-card voice-provider-health-card"
+              intervalMs={5_000}
+            />
+
+            <VoiceProviderContracts
               className="voice-card voice-provider-health-card"
               intervalMs={5_000}
             />
@@ -510,10 +731,28 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
               intervalMs={5_000}
             />
 
+            <VoiceDeliveryRuntime
+              className="voice-card voice-workflow-card"
+              intervalMs={5_000}
+            />
+
+            <VoiceOpsActionCenter
+              actions={createVoiceOpsActionCenterActions({
+                providers: ["deepgram", "assemblyai"],
+              })}
+              className="voice-card voice-workflow-card"
+            />
+
+            <div ref={liveOpsPanelRef} />
+
+            <div className="voice-card voice-workflow-card" ref={opsActionHistoryRef} />
+
             <VoiceTraceTimeline
               className="voice-card voice-provider-health-card"
               intervalMs={5_000}
               limit={2}
+              operationsRecordBasePath="/voice-operations"
+              incidentBundleBasePath="/voice-incidents"
             />
 
             <div ref={bargeInProofRef} />
@@ -585,6 +824,12 @@ export const ReactVoiceDemo = ({ cssPath }: ReactVoiceDemoProps) => {
                 <div className="status-row">
                   <span className="label">Voice status</span>
                   <span className="value">{currentVoice.status}</span>
+                </div>
+                <div className="status-row">
+                  <span className="label">Reconnect</span>
+                  <span className="value">
+                    {formatReconnectState(currentVoice.reconnect)}
+                  </span>
                 </div>
                 <div className="status-row">
                   <span className="label">Current prompt</span>

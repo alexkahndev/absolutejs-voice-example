@@ -15,7 +15,35 @@ import { ReactVoiceDemo } from "../../frontend/react/pages/ReactVoiceDemo";
 import type * as AngularVoiceDemoPage from "../../frontend/angular/pages/angular-voice-demo";
 import type SvelteVoiceDemo from "../../frontend/svelte/pages/SvelteVoiceDemo.svelte";
 import type VueVoiceDemo from "../../frontend/vue/pages/VueVoiceDemo.vue";
-import { FRAMEWORKS } from "../../shared/demo";
+import {
+  FRAMEWORKS,
+  isVoiceModelProvider,
+  isVoiceRoutingMode,
+  isVoiceSpeechEngine,
+  type VoiceModelProvider,
+  type VoiceRoutingMode,
+  type VoiceSpeechEngine,
+} from "../../shared/demo";
+
+type VoiceDemoSelectionProps = {
+  initialModelProvider: VoiceModelProvider;
+  initialRoutingMode: VoiceRoutingMode;
+  initialSpeechEngine: VoiceSpeechEngine;
+};
+
+const resolveVoiceDemoSelectionProps = (
+  query: Record<string, unknown>,
+): VoiceDemoSelectionProps => ({
+  initialModelProvider: isVoiceModelProvider(query.provider)
+    ? query.provider
+    : "deterministic",
+  initialRoutingMode: isVoiceRoutingMode(query.routing)
+    ? query.routing
+    : "balanced",
+  initialSpeechEngine: isVoiceSpeechEngine(query.engine)
+    ? query.engine
+    : "cascaded",
+});
 
 export const pagesPlugin = (manifest: Record<string, string>) =>
   new Elysia()
@@ -104,29 +132,31 @@ export const pagesPlugin = (manifest: Record<string, string>) =>
           },
         ),
     )
-    .get("/react", () =>
+    .get("/react", ({ query }) =>
       handleReactPageRequest({
         Page: ReactVoiceDemo,
         index: asset(manifest, "ReactVoiceDemoIndex"),
         props: {
           cssPath: asset(manifest, "VoiceDemoCSS"),
+          ...resolveVoiceDemoSelectionProps(query),
         },
       }),
     )
-    .get("/svelte", async () => {
+    .get("/svelte", async ({ query }) => {
       return handleSveltePageRequest<typeof SvelteVoiceDemo>({
         pagePath: asset(manifest, "SvelteVoiceDemo"),
         indexPath: asset(manifest, "SvelteVoiceDemoIndex"),
         props: {
           cssPath: asset(manifest, "VoiceDemoCSS"),
+          ...resolveVoiceDemoSelectionProps(query),
         },
       });
     })
-    .get("/vue", async () => {
+    .get("/vue", async ({ query }) => {
       return handleVuePageRequest<typeof VueVoiceDemo>({
         pagePath: asset(manifest, "VueVoiceDemo"),
         indexPath: asset(manifest, "VueVoiceDemoIndex"),
-        props: {},
+        props: resolveVoiceDemoSelectionProps(query),
         headTag: generateHeadElement({
           cssPath: asset(manifest, "VoiceDemoCSS"),
           title: "AbsoluteJS Voice Intake - Vue",
@@ -135,11 +165,11 @@ export const pagesPlugin = (manifest: Record<string, string>) =>
     })
     .get("/html", () => handleHTMLPageRequest(asset(manifest, "HtmlVoiceDemo")))
     .get("/htmx", () => handleHTMXPageRequest(asset(manifest, "HtmxVoiceDemo")))
-    .get("/angular", async () =>
+    .get("/angular", async ({ query }) =>
       handleAngularPageRequest<typeof AngularVoiceDemoPage>({
         pagePath: asset(manifest, "AngularVoiceDemo"),
         indexPath: asset(manifest, "AngularVoiceDemoIndex"),
-        props: {},
+        props: resolveVoiceDemoSelectionProps(query),
         headTag: generateHeadElement({
           cssPath: asset(manifest, "VoiceDemoCSS"),
           title: "AbsoluteJS Voice Intake - Angular",
