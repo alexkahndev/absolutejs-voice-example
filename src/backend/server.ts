@@ -57,6 +57,7 @@ import {
   createVoiceProofTrendRoutes,
   createVoiceRealCallProfileHistoryRoutes,
   createVoiceRealCallProfileRecoveryActionRoutes,
+  createVoiceInMemoryRealCallProfileRecoveryJobStore,
   buildVoiceRealCallProfileHistoryReport,
   buildVoiceRealCallProfileReadinessCheck,
   loadVoiceRealCallProfileEvidenceFromTraceStore,
@@ -3641,6 +3642,10 @@ const longProofWindowRoot = ".voice-runtime/long-proof-window";
 const latestBrowserCallProfilesJsonPath =
   ".voice-runtime/browser-call-profiles/latest.json";
 const realCallProfilesRoot = ".voice-runtime/real-call-profiles";
+const realCallProfileRecoveryJobStore =
+  createVoiceInMemoryRealCallProfileRecoveryJobStore({
+    idPrefix: "voice-profile-recovery",
+  });
 const latestProofTrendsJsonPath = ".voice-runtime/proof-trends/latest.json";
 const latestProofTrendsMarkdownPath = ".voice-runtime/proof-trends/latest.md";
 const configuredProofTrendsMaxAgeMs = Number(
@@ -3693,6 +3698,84 @@ const readLatestBrowserCallProfiles =
       });
     }
   };
+
+const resolveRecoveryProofBaseUrl = () =>
+  process.env.VOICE_DEMO_URL ??
+  `http://127.0.0.1:${process.env.PORT ?? "3004"}`;
+
+const runRecoveryProofScript = async (
+  script: string,
+  env: Record<string, string> = {},
+) => {
+  const child = Bun.spawn(["bun", "run", script], {
+    env: {
+      ...process.env,
+      PORT: process.env.PORT ?? "3004",
+      VOICE_DEMO_URL: resolveRecoveryProofBaseUrl(),
+      ...env,
+    },
+    stderr: "inherit",
+    stdout: "inherit",
+  });
+  const exitCode = await child.exited;
+  if (exitCode !== 0) {
+    throw new Error(`${script} failed with exit code ${exitCode}.`);
+  }
+};
+
+const runBrowserCallProfileRecoveryProof = async () => {
+  await runRecoveryProofScript("proof:profiles:browser-call", {
+    VOICE_BROWSER_CALL_USE_EXISTING_SERVER: "1",
+  });
+  realCallProfileDefaultsCache = undefined;
+  const report = await readLatestBrowserCallProfiles();
+  const passing = report.status === "pass";
+
+  return {
+    ok: passing,
+    status: passing ? "pass" : "fail",
+    message: passing
+      ? "Browser profile proof completed and latest artifact is passing."
+      : "Browser profile proof completed but latest artifact is not passing.",
+  } as const;
+};
+
+const runPhoneSmokeRecoveryProof = async () => {
+  const baseUrl = resolveRecoveryProofBaseUrl();
+  const providers = ["twilio", "telnyx", "plivo"] as const;
+  const results = await Promise.all(
+    providers.map(async (provider) => {
+      const sessionId = `profile-recovery-${provider}-${Date.now()}`;
+      const response = await fetch(
+        `${baseUrl}/api/voice/phone/smoke-contract?provider=${provider}&sessionId=${sessionId}`,
+        { headers: { accept: "application/json" } },
+      );
+      return {
+        provider,
+        ok: response.ok,
+        status: response.status,
+      };
+    }),
+  );
+  const failing = results.filter((result) => !result.ok);
+  if (failing.length > 0) {
+    return {
+      ok: false,
+      status: "fail",
+      message: `Phone smoke proof failed for ${failing
+        .map((result) => `${result.provider} (${result.status})`)
+        .join(", ")}.`,
+    } as const;
+  }
+
+  return {
+    ok: true,
+    status: "pass",
+    message: `Phone smoke proof completed for ${results
+      .map((result) => result.provider)
+      .join(", ")}.`,
+  } as const;
+};
 
 const readLatestProofTrends = async (): Promise<VoiceProofTrendReport> => {
   const file = Bun.file(latestProofTrendsJsonPath);
@@ -10683,23 +10766,10 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
   )
   .use(
     createVoiceRealCallProfileRecoveryActionRoutes({
+      asyncActionIds: ["collect-browser-proof", "collect-phone-proof"],
       handlers: {
-        "collect-browser-proof": async () => {
-          const report = await readLatestBrowserCallProfiles();
-          const passing = report.status === "pass";
-
-          return {
-            ok: passing,
-            status: passing ? "pass" : "fail",
-            message: passing
-              ? "Latest browser profile proof is passing."
-              : "Browser profile proof is not passing; refresh browser profile proof and re-check readiness.",
-          };
-        },
-        "collect-phone-proof": async () => ({
-          message:
-            "Run the configured carrier smoke proof, then refresh production readiness.",
-        }),
+        "collect-browser-proof": runBrowserCallProfileRecoveryProof,
+        "collect-phone-proof": runPhoneSmokeRecoveryProof,
         "collect-provider-role-evidence": async () => {
           realCallProfileDefaultsCache = undefined;
           const report = await readRealCallProfileDefaultsReport();
@@ -10724,6 +10794,7 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
           };
         },
       },
+      jobStore: realCallProfileRecoveryJobStore,
       maxAgeMs: proofTrendsMaxAgeMs,
       minActionableProfiles: 2,
       minCycles: 10,
