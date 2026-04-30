@@ -520,6 +520,7 @@ const proofTargets: ProofTarget[] = [
     requiredText: [
       "AbsoluteJS Voice Media Pipeline Proof",
       "Native media pipeline",
+      "Media quality",
       "VAD segments",
       "Interruptions",
     ],
@@ -532,6 +533,7 @@ const proofTargets: ProofTarget[] = [
     requiredText: [
       "Voice Media Pipeline Proof",
       "Status: pass",
+      "Media quality",
       "VAD segments",
       "Interruption frames",
     ],
@@ -2713,9 +2715,14 @@ const mediaPipelineCalibrationEvidence = mediaPipelineCalibration
   ? evaluateVoiceMediaPipelineEvidence(mediaPipelineCalibration, {
       maxFirstAudioLatencyMs: 800,
       maxInterruptionLatencyMs: 250,
+      maxMediaBackpressureEvents: 0,
+      maxMediaGapMs: 800,
+      maxMediaJitterMs: 40,
+      maxMediaTimestampDriftMs: 800,
       maxTransportBackpressureEvents: 0,
       minAssistantAudioFrames: 1,
       minInputAudioFrames: 1,
+      minMediaSpeechRatio: 0.8,
       minProcessorGraphEmittedFrames: 5,
       minProcessorGraphNodes: 3,
       minTransportInputFrames: 1,
@@ -2725,6 +2732,7 @@ const mediaPipelineCalibrationEvidence = mediaPipelineCalibration
       requireInterruptionFrame: true,
       requirePass: true,
       requireProcessorGraph: true,
+      requireQualityPass: true,
       requireResamplingReady: true,
       requireTransportConnected: true,
     })

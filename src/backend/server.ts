@@ -5909,8 +5909,9 @@ const buildDemoMediaPipelineReportOptions = async () => {
       if (event.type === "turn.transcript") {
         return createMediaFrame({
           ...base,
+          durationMs: 20,
           kind: "input-audio",
-          metadata: { ...base.metadata, speechProbability: 0.92 },
+          metadata: { ...base.metadata, level: 0.52, speechProbability: 0.92 },
           source: "browser",
         } as MediaFrame);
       }
@@ -5924,9 +5925,10 @@ const buildDemoMediaPipelineReportOptions = async () => {
       ) {
         return createMediaFrame({
           ...base,
+          durationMs: 20,
           kind: "assistant-audio",
           latencyMs: 420,
-          metadata: { ...base.metadata, jitterMs: 12 },
+          metadata: { ...base.metadata, jitterMs: 12, level: 0.45 },
           source: "provider",
         } as MediaFrame);
       }
@@ -6037,6 +6039,10 @@ const buildDemoMediaPipelineReportOptions = async () => {
     maxBackpressureFrames: 0,
     maxFirstAudioLatencyMs: 800,
     maxJitterMs: 40,
+    maxMediaBackpressureEvents: 0,
+    maxMediaGapMs: 800,
+    maxMediaJitterMs: 40,
+    maxMediaTimestampDriftMs: 800,
     outputFormat: realtimeChannelFormat,
     requireInterruptionFrame: true,
     requireTraceEvidence: true,
@@ -6045,6 +6051,7 @@ const buildDemoMediaPipelineReportOptions = async () => {
     transport: transport.report(),
     maxSilenceFrames: 1,
     minSpeechFrames: 1,
+    minMediaSpeechRatio: 0.8,
     maxInterruptionLatencyMs: 250,
   };
 };
