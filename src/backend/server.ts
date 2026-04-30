@@ -7792,7 +7792,7 @@ const productionReadinessOptions = () => ({
       },
       browserMedia: {
         detail:
-          "Generated from browser WebRTC-style stats and checks live audio tracks, selected candidate pairs, packet loss, RTT, jitter, and byte flow.",
+          "Generated from browser WebRTC-style stats and checks live audio tracks, selected candidate pairs, packet loss, RTT, jitter, and byte flow. In production this can be fed directly from collectMediaWebRTCStatsReport(peerConnection.getStats()).",
         href: "/voice/browser-media",
         source: "webrtc-stats",
         sourceLabel: "Browser WebRTC stats proof",
@@ -9223,6 +9223,7 @@ const server = new Elysia()
       <h1>AbsoluteJS Voice Browser Media Proof</h1>
       <p class="badge">${escapeHtml(report.status)}</p>
       <p>This deterministic proof exercises the same WebRTC stats shape browsers expose for live calls, so readiness can gate on candidate pairs, audio tracks, packet loss, RTT, jitter, and media byte flow.</p>
+      <p>Real browser sessions can feed this same readiness gate with <code>collectMediaWebRTCStatsReport({ peerConnection })</code> from <code>@absolutejs/media</code>, which normalizes <code>RTCPeerConnection.getStats()</code> output into the report shown here.</p>
       <table>${rows}</table>
     </main>
   </body>
