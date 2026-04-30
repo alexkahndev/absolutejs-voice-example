@@ -32,6 +32,7 @@ import {
   createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
   createVoiceMemoryTraceEventStore,
+  createVoiceProfileTraceTagger,
   createVoiceProductionReadinessProofRuntime,
   createVoiceOpsConsoleRoutes,
   createVoiceOpsActionAuditRoutes,
@@ -612,7 +613,7 @@ const recordAuditDeliveryForTraceExport = async (
   );
 };
 
-const deliveryTraceStore: VoiceTraceEventStore = {
+const rawDeliveryTraceStore: VoiceTraceEventStore = {
   append: async (event) => {
     const stored = await runtimeStorage.traces.append(event);
     await runtimeStorage.traceDeliveries.set(
@@ -632,6 +633,42 @@ const deliveryTraceStore: VoiceTraceEventStore = {
     );
   },
 };
+const deliveryTraceStore: VoiceTraceEventStore = createVoiceProfileTraceTagger({
+  defaultProfile: {
+    description:
+      "Default real browser or phone call profile for general recording sessions.",
+    id: "meeting-recorder",
+    label: "Meeting recorder",
+  },
+  profiles: [
+    {
+      description:
+        "Browser recorder with longer passive listening and transcript capture.",
+      id: "meeting-recorder",
+      label: "Meeting recorder",
+    },
+    {
+      description:
+        "Realtime support agent with fast interruption recovery and tool-ready turns.",
+      id: "support-agent",
+      label: "Support agent",
+    },
+    {
+      description:
+        "Appointment scheduler with short structured turns and reliable follow-up capture.",
+      id: "appointment-scheduler",
+      label: "Appointment scheduler",
+    },
+    {
+      description:
+        "Noisy phone call with stricter transport and interruption proof requirements.",
+      id: "noisy-phone-call",
+      label: "Noisy phone call",
+    },
+  ],
+  resolveProfile: (event) => sessionVoiceProfileIds.get(event.sessionId),
+  store: rawDeliveryTraceStore,
+});
 const productionReadinessProofRuntime =
   createVoiceProductionReadinessProofRuntime({
     cacheMs: 10_000,
