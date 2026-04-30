@@ -61,7 +61,6 @@ import {
   createVoiceProviderContractMatrixPreset,
   createVoiceReadinessProfile,
   createVoiceSQLiteCampaignStore,
-  createOpenAIRealtimeAdapter,
   createOpenAIVoiceAssistantModel,
   createOpenAIVoiceTTS,
   createVoiceHandoffDeliveryWorker,
@@ -205,6 +204,7 @@ import {
 import { assemblyai } from "@absolutejs/voice-assemblyai";
 import { deepgram } from "@absolutejs/voice-deepgram";
 import { gemini } from "@absolutejs/voice-gemini";
+import { openai } from "@absolutejs/voice-openai";
 import { Elysia } from "elysia";
 import { existsSync, statSync } from "node:fs";
 import { mkdir, readdir } from "node:fs/promises";
@@ -1479,7 +1479,7 @@ const geminiRealtime = geminiApiKey
     })
   : undefined;
 const openAIRealtime = openAIApiKey
-  ? createOpenAIRealtimeAdapter({
+  ? openai({
       apiKey: openAIApiKey,
       instructions:
         "Speak like a concise product demo assistant for AbsoluteJS Voice. Keep replies short, natural, and useful.",
