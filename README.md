@@ -228,6 +228,14 @@ That starts one demo server, runs sustained proof trends with a longer default w
 
 Tune the window with `VOICE_LONG_PROOF_TREND_CYCLES`, `VOICE_LONG_PROOF_TREND_INTERVAL_MS`, and `VOICE_LONG_PROOF_LIVE_SAMPLES_PER_CYCLE`. The defaults are intentionally longer than the normal demo proof pack.
 
+To capture a real browser microphone/WebSocket profile for the proof history:
+
+```bash
+bun run proof:profiles:real-calls
+```
+
+That collector now seeds provider SLO proof, opens the HTML demo in headless Chrome with a fake microphone, starts the realtime voice flow, records `/voice/realtime` WebSocket bytes/messages, and writes `.voice-runtime/browser-call-profiles/latest.json` plus `.voice-runtime/real-call-profiles/latest.json`. Set `VOICE_REAL_CALL_BROWSER_CAPTURE=0` to skip the browser pass, or `VOICE_REAL_CALL_BROWSER_CAPTURE_REQUIRED=1` when a missing Chrome/browser capture should fail the run.
+
 The demo also mounts `/api/voice/slo-calibration`, `/voice/slo-calibration.md`, `/api/voice/slo-readiness-thresholds`, `/voice/slo-readiness-thresholds`, and `/voice/slo-readiness-thresholds.md`. Those routes consume long proof-window history and recommend provider, live-latency, turn-latency, interruption, reconnect, monitor-run, and notifier-delivery thresholds through the package-level `createVoiceSloCalibrationRoutes(...)` and `createVoiceSloReadinessThresholdRoutes(...)` primitives. The readable readiness-threshold page shows the exact calibrated gates currently driving production readiness. The long-window runner writes runtime calibration samples from barge-in proof events, reconnect resume proof, proof-pack monitor/readiness route timing, and proof-pack delivery timing. Set `VOICE_SLO_CALIBRATION_MIN_RUNS` when you want the route to require multiple long-window runs before treating the calibration as ready.
 
 Production readiness also uses `createVoiceSloThresholdProfile(...)` plus `createVoiceSloReadinessThresholdOptions(...)` to feed calibrated provider SLO, live-latency, barge-in, reconnect, monitor-run, and notifier-delivery thresholds back into the demo gate. The live-latency gate only considers recent samples, controlled by `VOICE_LIVE_LATENCY_READINESS_MAX_AGE_MS`, so old demo traces do not pollute the current calibrated deploy gate.

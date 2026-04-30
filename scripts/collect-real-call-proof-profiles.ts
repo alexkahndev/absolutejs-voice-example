@@ -17,6 +17,9 @@ const baseUrl = (
 const outputRoot =
   process.env.VOICE_REAL_CALL_PROFILE_OUTPUT_DIR ??
   ".voice-runtime/real-call-profiles";
+const browserCallProfileRoot =
+  process.env.VOICE_BROWSER_CALL_PROFILE_OUTPUT_DIR ??
+  ".voice-runtime/browser-call-profiles";
 const runId = new Date().toISOString().replaceAll(":", "-");
 const outputDir = join(outputRoot, runId);
 const maxAgeMs = 10 * 365 * 24 * 60 * 60 * 1000;
@@ -146,8 +149,111 @@ const inferProfileId = (session: JsonRecord) => {
   return "meeting-recorder";
 };
 
+const collectBrowserCallProfile = async () => {
+  if (process.env.VOICE_REAL_CALL_BROWSER_CAPTURE === "0") {
+    return;
+  }
+
+  const proc = Bun.spawn(
+    ["bun", "run", "./scripts/capture-real-browser-call-profile.ts"],
+    {
+      env: {
+        ...process.env,
+        PORT: process.env.PORT ?? "3004",
+        VOICE_BROWSER_CALL_USE_EXISTING_SERVER: "1",
+      },
+      stderr: "inherit",
+      stdout: "inherit",
+    },
+  );
+  const exitCode = await proc.exited;
+  if (
+    exitCode !== 0 &&
+    process.env.VOICE_REAL_CALL_BROWSER_CAPTURE_REQUIRED === "1"
+  ) {
+    throw new Error(`Browser call profile capture exited with code ${exitCode}.`);
+  }
+};
+
+const readLatestBrowserCallProfile = async () => {
+  const file = Bun.file(join(browserCallProfileRoot, "latest.json"));
+  if (!(await file.exists())) {
+    return undefined;
+  }
+
+  const parsed = (await file.json().catch(() => undefined)) as
+    | JsonRecord
+    | undefined;
+  if (!isRecord(parsed) || parsed.ok !== true || parsed.baseUrl !== baseUrl) {
+    return undefined;
+  }
+
+  const generatedAt = readString(parsed.generatedAt);
+  if (!generatedAt || Date.now() - Date.parse(generatedAt) > 5 * 60 * 1000) {
+    return undefined;
+  }
+
+  return parsed;
+};
+
+const buildBrowserCallEvidence = (
+  browserCallProfile: JsonRecord | undefined,
+  input: {
+    generatedAt: string;
+    proofSummary: JsonRecord;
+    providers: VoiceProofTrendProviderSummary[];
+    runtimeChannel?: VoiceProofTrendRuntimeChannelSummary;
+  },
+): VoiceProofTrendRealCallProfileEvidence[] => {
+  if (!browserCallProfile) {
+    return [];
+  }
+
+  const summary = isRecord(browserCallProfile.summary)
+    ? browserCallProfile.summary
+    : {};
+  const sentBytes = readNumber(summary.sentBytes) ?? 0;
+  const receivedBytes = readNumber(summary.receivedBytes) ?? 0;
+  const messageCount = readNumber(summary.messageCount) ?? 0;
+  const transportSamples =
+    sentBytes > 0 || receivedBytes > 0 || messageCount > 0 ? 1 : 0;
+  const runtimeChannel: VoiceProofTrendRuntimeChannelSummary = {
+    ...input.runtimeChannel,
+    maxBackpressureEvents: input.runtimeChannel?.maxBackpressureEvents ?? 0,
+    samples: Math.max(input.runtimeChannel?.samples ?? 0, transportSamples),
+    status:
+      input.runtimeChannel?.status === "fail"
+        ? "fail"
+        : transportSamples > 0
+          ? "pass"
+          : input.runtimeChannel?.status,
+  };
+
+  return [
+    {
+      generatedAt: readString(browserCallProfile.generatedAt) ?? input.generatedAt,
+      liveP95Ms: readNumber(input.proofSummary.maxLiveP95Ms),
+      ok: true,
+      operationsRecordHref: "/voice-operations/latest",
+      profileId: readString(browserCallProfile.profileId) ?? "meeting-recorder",
+      providerP95Ms: readNumber(input.proofSummary.maxProviderP95Ms),
+      providers: input.providers,
+      runtimeChannel,
+      sessionId: `browser-cdp-${readString(browserCallProfile.runId) ?? "latest"}`,
+      turnP95Ms: readNumber(input.proofSummary.maxTurnP95Ms),
+    },
+  ];
+};
+
 const run = async () => {
   await fetchJson("/api/provider-slo/proof", { method: "POST" }).catch(() => ({}));
+  await collectBrowserCallProfile().catch((error) => {
+    console.warn(
+      `Browser call profile capture skipped: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  });
 
   const [sessionsBody, providerSloBody, proofTrendsBody] = await Promise.all([
     fetchJson("/api/voice-sessions?status=all"),
@@ -169,8 +275,9 @@ const run = async () => {
     : {};
   const runtimeChannel = readRuntimeChannel(proofTrends);
   const generatedAt = new Date().toISOString();
-  const evidence: VoiceProofTrendRealCallProfileEvidence[] = sessions.map(
-    (session) => {
+  const browserCallProfile = await readLatestBrowserCallProfile();
+  const evidence: VoiceProofTrendRealCallProfileEvidence[] = [
+    ...sessions.map((session) => {
       const sessionId = readString(session.sessionId) ?? "unknown-session";
       return {
         generatedAt:
@@ -187,8 +294,14 @@ const run = async () => {
         sessionId,
         turnP95Ms: readNumber(proofSummary.maxTurnP95Ms),
       };
-    },
-  );
+    }),
+    ...buildBrowserCallEvidence(browserCallProfile, {
+      generatedAt,
+      proofSummary,
+      providers,
+      runtimeChannel,
+    }),
+  ];
   const report = buildVoiceProofTrendReportFromRealCallProfiles({
     baseUrl,
     evidence,
@@ -213,6 +326,7 @@ const run = async () => {
         evidence: evidence.length,
         ok: report.ok,
         outputDir,
+        realBrowserCapture: browserCallProfile ? "included" : "missing",
         profiles: report.summary.profiles?.map((profile) => ({
           id: profile.id,
           samples: profile.providers?.[0]?.samples,

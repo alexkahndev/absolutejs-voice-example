@@ -10,6 +10,7 @@
     "lint": "absolute eslint",
     "proof:pack": "bun run ./scripts/run-proof-pack.ts",
     "proof:pack:server": "bun run ./scripts/run-proof-pack-server.ts",
+    "proof:profiles:browser-call": "bun run ./scripts/capture-real-browser-call-profile.ts",
     "proof:profiles:real-calls": "bun run ./scripts/collect-real-call-proof-profiles.ts",
     "proof:long-window": "bun run ./scripts/run-long-proof-window.ts",
     "proof:screenshots": "bun run ./scripts/run-proof-pack-screenshots.ts",
