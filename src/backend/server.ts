@@ -70,6 +70,7 @@ import {
   createVoiceProviderCapabilityRoutes,
   createVoiceProviderHealthRoutes,
   createVoiceBrowserMediaRoutes,
+  createVoiceTelephonyMediaRoutes,
   getLatestVoiceBrowserMediaReport,
   buildVoiceProviderOrchestrationReport,
   createVoiceProviderOrchestrationProfile,
@@ -9188,6 +9189,11 @@ const server = new Elysia()
     createVoiceBrowserMediaRoutes({
       store: runtimeStorage.traces,
       title: "AbsoluteJS Voice Browser Media Proof",
+    }),
+  )
+  .use(
+    createVoiceTelephonyMediaRoutes({
+      title: "AbsoluteJS Voice Telephony Media Proof",
     }),
   )
   .use(createVoiceProductionReadinessRoutes(productionReadinessOptions()))

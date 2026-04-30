@@ -575,6 +575,11 @@ const proofTargets: ProofTarget[] = [
     path: "/api/voice/browser-media",
   },
   {
+    kind: "json",
+    name: "telephonyMedia",
+    path: "/api/voice/telephony/media",
+  },
+  {
     accept: "text/html,text/plain,*/*",
     kind: "text",
     name: "browserMediaPage",
@@ -586,6 +591,20 @@ const proofTargets: ProofTarget[] = [
       "Inbound streams",
       "Stalled streams",
       "Loss",
+    ],
+  },
+  {
+    accept: "text/html,text/plain,*/*",
+    kind: "text",
+    name: "telephonyMediaPage",
+    path: "/voice/telephony-media",
+    requiredText: [
+      "AbsoluteJS Voice Telephony Media Proof",
+      "Carrier media serializer proof",
+      "MediaFrame",
+      "Twilio",
+      "Telnyx",
+      "Plivo",
     ],
   },
   {
