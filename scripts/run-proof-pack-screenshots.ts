@@ -119,7 +119,6 @@ const screenshotTargets: ScreenshotTarget[] = [
       "Realtime provider contracts",
       "openai-realtime",
       "gemini-live",
-      "pipecat-bridge",
       "Trace evidence",
     ],
   },

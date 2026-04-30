@@ -3938,7 +3938,7 @@ const competitiveCoverageSurfaces = [
   },
   {
     buyerNeed: "Prove realtime quality across latency, interruption, reconnect, and provider stages.",
-    competitors: ["Vapi", "Pipecat", "LiveKit"],
+    competitors: ["Vapi", "LiveKit"],
     coverage: "covered",
     depth: "parity",
     evidence: [
@@ -3956,7 +3956,7 @@ const competitiveCoverageSurfaces = [
   },
   {
     buyerNeed: "Use direct realtime/duplex providers when they are the right execution engine.",
-    competitors: ["OpenAI Realtime", "Pipecat"],
+    competitors: ["OpenAI Realtime"],
     coverage: "covered",
     depth: "parity",
     evidence: [
@@ -3973,7 +3973,7 @@ const competitiveCoverageSurfaces = [
     readinessGate: "present",
     surface: "Direct realtime/duplex providers",
     why: "OpenAI Realtime adapter path, browser capture negotiation, raw PCM realtime format proof, first assistant audio latency, provider contracts, and cascaded STT/LLM/TTS fallback are all app-owned.",
-    nextMove: "Add Gemini Live and Pipecat bridge rows as adapters land.",
+    nextMove: "Keep Gemini Live and OpenAI Realtime proof current while native media-pipeline primitives expand.",
   },
   {
     buyerNeed: "Build visual workflows without code.",
@@ -4011,7 +4011,7 @@ const competitiveCoverageSurfaces = [
     remainingGap:
       "LiveKit owns SIP trunks, rooms, RTP/SRTP, DTMF, REFER, dispatch, and media networking.",
     surface: "SIP/media infrastructure",
-    why: "AbsoluteJS Voice should maintain clean seams for LiveKit/Pipecat/provider transport interop instead of recreating media infrastructure.",
+    why: "AbsoluteJS Voice should own app-level media pipeline primitives without becoming a hosted telco dashboard.",
     nextMove: "Expose adapter seams when needed.",
   },
 ] satisfies VoiceCompetitiveSurface[];
@@ -5859,20 +5859,9 @@ const buildDemoGeminiRealtimeChannelReport = async () =>
 
 const buildDemoRealtimeProviderContractMatrixInput = async () =>
   createVoiceRealtimeProviderContractMatrixPreset({
-    capabilities: {
-      "pipecat-bridge": [
-        "browser-format-negotiation",
-        "raw-pcm",
-        "duplex-audio",
-        "turn-commit",
-        "first-audio-latency",
-        "trace-evidence",
-      ],
-    },
     configured: {
       "gemini-live": Boolean(geminiRealtime),
       "openai-realtime": Boolean(openAIRealtime),
-      "pipecat-bridge": false,
     },
     env: {
       ...process.env,
@@ -5881,16 +5870,13 @@ const buildDemoRealtimeProviderContractMatrixInput = async () =>
     fallbackProviders: {
       "gemini-live": ["openai-realtime", "cascaded-stt-llm-tts"],
       "openai-realtime": ["cascaded-stt-llm-tts"],
-      "pipecat-bridge": ["openai-realtime", "cascaded-stt-llm-tts"],
     },
     implementationStatus: {
       "gemini-live": geminiRealtime ? "available" : "planned",
-      "pipecat-bridge": "planned",
     },
     latencyBudgets: {
       "gemini-live": 900,
       "openai-realtime": 800,
-      "pipecat-bridge": 850,
     },
     readinessHref: "/production-readiness",
     realtimeChannels: {

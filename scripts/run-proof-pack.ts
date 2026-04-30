@@ -520,7 +520,6 @@ const proofTargets: ProofTarget[] = [
       "Realtime provider contracts",
       "openai-realtime",
       "gemini-live",
-      "pipecat-bridge",
       "Trace evidence",
     ],
   },
@@ -2417,7 +2416,7 @@ const providerContractMatrixEvidenceReport = providerContractMatrix
       maxFailed: 0,
       maxStatus: "pass",
       maxWarned: 0,
-      minRows: 3,
+      minRows: 2,
       requiredCheckKeys: [
         "configured",
         "env",
@@ -2681,7 +2680,7 @@ const realtimeProviderContractEvidenceReport = realtimeProviderContracts
       maxFailed: 0,
       maxStatus: "warn",
       maxWarned: 2,
-      minRows: 3,
+      minRows: 2,
       requiredCheckKeys: [
         "configured",
         "env",
@@ -2692,7 +2691,7 @@ const realtimeProviderContractEvidenceReport = realtimeProviderContracts
         "traceEvidence",
         "readiness",
       ],
-      requiredProviders: ["gemini-live", "openai-realtime", "pipecat-bridge"],
+      requiredProviders: ["gemini-live", "openai-realtime"],
       requireSelected: true,
     })
   : undefined;
