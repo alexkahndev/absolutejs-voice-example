@@ -8,7 +8,10 @@ import {
   signal,
 } from "@angular/core";
 import type { VoiceRoutingDecisionSummary } from "@absolutejs/voice";
-import { defineVoiceProviderSimulationControlsElement } from "@absolutejs/voice/client";
+import {
+  defineVoiceProfileComparisonElement,
+  defineVoiceProviderSimulationControlsElement,
+} from "@absolutejs/voice/client";
 import { createVoiceOpsActionCenterActions } from "@absolutejs/voice/client";
 import {
   VoiceOpsStatusService,
@@ -314,6 +317,13 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
               <a href="/api/voice/vapi-coverage">Open JSON</a>
             </p>
           </article>
+
+          <absolute-voice-profile-comparison
+            class="voice-card voice-provider-health-card"
+            description="Angular renders measured profile defaults behind each selected stack."
+            interval-ms="10000"
+            title="Profile Stack Comparison"
+          ></absolute-voice-profile-comparison>
 
           <article class="voice-card voice-provider-health-card">
             <span class="voice-framework-pill">Sustained Proof Trends</span>
@@ -1565,6 +1575,7 @@ export class AngularVoiceDemoComponent {
   private bargeInProofTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
+    defineVoiceProfileComparisonElement();
     defineVoiceProviderSimulationControlsElement();
     effect(() => {
       const voice = this.currentVoice();

@@ -2,6 +2,7 @@ import {
   createVoiceStream,
   createVoiceCampaignDialerProofStore,
   createVoicePlatformCoverageStore,
+  mountVoiceProfileComparison,
   mountVoiceOpsStatus,
   mountVoiceProofTrends,
   mountVoiceProviderCapabilities,
@@ -106,6 +107,7 @@ const voiceWavePath = document.querySelector("#voice-wave-path");
 const workflowStatusHost = document.querySelector("#workflow-status-card");
 const platformCoverageHost = document.querySelector("#platform-coverage-card");
 const proofTrendsHost = document.querySelector("#proof-trends-card");
+const profileComparisonHost = document.querySelector("#profile-comparison-card");
 const readinessFailuresHost = document.querySelector(
   "#readiness-failures-card",
 );
@@ -159,6 +161,7 @@ if (
   !(workflowStatusHost instanceof HTMLElement) ||
   !(platformCoverageHost instanceof HTMLElement) ||
   !(proofTrendsHost instanceof HTMLElement) ||
+  !(profileComparisonHost instanceof HTMLElement) ||
   !(readinessFailuresHost instanceof HTMLElement) ||
   !(providerCapabilitiesHost instanceof HTMLElement) ||
   !(providerContractsHost instanceof HTMLElement) ||
@@ -221,6 +224,15 @@ const proofTrends = mountVoiceProofTrends(
     description: `${framework.toUpperCase()} renders sustained proof freshness and p95 metrics from the package proof-trends widget.`,
     intervalMs: 10_000,
     title: "Sustained Proof Trends",
+  },
+);
+const profileComparison = mountVoiceProfileComparison(
+  profileComparisonHost,
+  "/api/voice/real-call-profile-history",
+  {
+    description: `${framework.toUpperCase()} renders measured profile defaults behind each selected stack.`,
+    intervalMs: 10_000,
+    title: "Profile Stack Comparison",
   },
 );
 const readinessFailures = mountVoiceReadinessFailures(
@@ -684,6 +696,7 @@ window.addEventListener("beforeunload", () => {
   microphone.stop();
   guidedVoice.close();
   generalVoice.close();
+  profileComparison.close();
 });
 
 render();

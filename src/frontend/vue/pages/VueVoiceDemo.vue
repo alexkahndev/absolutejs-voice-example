@@ -7,6 +7,7 @@ import {
   VoiceOpsStatus,
   VoicePlatformCoverage,
   VoiceProofTrends,
+  useVoiceProfileComparison,
   VoiceProviderCapabilities,
   VoiceProviderContracts,
   VoiceProviderSimulationControls,
@@ -19,6 +20,7 @@ import {
 } from "@absolutejs/voice/vue";
 import {
   createVoiceOpsActionCenterActions,
+  createVoiceProfileComparisonViewModel,
   createVoiceTraceTimelineViewModel,
   mountVoiceOpsActionHistory,
 } from "@absolutejs/voice/client";
@@ -117,6 +119,27 @@ const generalVoice = useVoiceStream<SavedIntake>(
 const traceTimeline = useVoiceTraceTimeline("/api/voice-traces", {
   intervalMs: 5_000,
 });
+const profileComparison = useVoiceProfileComparison(
+  "/api/voice/real-call-profile-history",
+  {
+    intervalMs: 10_000,
+  },
+);
+const profileComparisonModel = computed(() =>
+  createVoiceProfileComparisonViewModel(
+    {
+      error: profileComparison.error.value,
+      isLoading: profileComparison.isLoading.value,
+      report: profileComparison.report.value,
+      updatedAt: profileComparison.updatedAt.value,
+    },
+    {
+      description:
+        "Vue renders measured profile defaults behind each selected stack.",
+      title: "Profile Stack Comparison",
+    },
+  ),
+);
 type CampaignDialerProofSnapshot = {
   error: string | null;
   isLoading: boolean;
@@ -646,6 +669,53 @@ onUnmounted(() => {
           path="/api/voice/proof-trends"
           title="Sustained Proof Trends"
         />
+
+        <section
+          class="voice-card voice-provider-health-card absolute-voice-profile-comparison"
+          :class="`absolute-voice-profile-comparison--${profileComparisonModel.status}`"
+        >
+          <header class="absolute-voice-profile-comparison__header">
+            <span class="absolute-voice-profile-comparison__eyebrow">
+              {{ profileComparisonModel.title }}
+            </span>
+            <strong class="absolute-voice-profile-comparison__label">
+              {{ profileComparisonModel.label }}
+            </strong>
+          </header>
+          <p class="absolute-voice-profile-comparison__description">
+            {{ profileComparisonModel.description }}
+          </p>
+          <div
+            v-if="profileComparisonModel.profiles.length"
+            class="absolute-voice-profile-comparison__profiles"
+          >
+            <article
+              v-for="profile in profileComparisonModel.profiles"
+              :key="profile.profileId"
+              class="absolute-voice-profile-comparison__profile"
+              :class="`absolute-voice-profile-comparison__profile--${profile.status}`"
+            >
+              <header>
+                <span>{{ profile.status }}</span>
+                <strong>{{ profile.label }}</strong>
+              </header>
+              <p>{{ profile.providerRoutes }}</p>
+              <div>
+                <span v-for="metric in profile.evidence" :key="metric.label">
+                  <small>{{ metric.label }}</small>
+                  <b>{{ metric.value }}</b>
+                </span>
+              </div>
+              <em>{{ profile.nextMove }}</em>
+            </article>
+          </div>
+          <p v-else class="absolute-voice-profile-comparison__empty">
+            {{
+              profileComparisonModel.error ??
+              "Run real-call profile collection to populate profile comparisons."
+            }}
+          </p>
+        </section>
 
         <VoiceReadinessFailures
           class="voice-card voice-provider-health-card"

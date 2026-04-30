@@ -6,6 +6,7 @@
     createVoiceOpsActionCenter,
     createVoiceOpsStatus,
     createVoicePlatformCoverage,
+    createVoiceProfileComparison,
     createVoiceProofTrends,
     createVoiceProviderCapabilities,
     createVoiceProviderContracts,
@@ -20,6 +21,7 @@
   } from "@absolutejs/voice/svelte";
   import {
     renderVoicePlatformCoverageHTML,
+    renderVoiceProfileComparisonHTML,
     renderVoiceProofTrendsHTML,
     renderVoiceReadinessFailuresHTML,
     createVoiceOpsActionCenterActions,
@@ -130,6 +132,7 @@
   let opsActionCenterHTML = $state("");
   let opsStatusHTML = $state("");
   let platformCoverageHTML = $state("");
+  let profileComparisonHTML = $state("");
   let proofTrendsHTML = $state("");
   let readinessFailuresHTML = $state("");
   let providerCapabilitiesHTML = $state("");
@@ -191,6 +194,21 @@
   const proofTrends = createVoiceProofTrends("/api/voice/proof-trends", {
     intervalMs: 10_000,
   });
+  const profileComparison = createVoiceProfileComparison(
+    "/api/voice/real-call-profile-history",
+    {
+      intervalMs: 10_000,
+    },
+  );
+  const profileComparisonWidgetOptions = {
+    description:
+      "Svelte renders measured profile defaults behind each selected stack.",
+    title: "Profile Stack Comparison",
+  };
+  profileComparisonHTML = renderVoiceProfileComparisonHTML(
+    profileComparison.getSnapshot(),
+    profileComparisonWidgetOptions,
+  );
   const readinessFailures = createVoiceReadinessFailures(
     "/api/production-readiness",
     {
@@ -254,6 +272,7 @@
   let unsubscribeOpsActionCenter = () => {};
   let unsubscribeOpsStatus = () => {};
   let unsubscribePlatformCoverage = () => {};
+  let unsubscribeProfileComparison = () => {};
   let unsubscribeProofTrends = () => {};
   let unsubscribeReadinessFailures = () => {};
   let unsubscribeProviderSimulation = () => {};
@@ -569,6 +588,12 @@
         title: "Sustained Proof Trends",
       });
     });
+    unsubscribeProfileComparison = profileComparison.subscribe(() => {
+      profileComparisonHTML = renderVoiceProfileComparisonHTML(
+        profileComparison.getSnapshot(),
+        profileComparisonWidgetOptions,
+      );
+    });
     unsubscribeReadinessFailures = readinessFailures.subscribe(() => {
       readinessFailuresHTML = renderVoiceReadinessFailuresHTML(
         readinessFailures.getSnapshot(),
@@ -622,6 +647,10 @@
         "Svelte renders sustained proof freshness, provider p95, turn p95, and live p95 from the package proof-trends widget.",
       title: "Sustained Proof Trends",
     });
+    profileComparisonHTML = renderVoiceProfileComparisonHTML(
+      profileComparison.getSnapshot(),
+      profileComparisonWidgetOptions,
+    );
     readinessFailuresHTML = renderVoiceReadinessFailuresHTML(
       readinessFailures.getSnapshot(),
       readinessFailuresWidgetOptions,
@@ -714,6 +743,7 @@
     unsubscribeOpsActionCenter();
     unsubscribeOpsStatus();
     unsubscribePlatformCoverage();
+    unsubscribeProfileComparison();
     unsubscribeProofTrends();
     unsubscribeReadinessFailures();
     unsubscribeProviderSimulation();
@@ -733,6 +763,7 @@
     generalVoice?.close();
     opsStatus.close();
     platformCoverage.close();
+    profileComparison.close();
     proofTrends.close();
     deliveryRuntime.close();
     opsActionCenter.close();
@@ -891,6 +922,10 @@
 
       <div class="voice-card voice-provider-health-card">
         {@html proofTrendsHTML}
+      </div>
+
+      <div class="voice-card voice-provider-health-card">
+        {@html profileComparisonHTML}
       </div>
 
       <div class="voice-card voice-provider-health-card">

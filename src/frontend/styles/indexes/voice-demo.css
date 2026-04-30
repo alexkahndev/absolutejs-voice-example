@@ -425,6 +425,133 @@ nav a.active {
     rgba(255, 255, 255, 0.045);
 }
 
+.absolute-voice-profile-comparison {
+  background: transparent;
+  color: inherit;
+}
+
+.absolute-voice-profile-comparison__header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.absolute-voice-profile-comparison__eyebrow {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  color: var(--accent);
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 6px 10px;
+  text-transform: uppercase;
+}
+
+.absolute-voice-profile-comparison__label {
+  color: var(--text);
+  font-family: var(--display-font);
+  font-size: clamp(1.8rem, 4vw, 3.4rem);
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+}
+
+.absolute-voice-profile-comparison__description,
+.absolute-voice-profile-comparison__empty,
+.absolute-voice-profile-comparison__profile em {
+  color: var(--muted);
+}
+
+.absolute-voice-profile-comparison__profiles {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 16px;
+}
+
+.absolute-voice-profile-comparison__profile {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.absolute-voice-profile-comparison__profile--pass {
+  border-color: rgba(45, 212, 191, 0.35);
+}
+
+.absolute-voice-profile-comparison__profile--warn {
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.absolute-voice-profile-comparison__profile--fail {
+  border-color: rgba(248, 113, 113, 0.6);
+}
+
+.absolute-voice-profile-comparison__profile header {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.absolute-voice-profile-comparison__profile header span {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: var(--accent);
+  font-size: 0.68rem;
+  font-weight: 900;
+  padding: 3px 7px;
+  text-transform: uppercase;
+}
+
+.absolute-voice-profile-comparison__profile p {
+  color: var(--ink);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.absolute-voice-profile-comparison__profile div {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.absolute-voice-profile-comparison__profile small {
+  color: var(--muted);
+  display: block;
+  font-size: 0.68rem;
+}
+
+.absolute-voice-profile-comparison__profile b {
+  color: var(--text);
+  display: block;
+}
+
+.absolute-voice-profile-comparison__profile em {
+  display: block;
+  font-size: 0.82rem;
+  margin-top: 12px;
+}
+
+.absolute-voice-profile-comparison__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 0;
+}
+
+.absolute-voice-profile-comparison__links a {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--accent);
+  font-weight: 800;
+  padding: 6px 10px;
+  text-decoration: none;
+}
+
 .voice-routing-card.absolute-voice-routing-status,
 .voice-routing-card .absolute-voice-routing-status {
   background: transparent;
@@ -1443,6 +1570,7 @@ nav a.active {
 
   .voice-config-grid,
   .voice-proof-links,
+  .absolute-voice-profile-comparison__profiles,
   .voice-routing-stack,
   .absolute-voice-routing-status__stack {
     grid-template-columns: 1fr;

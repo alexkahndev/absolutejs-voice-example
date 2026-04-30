@@ -8,6 +8,7 @@ import {
   VoiceOpsActionCenter,
   VoiceOpsStatus,
   VoicePlatformCoverage,
+  VoiceProfileComparison,
   VoiceProofTrends,
   VoiceProviderCapabilities,
   VoiceProviderContracts,
@@ -625,6 +626,14 @@ export const ReactVoiceDemo = ({
               intervalMs={10_000}
               path="/api/voice/proof-trends"
               title="Sustained Proof Trends"
+            />
+
+            <VoiceProfileComparison
+              className="voice-card voice-provider-health-card"
+              description="React renders measured profile defaults so users can see why each voice stack was selected."
+              intervalMs={10_000}
+              path="/api/voice/real-call-profile-history"
+              title="Profile Stack Comparison"
             />
 
             <VoiceReadinessFailures

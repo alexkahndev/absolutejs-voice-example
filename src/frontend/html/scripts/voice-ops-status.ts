@@ -3,6 +3,7 @@ import {
   createVoiceOpsActionCenterActions,
   defineVoiceDeliveryRuntimeElement,
   defineVoiceOpsStatusElement,
+  defineVoiceProfileComparisonElement,
   defineVoiceProviderCapabilitiesElement,
   defineVoiceProviderContractsElement,
   defineVoiceProviderSimulationControlsElement,
@@ -22,6 +23,7 @@ import { mountVoiceLiveOpsPanel } from "../../shared/browser";
 
 defineVoiceDeliveryRuntimeElement();
 defineVoiceOpsStatusElement();
+defineVoiceProfileComparisonElement();
 defineVoiceProviderCapabilitiesElement();
 defineVoiceProviderContractsElement();
 defineVoiceProviderSimulationControlsElement();
