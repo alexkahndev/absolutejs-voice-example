@@ -475,6 +475,52 @@ nav a.active {
   margin: 14px 0 0;
 }
 
+.voice-routing-stack,
+.absolute-voice-routing-status__stack {
+  background:
+    linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(45, 212, 191, 0.1)),
+    rgba(0, 0, 0, 0.22);
+  border: 1px solid rgba(245, 158, 11, 0.24);
+  border-radius: 18px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-top: 16px;
+  padding: 12px;
+}
+
+.voice-routing-stack div,
+.absolute-voice-routing-status__stack div {
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  padding-left: 10px;
+}
+
+.voice-routing-stack div:first-child,
+.absolute-voice-routing-status__stack div:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.voice-routing-stack span,
+.absolute-voice-routing-status__stack span {
+  color: var(--accent);
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+}
+
+.voice-routing-stack strong,
+.absolute-voice-routing-status__stack strong {
+  color: var(--text);
+  display: block;
+  font-size: 0.86rem;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
 .voice-routing-grid,
 .absolute-voice-routing-status__grid {
   display: grid;
@@ -1396,8 +1442,24 @@ nav a.active {
   }
 
   .voice-config-grid,
-  .voice-proof-links {
+  .voice-proof-links,
+  .voice-routing-stack,
+  .absolute-voice-routing-status__stack {
     grid-template-columns: 1fr;
+  }
+
+  .voice-routing-stack div,
+  .absolute-voice-routing-status__stack div {
+    border-left: 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding-left: 0;
+    padding-top: 10px;
+  }
+
+  .voice-routing-stack div:first-child,
+  .absolute-voice-routing-status__stack div:first-child {
+    border-top: 0;
+    padding-top: 0;
   }
 
   header {

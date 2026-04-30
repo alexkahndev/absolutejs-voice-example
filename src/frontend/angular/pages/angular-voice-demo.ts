@@ -7,6 +7,7 @@ import {
   inject,
   signal,
 } from "@angular/core";
+import type { VoiceRoutingDecisionSummary } from "@absolutejs/voice";
 import { defineVoiceProviderSimulationControlsElement } from "@absolutejs/voice/client";
 import { createVoiceOpsActionCenterActions } from "@absolutejs/voice/client";
 import {
@@ -426,6 +427,30 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
               Latest router event from the self-hosted trace store.
             </p>
             @if (routingStatus.decision(); as decision) {
+              <div class="voice-routing-stack">
+                <div>
+                  <span>Profile</span>
+                  <strong>{{
+                    decision.profileLabel ?? decision.profileId ?? "None"
+                  }}</strong>
+                </div>
+                <div>
+                  <span>LLM</span>
+                  <strong>{{ formatProviderRoute(decision.providerRoutes, "llm") }}</strong>
+                </div>
+                <div>
+                  <span>STT</span>
+                  <strong>{{ formatProviderRoute(decision.providerRoutes, "stt") }}</strong>
+                </div>
+                <div>
+                  <span>TTS</span>
+                  <strong>{{ formatProviderRoute(decision.providerRoutes, "tts") }}</strong>
+                </div>
+                <div>
+                  <span>Fallback path</span>
+                  <strong>{{ formatFallbackPath(decision) }}</strong>
+                </div>
+              </div>
               <div class="voice-routing-grid">
                 <div>
                   <span>Policy</span>
@@ -1450,6 +1475,30 @@ export class AngularVoiceDemoComponent {
         .map(([role, provider]) => `${role}: ${String(provider)}`)
         .join(", ") || "None"
     );
+  }
+  formatProviderRoute(routes: unknown, role: "llm" | "stt" | "tts") {
+    if (!routes || typeof routes !== "object") {
+      return "Not configured";
+    }
+
+    const value = (routes as Record<string, unknown>)[role];
+    return typeof value === "string" && value.trim()
+      ? value
+      : "Not configured";
+  }
+  formatFallbackPath(decision: VoiceRoutingDecisionSummary) {
+    const provider = decision.provider || "Unknown";
+    const selectedProvider = decision.selectedProvider || provider;
+
+    if (decision.fallbackProvider) {
+      return `${provider} -> ${decision.fallbackProvider}`;
+    }
+
+    if (selectedProvider !== provider) {
+      return `${provider} -> ${selectedProvider}`;
+    }
+
+    return `${provider} primary`;
   }
   currentVoice = computed(() =>
     this.activeMode() === "general" ? this.generalVoice : this.guidedVoice,
