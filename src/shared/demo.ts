@@ -248,6 +248,12 @@ export const VOICE_PROOF_DASHBOARDS = [
     href: "/voice/profile-switch-live-decisions",
     label: "Profile decisions",
   },
+  {
+    description:
+      "Deploy-facing gate for profile switch policy, audit, trace, and live evidence.",
+    href: "/voice/profile-switch-readiness",
+    label: "Profile readiness",
+  },
 ] as const;
 
 export const isVoiceModelProvider = (

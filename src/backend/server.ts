@@ -101,6 +101,7 @@ import {
   applyVoiceProfileSwitchGuard,
   createVoiceProfileSwitchLiveDecisionRoutes,
   createVoiceProfileSwitchPolicyProofRoutes,
+  createVoiceProfileSwitchReadinessRoutes,
   recommendVoiceProfileSwitch,
   summarizeVoiceTurnQuality,
   createVoiceSTTProviderRouter,
@@ -10317,6 +10318,30 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
       audit: runtimeStorage.audit,
       limit: 50,
       title: "Voice Profile Switch Live Decisions",
+      trace: deliveryTraceStore,
+    }),
+  )
+  .use(
+    createVoiceProfileSwitchReadinessRoutes({
+      audit: runtimeStorage.audit,
+      autoMode: true,
+      limit: 50,
+      maxAutoAppliedRatio: 1,
+      policyProof: {
+        allowedProfileIds: [...demoVoiceProfileIds],
+        audit: runtimeStorage.audit,
+        defaults: () => readRealCallProfileDefaultsReport(),
+        metadata: {
+          source: "absolutejs-voice-example",
+        },
+        observed: {
+          currentProfileId: "meeting-recorder",
+          fallbackUsed: true,
+          providerP95Ms: 950,
+          turnWarnings: 3,
+        },
+      },
+      title: "Voice Profile Switch Readiness",
       trace: deliveryTraceStore,
     }),
   )
