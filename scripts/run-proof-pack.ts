@@ -519,6 +519,8 @@ const proofTargets: ProofTarget[] = [
       "AbsoluteJS Voice Realtime Provider Contracts",
       "Realtime provider contracts",
       "openai-realtime",
+      "gemini-live",
+      "pipecat-bridge",
       "Trace evidence",
     ],
   },
@@ -2677,8 +2679,9 @@ const realtimeProviderContracts = proofResults.find(
 const realtimeProviderContractEvidenceReport = realtimeProviderContracts
   ? evaluateVoiceRealtimeProviderContractEvidence(realtimeProviderContracts, {
       maxFailed: 0,
-      maxWarned: 0,
-      minRows: 1,
+      maxStatus: "warn",
+      maxWarned: 2,
+      minRows: 3,
       requiredCheckKeys: [
         "configured",
         "env",
@@ -2689,7 +2692,7 @@ const realtimeProviderContractEvidenceReport = realtimeProviderContracts
         "traceEvidence",
         "readiness",
       ],
-      requiredProviders: ["openai-realtime"],
+      requiredProviders: ["gemini-live", "openai-realtime", "pipecat-bridge"],
       requireSelected: true,
     })
   : undefined;

@@ -118,6 +118,8 @@ const screenshotTargets: ScreenshotTarget[] = [
       "AbsoluteJS Voice Realtime Provider Contracts",
       "Realtime provider contracts",
       "openai-realtime",
+      "gemini-live",
+      "pipecat-bridge",
       "Trace evidence",
     ],
   },
