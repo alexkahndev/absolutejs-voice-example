@@ -1553,6 +1553,7 @@ const sttLatencyBudgets = {
 type VoiceSTTProvider = "deepgram" | "assemblyai";
 const sessionRoutingModes = new Map<string, VoiceRoutingMode>();
 const sessionVoiceProfileIds = new Map<string, string>();
+const sessionVoiceProfileGuarded = new Set<string>();
 const configuredModelProviders: VoiceModelProvider[] = [
   "deterministic",
   openAIApiKey ? "openai" : undefined,
@@ -2108,13 +2109,87 @@ const findVoiceProfileDefault = async (profileId?: string) => {
     report.defaults.profiles[0]
   );
 };
-const rememberSessionVoiceProfileId = (input: {
+const rememberSessionVoiceProfileId = async (input: {
   context: unknown;
   sessionId: string;
 }) => {
-  const profileId = resolveVoiceProfileIdFromContext(input.context);
-  sessionVoiceProfileIds.set(input.sessionId, profileId);
-  return profileId;
+  if (sessionVoiceProfileGuarded.has(input.sessionId)) {
+    return (
+      sessionVoiceProfileIds.get(input.sessionId) ??
+      resolveVoiceProfileIdFromContext(input.context)
+    );
+  }
+
+  const requestedProfileId = resolveVoiceProfileIdFromContext(input.context);
+  sessionVoiceProfileIds.set(input.sessionId, requestedProfileId);
+  sessionVoiceProfileGuarded.add(input.sessionId);
+
+  const [defaults, turnQuality] = await Promise.all([
+    readRealCallProfileDefaultsReport(),
+    summarizeVoiceTurnQuality({
+      limit: 25,
+      store: runtimeStorage.session,
+    }),
+  ]);
+  const turnLatencies = turnQuality.turns
+    .map((turn) => turn.latencyMs)
+    .filter((value): value is number => typeof value === "number");
+  const turnP95Ms =
+    turnLatencies.length > 0
+      ? turnLatencies.sort((left, right) => left - right)[
+          Math.max(0, Math.ceil(turnLatencies.length * 0.95) - 1)
+        ]
+      : undefined;
+  const query = queryFromContext(input.context);
+  const minConfidence = Number(readQueryString(query, ["minProfileConfidence"]));
+  const guard = await applyVoiceProfileSwitchGuard({
+    actor: {
+      id: "absolutejs-voice-example",
+      kind: "system",
+      name: "AbsoluteJS Voice Example",
+    },
+    audit: runtimeStorage.audit,
+    defaults,
+    metadata: {
+      endpoint: "/voice/intake",
+      requestedProfileId,
+      selectedBy: "session-start",
+    },
+    minConfidence: Number.isFinite(minConfidence) ? minConfidence : 0.75,
+    mode: readQueryString(query, ["profileSwitchMode"]) === "recommend"
+      ? "recommend"
+      : "auto",
+    observed: {
+      currentProfileId: requestedProfileId,
+      turnP95Ms,
+      turnWarnings: turnQuality.warnings,
+    },
+    sessionId: input.sessionId,
+  });
+  const selectedProfileId = guard.selectedProfileId ?? requestedProfileId;
+  sessionVoiceProfileIds.set(input.sessionId, selectedProfileId);
+  await deliveryTraceStore.append({
+    at: Date.now(),
+    metadata: {
+      requestedProfileId,
+      selectedProfileId,
+      source: "profile-switch-guard",
+    },
+    payload: {
+      action: guard.action,
+      autoApplied: guard.autoApplied,
+      confidence: guard.confidence,
+      minConfidence: guard.minConfidence,
+      mode: guard.mode,
+      reason: guard.reason,
+      recommendedProfileId: guard.recommendedProfileId,
+      selectedProfileId,
+      status: guard.recommendation.status,
+    },
+    sessionId: input.sessionId,
+    type: "provider.decision",
+  });
+  return selectedProfileId;
 };
 const intakeModel: VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake> = {
   generate: ({ context, session, turn, system }) => {
@@ -2363,7 +2438,7 @@ const sttAdapter: STTAdapter = {
     return sttRouters[routing].open(input);
   },
 };
-const rememberSessionRoutingMode = (input: {
+const rememberSessionRoutingMode = async (input: {
   context: unknown;
   sessionId: string;
 }) => {
@@ -2374,7 +2449,7 @@ const rememberSessionRoutingMode = (input: {
       : "balanced";
 
   sessionRoutingModes.set(input.sessionId, routing);
-  rememberSessionVoiceProfileId(input);
+  await rememberSessionVoiceProfileId(input);
   return routing;
 };
 const providerFailureSimulator = createVoiceProviderFailureSimulator({
@@ -9257,8 +9332,8 @@ const createTelephonyBridgeConfig = () => ({
   },
   onTurn: contractAwareOnTurn,
   ops: assistant.ops,
-  phraseHints: (input: { context: unknown; sessionId: string }) => {
-    rememberSessionRoutingMode(input);
+  phraseHints: async (input: { context: unknown; sessionId: string }) => {
+    await rememberSessionRoutingMode(input);
     return VOICE_DEMO_PHRASE_HINTS;
   },
   preset: "reliability" as const,
@@ -9327,8 +9402,8 @@ const server = new Elysia()
           : undefined,
       ops: assistant.ops,
       correctTurn: correctDemoTurn,
-      phraseHints: (input) => {
-        rememberSessionRoutingMode(input);
+      phraseHints: async (input) => {
+        await rememberSessionRoutingMode(input);
         return VOICE_DEMO_PHRASE_HINTS;
       },
       onTurn: contractAwareOnTurn,
@@ -9362,8 +9437,8 @@ const server = new Elysia()
           onTurn: contractAwareOnTurn,
           ops: assistant.ops,
           path: "/voice/realtime",
-          phraseHints: (input) => {
-            rememberSessionRoutingMode(input);
+          phraseHints: async (input) => {
+            await rememberSessionRoutingMode(input);
             return VOICE_DEMO_PHRASE_HINTS;
           },
           preset: "reliability",
