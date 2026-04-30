@@ -34,6 +34,32 @@ export const VOICE_ROUTING_MODES = [
     shortLabel: "Quality"
   }
 ];
+export const VOICE_PROFILES = [
+  {
+    description: "General browser recording with meeting-focused defaults.",
+    id: "meeting-recorder",
+    label: "Meeting recorder",
+    shortLabel: "Meeting"
+  },
+  {
+    description: "Support triage defaults for guided handoff and tool flows.",
+    id: "support-agent",
+    label: "Support agent",
+    shortLabel: "Support"
+  },
+  {
+    description: "Scheduling flow tuned for booking and appointment capture.",
+    id: "appointment-scheduler",
+    label: "Appointment scheduler",
+    shortLabel: "Scheduler"
+  },
+  {
+    description: "Noisy phone-call profile for tougher STT routing conditions.",
+    id: "noisy-phone-call",
+    label: "Noisy phone call",
+    shortLabel: "Noisy"
+  }
+];
 export const VOICE_SPEECH_ENGINES = [
   {
     description: "Deepgram or AssemblyAI STT, routed LLM, and OpenAI/emergency TTS.",
@@ -119,6 +145,7 @@ export const VOICE_PROOF_DASHBOARDS = [
 ];
 export const isVoiceModelProvider = (value) => value === "deterministic" || value === "openai" || value === "anthropic" || value === "gemini";
 export const isVoiceRoutingMode = (value) => value === "balanced" || value === "fastest" || value === "cheapest" || value === "quality";
+export const isVoiceProfileId = (value) => value === "meeting-recorder" || value === "support-agent" || value === "appointment-scheduler" || value === "noisy-phone-call";
 export const isVoiceSpeechEngine = (value) => value === "cascaded" || value === "openai-realtime";
 export const VOICE_ROUTE_PATH = "/voice/intake";
 export const VOICE_REALTIME_ROUTE_PATH = "/voice/realtime";
@@ -177,7 +204,7 @@ export const VOICE_TEST_QUESTIONS = [
   "Now describe what you are trying to do or test.",
   "Finish with any detail that feels blocked, risky, or unclear."
 ];
-export const getVoiceRoutePath = (scenarioId, provider, routing, engine = "cascaded") => {
+export const getVoiceRoutePath = (scenarioId, provider, routing, engine = "cascaded", profileId) => {
   const params = new URLSearchParams({
     scenarioId
   });
@@ -187,11 +214,15 @@ export const getVoiceRoutePath = (scenarioId, provider, routing, engine = "casca
   if (routing) {
     params.set("routing", routing);
   }
+  if (profileId) {
+    params.set("voiceProfile", profileId);
+  }
   const path = engine === "openai-realtime" ? VOICE_REALTIME_ROUTE_PATH : VOICE_ROUTE_PATH;
   return `${path}?${params.toString()}`;
 };
 export const getVoiceProviderLabel = (provider) => VOICE_MODEL_PROVIDERS.find((item) => item.id === provider)?.label ?? provider;
 export const getVoiceRoutingLabel = (routing) => VOICE_ROUTING_MODES.find((item) => item.id === routing)?.label ?? routing ?? "Unknown";
+export const getVoiceProfileLabel = (profileId) => VOICE_PROFILES.find((item) => item.id === profileId)?.label ?? profileId ?? "Unknown";
 export const getVoiceSpeechEngineLabel = (engine) => VOICE_SPEECH_ENGINES.find((item) => item.id === engine)?.label ?? engine;
 export const getVoiceSpeechEngineSampleRate = (engine) => VOICE_SPEECH_ENGINES.find((item) => item.id === engine)?.sampleRateHz ?? 16000;
 export const getVoiceProviderStatusLabel = (status) => {
@@ -244,6 +275,23 @@ export const getInitialVoiceRoutingMode = () => {
 export const rememberVoiceRoutingMode = (routing) => {
   if (typeof window !== "undefined") {
     window.localStorage.setItem("voiceRoutingMode", routing);
+  }
+};
+export const getInitialVoiceProfileId = () => {
+  if (typeof window === "undefined") {
+    return "meeting-recorder";
+  }
+  const params = new URLSearchParams(window.location.search);
+  const urlProfile = params.get("voiceProfile") ?? params.get("profileId") ?? params.get("callProfile");
+  if (isVoiceProfileId(urlProfile)) {
+    return urlProfile;
+  }
+  const storedProfile = window.localStorage.getItem("voiceProfileId");
+  return isVoiceProfileId(storedProfile) ? storedProfile : "meeting-recorder";
+};
+export const rememberVoiceProfileId = (profileId) => {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem("voiceProfileId", profileId);
   }
 };
 export const getInitialVoiceSpeechEngine = () => {

@@ -31,11 +31,13 @@ import {
   getVoiceLeadMessage,
   getVoiceModeLabel,
   getVoiceModePrompt,
+  getVoiceProfileLabel,
   getVoiceProviderLabel,
   getVoiceRoutingLabel,
   getVoiceRoutePath,
   getVoiceSpeechEngineSampleRate,
   rememberVoiceModelProvider,
+  rememberVoiceProfileId,
   rememberVoiceRoutingMode,
   rememberVoiceSpeechEngine,
   VOICE_ASSISTANT_CONFIG,
@@ -49,12 +51,14 @@ import {
   VOICE_CALL_CONTROL_ACTIONS,
   VOICE_MODEL_PROVIDERS,
   VOICE_PROOF_DASHBOARDS,
+  VOICE_PROFILES,
   VOICE_ROUTING_MODES,
   VOICE_SPEECH_ENGINES,
   type VoiceAgentSquadDemoStatus,
   type SavedIntake,
   type VoiceDemoMode,
   type VoiceModelProvider,
+  type VoiceProfileId,
   type VoiceRoutingMode,
   type VoiceSpeechEngine,
 } from "../../../shared/demo";
@@ -83,12 +87,16 @@ import {
 
 type AngularVoiceDemoProps = {
   initialModelProvider: VoiceModelProvider;
+  initialProfileId: VoiceProfileId;
   initialRoutingMode: VoiceRoutingMode;
   initialSpeechEngine: VoiceSpeechEngine;
 };
 
 export const INITIAL_MODEL_PROVIDER = new InjectionToken<VoiceModelProvider>(
   "INITIAL_MODEL_PROVIDER",
+);
+export const INITIAL_PROFILE_ID = new InjectionToken<VoiceProfileId>(
+  "INITIAL_PROFILE_ID",
 );
 export const INITIAL_ROUTING_MODE = new InjectionToken<VoiceRoutingMode>(
   "INITIAL_ROUTING_MODE",
@@ -185,13 +193,13 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             </p>
             <label class="voice-provider-select">
               <span>Provider</span>
-              <select
-                (change)="changeModelProvider($any($event.target).value)"
-              >
+              <select (change)="changeModelProvider($any($event.target).value)">
                 @for (provider of modelProviders; track provider.id) {
                   <option
                     value="{{ provider.id }}"
-                    [attr.selected]="provider.id === modelProvider() ? '' : null"
+                    [attr.selected]="
+                      provider.id === modelProvider() ? '' : null
+                    "
                   >
                     {{ provider.label }}
                   </option>
@@ -199,10 +207,21 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
               </select>
             </label>
             <label class="voice-provider-select">
+              <span>Voice profile</span>
+              <select (change)="changeProfileId($any($event.target).value)">
+                @for (profile of voiceProfiles; track profile.id) {
+                  <option
+                    value="{{ profile.id }}"
+                    [attr.selected]="profile.id === profileId() ? '' : null"
+                  >
+                    {{ profile.label }}
+                  </option>
+                }
+              </select>
+            </label>
+            <label class="voice-provider-select">
               <span>STT routing</span>
-              <select
-                (change)="changeRoutingMode($any($event.target).value)"
-              >
+              <select (change)="changeRoutingMode($any($event.target).value)">
                 @for (routing of routingModes; track routing.id) {
                   <option
                     value="{{ routing.id }}"
@@ -215,9 +234,7 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             </label>
             <label class="voice-provider-select">
               <span>Speech engine</span>
-              <select
-                (change)="changeSpeechEngine($any($event.target).value)"
-              >
+              <select (change)="changeSpeechEngine($any($event.target).value)">
                 @for (engine of speechEngines; track engine.id) {
                   <option
                     value="{{ engine.id }}"
@@ -255,7 +272,8 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             <span class="voice-framework-pill">Vapi Replacement Coverage</span>
             <h2>
               @if (platformCoverage.report(); as report) {
-                {{ platformCoveragePassing() }}/{{ report.total }} surfaces passing
+                {{ platformCoveragePassing() }}/{{ report.total }} surfaces
+                passing
               } @else if (platformCoverage.error()) {
                 Coverage unavailable
               } @else if (platformCoverage.isLoading()) {
@@ -286,7 +304,7 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
               <p class="empty-copy">
                 {{
                   platformCoverage.error() ??
-                  "Run the proof pack to populate coverage evidence."
+                    "Run the proof pack to populate coverage evidence."
                 }}
               </p>
             }
@@ -300,7 +318,8 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             <span class="voice-framework-pill">Sustained Proof Trends</span>
             <h2>
               @if (proofTrends.report(); as report) {
-                {{ report.status }} · {{ report.summary.cycles ?? report.cycles.length }} cycles
+                {{ report.status }} ·
+                {{ report.summary.cycles ?? report.cycles.length }} cycles
               } @else if (proofTrends.error()) {
                 Proof trends unavailable
               } @else if (proofTrends.isLoading()) {
@@ -317,7 +336,9 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
               <div class="voice-routing-grid">
                 <div>
                   <span>Provider p95</span>
-                  <strong>{{ formatMs(report.summary.maxProviderP95Ms) }}</strong>
+                  <strong>{{
+                    formatMs(report.summary.maxProviderP95Ms)
+                  }}</strong>
                 </div>
                 <div>
                   <span>Turn p95</span>
@@ -336,7 +357,7 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
               <p class="empty-copy">
                 {{
                   proofTrends.error() ??
-                  "Run the sustained proof trends script to populate evidence."
+                    "Run the sustained proof trends script to populate evidence."
                 }}
               </p>
             }
@@ -347,10 +368,13 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
           </article>
 
           <article class="voice-card voice-provider-health-card">
-            <span class="voice-framework-pill">Readiness Gate Explanations</span>
+            <span class="voice-framework-pill"
+              >Readiness Gate Explanations</span
+            >
             <h2>
               @if (readinessFailures.explanations().length > 0) {
-                {{ readinessFailures.explanations().length }} calibrated gate issue(s)
+                {{ readinessFailures.explanations().length }} calibrated gate
+                issue(s)
               } @else if (readinessFailures.error()) {
                 Readiness explanations unavailable
               } @else if (readinessFailures.isLoading()) {
@@ -366,23 +390,26 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             </p>
             @if (readinessFailures.explanations().length > 0) {
               <div class="voice-routing-grid">
-                @for (check of readinessFailures.explanations(); track check.label) {
-                <div>
-                  <span>{{ check.status }} · {{ check.label }}</span>
-                  <strong>
-                    {{ check.gateExplanation?.observed ?? "n/a" }}
-                    /
-                    {{ check.gateExplanation?.threshold ?? "n/a" }}
-                    {{ check.gateExplanation?.unit ?? "" }}
-                  </strong>
-                </div>
+                @for (
+                  check of readinessFailures.explanations();
+                  track check.label
+                ) {
+                  <div>
+                    <span>{{ check.status }} · {{ check.label }}</span>
+                    <strong>
+                      {{ check.gateExplanation?.observed ?? "n/a" }}
+                      /
+                      {{ check.gateExplanation?.threshold ?? "n/a" }}
+                      {{ check.gateExplanation?.unit ?? "" }}
+                    </strong>
+                  </div>
                 }
               </div>
             } @else {
               <p class="empty-copy">
                 {{
                   readinessFailures.error() ??
-                  "No calibrated readiness gate explanations are open."
+                    "No calibrated readiness gate explanations are open."
                 }}
               </p>
             }
@@ -428,7 +455,9 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
                 </div>
                 <div>
                   <span>Default routes</span>
-                  <strong>{{ formatProviderRoutes(decision.providerRoutes) }}</strong>
+                  <strong>{{
+                    formatProviderRoutes(decision.providerRoutes)
+                  }}</strong>
                 </div>
                 <div>
                   <span>Latency budget</span>
@@ -450,8 +479,8 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             <span class="voice-framework-pill">Agent Squad</span>
             <h2>Specialist routing is live</h2>
             <p class="voice-footnote">
-              Say “I have a billing question about my invoice” to route from
-              the front desk to billing with a compact context policy.
+              Say “I have a billing question about my invoice” to route from the
+              front desk to billing with a compact context policy.
             </p>
             <div class="voice-routing-grid">
               <div>
@@ -513,7 +542,10 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             </button>
             @if (campaignDialerProof.report()?.providers?.length) {
               <div class="voice-provider-health-list">
-                @for (provider of campaignDialerProof.report()!.providers; track provider.provider) {
+                @for (
+                  provider of campaignDialerProof.report()!.providers;
+                  track provider.provider
+                ) {
                   <div class="voice-provider-health-item">
                     <strong>{{ provider.provider }}</strong>
                     <span>
@@ -524,7 +556,8 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
                       }}
                     </span>
                     <small>
-                      {{ provider.carrierRequests.length }} dry-run carrier request{{
+                      {{ provider.carrierRequests.length }} dry-run carrier
+                      request{{
                         provider.carrierRequests.length === 1 ? "" : "s"
                       }}
                     </small>
@@ -535,11 +568,13 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
               <p class="empty-copy">
                 Ready for
                 {{
-                  (campaignDialerProof.status()?.providers ?? [
-                    "twilio",
-                    "telnyx",
-                    "plivo"
-                  ]).join(", ")
+                  (
+                    campaignDialerProof.status()?.providers ?? [
+                      "twilio",
+                      "telnyx",
+                      "plivo",
+                    ]
+                  ).join(", ")
                 }}.
               </p>
             }
@@ -565,19 +600,25 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             </p>
             @if (providerStatus.providers().length) {
               <div class="voice-provider-health-list">
-                @for (provider of providerStatus.providers(); track provider.provider) {
+                @for (
+                  provider of providerStatus.providers();
+                  track provider.provider
+                ) {
                   <div class="voice-provider-health-item">
                     <strong>{{ provider.provider }}</strong>
                     <span>{{ provider.status }}</span>
                     <small>
-                      {{ provider.runCount }} runs · {{ provider.errorCount }}
-                      errors · {{ provider.fallbackCount }} fallbacks
+                      {{ provider.runCount }} runs ·
+                      {{ provider.errorCount }} errors ·
+                      {{ provider.fallbackCount }} fallbacks
                     </small>
                   </div>
                 }
               </div>
             } @else {
-              <p class="empty-copy">Run assistant traffic to see provider health.</p>
+              <p class="empty-copy">
+                Run assistant traffic to see provider health.
+              </p>
             }
           </article>
 
@@ -591,7 +632,8 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
               }}
             </h2>
             <p class="voice-footnote">
-              Configured LLM/STT providers, selected defaults, models, and feature coverage.
+              Configured LLM/STT providers, selected defaults, models, and
+              feature coverage.
             </p>
             @if (providerCapabilities.report()?.capabilities?.length) {
               <div class="voice-provider-health-list">
@@ -600,17 +642,24 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
                   track capability.kind + ":" + capability.provider
                 ) {
                   <div class="voice-provider-health-item">
-                    <strong>{{ capability.provider }} {{ capability.kind }}</strong>
+                    <strong
+                      >{{ capability.provider }} {{ capability.kind }}</strong
+                    >
                     <span>{{ capability.status }}</span>
                     <small>
                       {{ capability.model || "default" }} ·
-                      {{ capability.features?.join(", ") || "features not specified" }}
+                      {{
+                        capability.features?.join(", ") ||
+                          "features not specified"
+                      }}
                     </small>
                   </div>
                 }
               </div>
             } @else {
-              <p class="empty-copy">Configure provider capabilities to see coverage.</p>
+              <p class="empty-copy">
+                Configure provider capabilities to see coverage.
+              </p>
             }
           </article>
 
@@ -619,12 +668,16 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             <h2>
               {{
                 providerContracts.report()
-                  ? providerContracts.report()!.passed + "/" + providerContracts.report()!.total + " passing"
+                  ? providerContracts.report()!.passed +
+                    "/" +
+                    providerContracts.report()!.total +
+                    " passing"
                   : "Checking contracts"
               }}
             </h2>
             <p class="voice-footnote">
-              Required env, latency budget, fallback, streaming, and capability contracts.
+              Required env, latency budget, fallback, streaming, and capability
+              contracts.
             </p>
             @if (providerContracts.report()?.rows?.length) {
               <div class="voice-provider-health-list">
@@ -651,7 +704,9 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
                 }
               </div>
             } @else {
-              <p class="empty-copy">Configure provider contracts to see coverage.</p>
+              <p class="empty-copy">
+                Configure provider contracts to see coverage.
+              </p>
             }
           </article>
 
@@ -675,11 +730,15 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
               }}
             </h2>
             <p class="voice-footnote">
-              STT confidence, fallback selection, correction, and transcript coverage.
+              STT confidence, fallback selection, correction, and transcript
+              coverage.
             </p>
             @if (turnQuality.report()?.turns?.length) {
               <div class="voice-provider-health-list">
-                @for (turn of turnQuality.report()!.turns; track turn.sessionId + ":" + turn.turnId) {
+                @for (
+                  turn of turnQuality.report()!.turns;
+                  track turn.sessionId + ":" + turn.turnId
+                ) {
                   <div class="voice-provider-health-item">
                     <strong>{{ turn.text || "Empty turn" }}</strong>
                     <span>{{ turn.status }}</span>
@@ -697,7 +756,9 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
                 }
               </div>
             } @else {
-              <p class="empty-copy">Complete a turn to see quality diagnostics.</p>
+              <p class="empty-copy">
+                Complete a turn to see quality diagnostics.
+              </p>
             }
           </article>
 
@@ -711,7 +772,8 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
               }}
             </h2>
             <p class="voice-footnote">
-              End-to-end turn responsiveness from transcript timing to assistant start.
+              End-to-end turn responsiveness from transcript timing to assistant
+              start.
             </p>
             <button
               class="absolute-voice-turn-latency__proof"
@@ -722,7 +784,10 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             </button>
             @if (turnLatency.report()?.turns?.length) {
               <div class="voice-provider-health-list">
-                @for (turn of turnLatency.report()!.turns; track turn.sessionId + ":" + turn.turnId) {
+                @for (
+                  turn of turnLatency.report()!.turns;
+                  track turn.sessionId + ":" + turn.turnId
+                ) {
                   <div class="voice-provider-health-item">
                     <strong>{{ turn.text || "Empty turn" }}</strong>
                     <span>{{ turn.status }}</span>
@@ -736,7 +801,9 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
                 }
               </div>
             } @else {
-              <p class="empty-copy">Complete a turn to see latency diagnostics.</p>
+              <p class="empty-copy">
+                Complete a turn to see latency diagnostics.
+              </p>
             }
           </article>
 
@@ -799,8 +866,10 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
               >
               <span class="pill"
                 >{{
-                  (deliveryRuntime.report()?.summary?.audit?.deadLettered ?? 0) +
-                    (deliveryRuntime.report()?.summary?.trace?.deadLettered ?? 0)
+                  (deliveryRuntime.report()?.summary?.audit?.deadLettered ??
+                    0) +
+                    (deliveryRuntime.report()?.summary?.trace?.deadLettered ??
+                      0)
                 }}
                 dead-lettered</span
               >
@@ -857,7 +926,9 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             </p>
             <div class="voice-live-ops-panel__session">
               <span>Active session</span>
-              <strong>{{ currentVoice().sessionId() || "No active session" }}</strong>
+              <strong>{{
+                currentVoice().sessionId() || "No active session"
+              }}</strong>
             </div>
             <label class="voice-provider-select">
               <span>Operator</span>
@@ -923,7 +994,8 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             @if ((traceTimeline.report()?.sessions?.length ?? 0) > 0) {
               <div class="absolute-voice-trace-timeline__sessions">
                 @for (
-                  session of traceTimeline.report()?.sessions?.slice(0, 2) ?? [];
+                  session of traceTimeline.report()?.sessions?.slice(0, 2) ??
+                    [];
                   track session.sessionId
                 ) {
                   <article
@@ -1222,20 +1294,25 @@ export class AngularVoiceDemoComponent {
   activeMode = signal<VoiceDemoMode | null>(null);
   private readonly initialModelProvider =
     inject(INITIAL_MODEL_PROVIDER, { optional: true }) ?? "deterministic";
+  private readonly initialProfileId =
+    inject(INITIAL_PROFILE_ID, { optional: true }) ?? "meeting-recorder";
   private readonly initialRoutingMode =
     inject(INITIAL_ROUTING_MODE, { optional: true }) ?? "balanced";
   private readonly initialSpeechEngine =
     inject(INITIAL_SPEECH_ENGINE, { optional: true }) ?? "cascaded";
   modelProvider = signal<VoiceModelProvider>(this.initialModelProvider);
+  profileId = signal<VoiceProfileId>(this.initialProfileId);
   routingMode = signal<VoiceRoutingMode>(this.initialRoutingMode);
   speechEngine = signal<VoiceSpeechEngine>(this.initialSpeechEngine);
   modelProviders = VOICE_MODEL_PROVIDERS;
   proofDashboards = VOICE_PROOF_DASHBOARDS;
+  voiceProfiles = VOICE_PROFILES;
   routingModes = VOICE_ROUTING_MODES;
   speechEngines = VOICE_SPEECH_ENGINES;
   callControlActions = VOICE_CALL_CONTROL_ACTIONS;
   liveOpsActions = VOICE_LIVE_OPS_ACTIONS;
   getVoiceProviderLabel = getVoiceProviderLabel;
+  getVoiceProfileLabel = getVoiceProfileLabel;
   getVoiceRoutingLabel = getVoiceRoutingLabel;
   getOpsStatusLabel = getOpsStatusLabel;
   hasStartedModes = signal<Record<VoiceDemoMode, boolean>>({
@@ -1266,6 +1343,7 @@ export class AngularVoiceDemoComponent {
       this.modelProvider(),
       this.routingMode(),
       this.speechEngine(),
+      this.profileId(),
     ),
     { reconnectReportPath: "/api/voice/reconnect-traces" },
   );
@@ -1275,6 +1353,7 @@ export class AngularVoiceDemoComponent {
       this.modelProvider(),
       this.routingMode(),
       this.speechEngine(),
+      this.profileId(),
     ),
     { reconnectReportPath: "/api/voice/reconnect-traces" },
   );
@@ -1426,10 +1505,10 @@ export class AngularVoiceDemoComponent {
   });
   routingDescription = computed(
     () =>
-      this.speechEngines.find((item) => item.id === this.speechEngine())
-        ?.description ??
-      this.routingModes.find((item) => item.id === this.routingMode())
-        ?.description ?? "",
+      `${getVoiceProfileLabel(this.profileId())} uses ${
+        this.voiceProfiles.find((item) => item.id === this.profileId())
+          ?.description ?? "the selected real-call defaults."
+      }`,
   );
   wavePath = computed(() => createVoiceWavePath(this.waveLevels()));
   private microphone: ReturnType<typeof createDemoMicrophone> | null = null;
@@ -1528,6 +1607,14 @@ export class AngularVoiceDemoComponent {
     rememberVoiceModelProvider(provider);
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("provider", provider);
+    window.location.href = nextUrl.toString();
+  }
+
+  changeProfileId(profileId: VoiceProfileId) {
+    this.stopMic();
+    rememberVoiceProfileId(profileId);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("voiceProfile", profileId);
     window.location.href = nextUrl.toString();
   }
 

@@ -32,11 +32,13 @@
     getVoiceLeadMessage,
     getVoiceModeLabel,
     getVoiceModePrompt,
+    getVoiceProfileLabel,
     getVoiceProviderLabel,
     getVoiceRoutingLabel,
     getVoiceRoutePath,
     getVoiceSpeechEngineSampleRate,
     rememberVoiceModelProvider,
+    rememberVoiceProfileId,
     rememberVoiceRoutingMode,
     rememberVoiceSpeechEngine,
     VOICE_ASSISTANT_CONFIG,
@@ -50,12 +52,14 @@
     VOICE_CALL_CONTROL_ACTIONS,
     VOICE_MODEL_PROVIDERS,
     VOICE_PROOF_DASHBOARDS,
+    VOICE_PROFILES,
     VOICE_ROUTING_MODES,
     VOICE_SPEECH_ENGINES,
     type VoiceAgentSquadDemoStatus,
     type SavedIntake,
     type VoiceDemoMode,
     type VoiceModelProvider,
+    type VoiceProfileId,
     type VoiceRoutingMode,
     type VoiceSpeechEngine,
   } from "../../../shared/demo";
@@ -97,6 +101,7 @@
   type SvelteVoiceDemoProps = {
     cssPath?: string;
     initialModelProvider?: VoiceModelProvider;
+    initialProfileId?: VoiceProfileId;
     initialRoutingMode?: VoiceRoutingMode;
     initialSpeechEngine?: VoiceSpeechEngine;
   };
@@ -104,11 +109,13 @@
   let {
     cssPath,
     initialModelProvider = "deterministic",
+    initialProfileId = "meeting-recorder",
     initialRoutingMode = "balanced",
     initialSpeechEngine = "cascaded",
   }: SvelteVoiceDemoProps = $props();
   let activeMode = $state<VoiceDemoMode | null>(null);
   let modelProvider = $state<VoiceModelProvider>(initialModelProvider);
+  let profileId = $state<VoiceProfileId>(initialProfileId);
   let routingMode = $state<VoiceRoutingMode>(initialRoutingMode);
   let speechEngine = $state<VoiceSpeechEngine>(initialSpeechEngine);
   let error = $state<string | null>(null);
@@ -440,11 +447,23 @@
     guidedVoice?.close();
     generalVoice?.close();
     guidedVoice = createVoiceStream<SavedIntake>(
-      getVoiceRoutePath("guided", modelProvider, routingMode, speechEngine),
+      getVoiceRoutePath(
+        "guided",
+        modelProvider,
+        routingMode,
+        speechEngine,
+        profileId,
+      ),
       { reconnectReportPath: "/api/voice/reconnect-traces" },
     );
     generalVoice = createVoiceStream<SavedIntake>(
-      getVoiceRoutePath("general", modelProvider, routingMode, speechEngine),
+      getVoiceRoutePath(
+        "general",
+        modelProvider,
+        routingMode,
+        speechEngine,
+        profileId,
+      ),
       { reconnectReportPath: "/api/voice/reconnect-traces" },
     );
     guidedState = { ...guidedVoice.getSnapshot() };
@@ -475,6 +494,14 @@
     connectVoices();
   };
 
+  const changeProfileId = (nextProfileId: VoiceProfileId) => {
+    stopMic();
+    activeMode = null;
+    profileId = nextProfileId;
+    rememberVoiceProfileId(nextProfileId);
+    connectVoices();
+  };
+
   const changeRoutingMode = (routing: VoiceRoutingMode) => {
     stopMic();
     activeMode = null;
@@ -495,6 +522,13 @@
     const target = event.target;
     if (target instanceof HTMLSelectElement) {
       changeModelProvider(target.value as VoiceModelProvider);
+    }
+  };
+
+  const changeProfileIdFromEvent = (event: Event) => {
+    const target = event.target;
+    if (target instanceof HTMLSelectElement) {
+      changeProfileId(target.value as VoiceProfileId);
     }
   };
 
@@ -632,7 +666,8 @@
       liveOpsPanel = mountVoiceLiveOpsPanel(liveOpsPanelElement, {
         getSessionId: () => currentVoice.sessionId,
         onControl: ({ action, detail, tag }) => {
-          const activeVoice = activeMode === "general" ? generalVoice : guidedVoice;
+          const activeVoice =
+            activeMode === "general" ? generalVoice : guidedVoice;
           if (!activeVoice) {
             return;
           }
@@ -802,6 +837,14 @@
           </select>
         </label>
         <label class="voice-provider-select">
+          <span>Voice profile</span>
+          <select value={profileId} on:change={changeProfileIdFromEvent}>
+            {#each VOICE_PROFILES as profile}
+              <option value={profile.id}>{profile.label}</option>
+            {/each}
+          </select>
+        </label>
+        <label class="voice-provider-select">
           <span>STT routing</span>
           <select value={routingMode} on:change={changeRoutingModeFromEvent}>
             {#each VOICE_ROUTING_MODES as routing}
@@ -818,11 +861,9 @@
           </select>
         </label>
         <p class="voice-footnote">
-          {VOICE_SPEECH_ENGINES.find((item) => item.id === speechEngine)
-            ?.description ??
-            VOICE_ROUTING_MODES.find((item) => item.id === routingMode)
-              ?.description ??
-            ""}
+          {getVoiceProfileLabel(profileId)} uses {VOICE_PROFILES.find(
+            (item) => item.id === profileId,
+          )?.description ?? "the selected real-call defaults."}
         </p>
       </article>
 
@@ -890,7 +931,9 @@
         </div>
         <p class="voice-footnote">
           {#if agentSquadStatus?.lastHandoff}
-            {agentSquadStatus.lastHandoff.fromAgentId} → {agentSquadStatus.lastHandoff.targetAgentId}: {agentSquadStatus.lastHandoff.summary ??
+            {agentSquadStatus.lastHandoff.fromAgentId} → {agentSquadStatus
+              .lastHandoff.targetAgentId}: {agentSquadStatus.lastHandoff
+              .summary ??
               agentSquadStatus.lastHandoff.reason ??
               "handoff applied"}
           {:else}
@@ -902,15 +945,21 @@
         </p>
       </article>
 
-      <div class="voice-card voice-provider-health-card voice-provider-status-host">
+      <div
+        class="voice-card voice-provider-health-card voice-provider-status-host"
+      >
         {@html providerStatusHTML}
       </div>
 
-      <div class="voice-card voice-provider-health-card voice-provider-capabilities-host">
+      <div
+        class="voice-card voice-provider-health-card voice-provider-capabilities-host"
+      >
         {@html providerCapabilitiesHTML}
       </div>
 
-      <div class="voice-card voice-provider-health-card voice-provider-contracts-host">
+      <div
+        class="voice-card voice-provider-health-card voice-provider-contracts-host"
+      >
         {@html providerContractsHTML}
       </div>
 
@@ -921,7 +970,9 @@
         {@html providerSimulationHTML}
       </div>
 
-      <div class="voice-card voice-provider-health-card voice-turn-quality-host">
+      <div
+        class="voice-card voice-provider-health-card voice-turn-quality-host"
+      >
         {@html turnQualityHTML}
       </div>
 
@@ -936,9 +987,9 @@
         <span class="voice-framework-pill">Campaign Dialer Proof</span>
         <h2>Carrier dialer dry-run</h2>
         <p class="voice-footnote">
-          Twilio, Telnyx, and Plivo campaign dials run through the shared
-          Svelte creator, attach campaign metadata, and resolve synthetic
-          webhook outcomes.
+          Twilio, Telnyx, and Plivo campaign dials run through the shared Svelte
+          creator, attach campaign metadata, and resolve synthetic webhook
+          outcomes.
         </p>
         <button
           class="absolute-voice-turn-latency__proof"
@@ -1001,7 +1052,9 @@
         bind:this={opsActionHistoryElement}
       ></div>
 
-      <div class="voice-card voice-provider-health-card voice-trace-timeline-host">
+      <div
+        class="voice-card voice-provider-health-card voice-trace-timeline-host"
+      >
         {@html traceTimelineHTML}
       </div>
 
@@ -1076,7 +1129,9 @@
           </div>
           <div class="status-row">
             <span class="label">Reconnect</span>
-            <span class="value">{formatReconnectState(currentVoice.reconnect)}</span>
+            <span class="value"
+              >{formatReconnectState(currentVoice.reconnect)}</span
+            >
           </div>
           <div class="status-row">
             <span class="label">Current prompt</span>

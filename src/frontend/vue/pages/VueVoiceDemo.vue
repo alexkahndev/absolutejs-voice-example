@@ -28,11 +28,13 @@ import {
   getVoiceLeadMessage,
   getVoiceModeLabel,
   getVoiceModePrompt,
+  getVoiceProfileLabel,
   getVoiceProviderLabel,
   getVoiceRoutingLabel,
   getVoiceRoutePath,
   getVoiceSpeechEngineSampleRate,
   rememberVoiceModelProvider,
+  rememberVoiceProfileId,
   rememberVoiceRoutingMode,
   rememberVoiceSpeechEngine,
   VOICE_ASSISTANT_CONFIG,
@@ -46,12 +48,14 @@ import {
   VOICE_CALL_CONTROL_ACTIONS,
   VOICE_MODEL_PROVIDERS,
   VOICE_PROOF_DASHBOARDS,
+  VOICE_PROFILES,
   VOICE_ROUTING_MODES,
   VOICE_SPEECH_ENGINES,
   type VoiceAgentSquadDemoStatus,
   type SavedIntake,
   type VoiceDemoMode,
   type VoiceModelProvider,
+  type VoiceProfileId,
   type VoiceRoutingMode,
   type VoiceSpeechEngine,
 } from "../../../shared/demo";
@@ -74,17 +78,20 @@ import {
 
 type VueVoiceDemoProps = {
   initialModelProvider?: VoiceModelProvider;
+  initialProfileId?: VoiceProfileId;
   initialRoutingMode?: VoiceRoutingMode;
   initialSpeechEngine?: VoiceSpeechEngine;
 };
 
 const props = withDefaults(defineProps<VueVoiceDemoProps>(), {
   initialModelProvider: "deterministic",
+  initialProfileId: "meeting-recorder",
   initialRoutingMode: "balanced",
   initialSpeechEngine: "cascaded",
 });
 
 const modelProvider = ref<VoiceModelProvider>(props.initialModelProvider);
+const profileId = ref<VoiceProfileId>(props.initialProfileId);
 const routingMode = ref<VoiceRoutingMode>(props.initialRoutingMode);
 const speechEngine = ref<VoiceSpeechEngine>(props.initialSpeechEngine);
 const guidedVoice = useVoiceStream<SavedIntake>(
@@ -93,6 +100,7 @@ const guidedVoice = useVoiceStream<SavedIntake>(
     modelProvider.value,
     routingMode.value,
     speechEngine.value,
+    profileId.value,
   ),
   { reconnectReportPath: "/api/voice/reconnect-traces" },
 );
@@ -102,6 +110,7 @@ const generalVoice = useVoiceStream<SavedIntake>(
     modelProvider.value,
     routingMode.value,
     speechEngine.value,
+    profileId.value,
   ),
   { reconnectReportPath: "/api/voice/reconnect-traces" },
 );
@@ -128,11 +137,7 @@ const campaignDialerProof = ref<CampaignDialerProofSnapshot>({
 });
 const campaignDialerProofReadyProviders = computed(() =>
   (
-    campaignDialerProof.value.status?.providers ?? [
-      "twilio",
-      "telnyx",
-      "plivo",
-    ]
+    campaignDialerProof.value.status?.providers ?? ["twilio", "telnyx", "plivo"]
   ).join(", "),
 );
 const refreshCampaignDialerProof = async () => {
@@ -190,7 +195,8 @@ const liveLatencyHTML = ref("");
 let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
-let opsActionHistory: ReturnType<typeof mountVoiceOpsActionHistory> | null = null;
+let opsActionHistory: ReturnType<typeof mountVoiceOpsActionHistory> | null =
+  null;
 let liveOpsPanel: ReturnType<typeof mountVoiceLiveOpsPanel> | null = null;
 const currentVoice = computed(() =>
   activeMode.value === "general" ? generalVoice : guidedVoice,
@@ -325,6 +331,14 @@ const changeModelProvider = (provider: VoiceModelProvider) => {
   window.location.href = nextUrl.toString();
 };
 
+const changeProfileId = (nextProfileId: VoiceProfileId) => {
+  stopMic();
+  rememberVoiceProfileId(nextProfileId);
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("voiceProfile", nextProfileId);
+  window.location.href = nextUrl.toString();
+};
+
 const changeRoutingMode = (routing: VoiceRoutingMode) => {
   stopMic();
   rememberVoiceRoutingMode(routing);
@@ -345,6 +359,13 @@ const changeModelProviderFromEvent = (event: Event) => {
   const target = event.target;
   if (target instanceof HTMLSelectElement) {
     changeModelProvider(target.value as VoiceModelProvider);
+  }
+};
+
+const changeProfileIdFromEvent = (event: Event) => {
+  const target = event.target;
+  if (target instanceof HTMLSelectElement) {
+    changeProfileId(target.value as VoiceProfileId);
   }
 };
 
@@ -544,6 +565,18 @@ onUnmounted(() => {
             </select>
           </label>
           <label class="voice-provider-select">
+            <span>Voice profile</span>
+            <select :value="profileId" @change="changeProfileIdFromEvent">
+              <option
+                v-for="profile in VOICE_PROFILES"
+                :key="profile.id"
+                :value="profile.id"
+              >
+                {{ profile.label }}
+              </option>
+            </select>
+          </label>
+          <label class="voice-provider-select">
             <span>STT routing</span>
             <select :value="routingMode" @change="changeRoutingModeFromEvent">
               <option
@@ -557,10 +590,7 @@ onUnmounted(() => {
           </label>
           <label class="voice-provider-select">
             <span>Speech engine</span>
-            <select
-              :value="speechEngine"
-              @change="changeSpeechEngineFromEvent"
-            >
+            <select :value="speechEngine" @change="changeSpeechEngineFromEvent">
               <option
                 v-for="engine in VOICE_SPEECH_ENGINES"
                 :key="engine.id"
@@ -572,10 +602,10 @@ onUnmounted(() => {
           </label>
           <p class="voice-footnote">
             {{
-              VOICE_SPEECH_ENGINES.find((item) => item.id === speechEngine)
-                ?.description ??
-              VOICE_ROUTING_MODES.find((item) => item.id === routingMode)
-                ?.description
+              getVoiceProfileLabel(profileId) +
+              " uses " +
+              (VOICE_PROFILES.find((item) => item.id === profileId)
+                ?.description ?? "the selected real-call defaults.")
             }}
           </p>
         </article>
@@ -640,7 +670,9 @@ onUnmounted(() => {
           <div class="voice-routing-grid">
             <div>
               <span>Current specialist</span>
-              <strong>{{ agentSquadStatus?.currentAgentId ?? "front-desk" }}</strong>
+              <strong>{{
+                agentSquadStatus?.currentAgentId ?? "front-desk"
+              }}</strong>
             </div>
             <div>
               <span>Context policy</span>
@@ -668,7 +700,9 @@ onUnmounted(() => {
                 "handoff applied"
               }}
             </template>
-            <template v-else>No specialist handoff in this session yet.</template>
+            <template v-else
+              >No specialist handoff in this session yet.</template
+            >
           </p>
           <p class="voice-footnote">
             <a href="/agent-squad-contract">Open squad contract proof</a>
@@ -786,10 +820,7 @@ onUnmounted(() => {
 
         <div ref="liveOpsPanelEl" />
 
-        <div
-          ref="opsActionHistoryEl"
-          class="voice-card voice-workflow-card"
-        />
+        <div ref="opsActionHistoryEl" class="voice-card voice-workflow-card" />
 
         <article
           class="voice-card voice-provider-health-card absolute-voice-trace-timeline"

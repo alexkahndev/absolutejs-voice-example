@@ -15,6 +15,11 @@ export type VoiceModelProvider =
   | "anthropic"
   | "gemini";
 export type VoiceRoutingMode = "balanced" | "fastest" | "cheapest" | "quality";
+export type VoiceProfileId =
+  | "meeting-recorder"
+  | "support-agent"
+  | "appointment-scheduler"
+  | "noisy-phone-call";
 export type VoiceProviderStatus =
   | "healthy"
   | "idle"
@@ -102,6 +107,38 @@ export const VOICE_ROUTING_MODES: Array<{
   },
 ];
 
+export const VOICE_PROFILES: Array<{
+  description: string;
+  id: VoiceProfileId;
+  label: string;
+  shortLabel: string;
+}> = [
+  {
+    description: "General browser recording with meeting-focused defaults.",
+    id: "meeting-recorder",
+    label: "Meeting recorder",
+    shortLabel: "Meeting",
+  },
+  {
+    description: "Support triage defaults for guided handoff and tool flows.",
+    id: "support-agent",
+    label: "Support agent",
+    shortLabel: "Support",
+  },
+  {
+    description: "Scheduling flow tuned for booking and appointment capture.",
+    id: "appointment-scheduler",
+    label: "Appointment scheduler",
+    shortLabel: "Scheduler",
+  },
+  {
+    description: "Noisy phone-call profile for tougher STT routing conditions.",
+    id: "noisy-phone-call",
+    label: "Noisy phone call",
+    shortLabel: "Noisy",
+  },
+];
+
 export const VOICE_SPEECH_ENGINES: Array<{
   description: string;
   id: VoiceSpeechEngine;
@@ -110,14 +147,16 @@ export const VOICE_SPEECH_ENGINES: Array<{
   shortLabel: string;
 }> = [
   {
-    description: "Deepgram or AssemblyAI STT, routed LLM, and OpenAI/emergency TTS.",
+    description:
+      "Deepgram or AssemblyAI STT, routed LLM, and OpenAI/emergency TTS.",
     id: "cascaded",
     label: "Cascaded STT + LLM + TTS",
     sampleRateHz: 16_000,
     shortLabel: "Cascaded",
   },
   {
-    description: "Direct OpenAI Realtime speech-to-speech route with 24kHz PCM.",
+    description:
+      "Direct OpenAI Realtime speech-to-speech route with 24kHz PCM.",
     id: "openai-realtime",
     label: "OpenAI Realtime",
     sampleRateHz: 24_000,
@@ -127,7 +166,8 @@ export const VOICE_SPEECH_ENGINES: Array<{
 
 export const VOICE_PROOF_DASHBOARDS = [
   {
-    description: "One action runs the demo proof suite and links every surface.",
+    description:
+      "One action runs the demo proof suite and links every surface.",
     href: "/demo-proof",
     label: "Run full proof",
   },
@@ -147,7 +187,8 @@ export const VOICE_PROOF_DASHBOARDS = [
     label: "Turn waterfall",
   },
   {
-    description: "Repeated provider, turn, live-latency, recovery, and readiness trends.",
+    description:
+      "Repeated provider, turn, live-latency, recovery, and readiness trends.",
     href: "/voice/proof-trends",
     label: "Sustained trends",
   },
@@ -157,12 +198,14 @@ export const VOICE_PROOF_DASHBOARDS = [
     label: "Trace timelines",
   },
   {
-    description: "Single-session trace, audit, handoff, and tool support record.",
+    description:
+      "Single-session trace, audit, handoff, and tool support record.",
     href: "/voice-operations/demo-incident-bundle",
     label: "Operations record",
   },
   {
-    description: "Copyable incident handoff generated from the operations record.",
+    description:
+      "Copyable incident handoff generated from the operations record.",
     href: "/voice-operations/demo-incident-bundle/incident.md",
     label: "Incident handoff",
   },
@@ -177,12 +220,14 @@ export const VOICE_PROOF_DASHBOARDS = [
     label: "Readiness",
   },
   {
-    description: "Provider fallback, queue failures, handoffs, live ops, and latency SLOs.",
+    description:
+      "Provider fallback, queue failures, handoffs, live ops, and latency SLOs.",
     href: "/ops-recovery",
     label: "Ops recovery",
   },
   {
-    description: "Redaction, retention dry-runs, audit exports, and provider key posture.",
+    description:
+      "Redaction, retention dry-runs, audit exports, and provider key posture.",
     href: "/data-control",
     label: "Data control",
   },
@@ -206,6 +251,12 @@ export const isVoiceRoutingMode = (value: unknown): value is VoiceRoutingMode =>
   value === "fastest" ||
   value === "cheapest" ||
   value === "quality";
+
+export const isVoiceProfileId = (value: unknown): value is VoiceProfileId =>
+  value === "meeting-recorder" ||
+  value === "support-agent" ||
+  value === "appointment-scheduler" ||
+  value === "noisy-phone-call";
 
 export const isVoiceSpeechEngine = (
   value: unknown,
@@ -315,6 +366,7 @@ export const getVoiceRoutePath = (
   provider?: VoiceModelProvider,
   routing?: VoiceRoutingMode,
   engine: VoiceSpeechEngine = "cascaded",
+  profileId?: VoiceProfileId,
 ) => {
   const params = new URLSearchParams({
     scenarioId,
@@ -325,6 +377,9 @@ export const getVoiceRoutePath = (
   }
   if (routing) {
     params.set("routing", routing);
+  }
+  if (profileId) {
+    params.set("voiceProfile", profileId);
   }
 
   const path =
@@ -339,6 +394,11 @@ export const getVoiceProviderLabel = (provider: VoiceModelProvider) =>
 export const getVoiceRoutingLabel = (routing?: string) =>
   VOICE_ROUTING_MODES.find((item) => item.id === routing)?.label ??
   routing ??
+  "Unknown";
+
+export const getVoiceProfileLabel = (profileId?: string) =>
+  VOICE_PROFILES.find((item) => item.id === profileId)?.label ??
+  profileId ??
   "Unknown";
 
 export const getVoiceSpeechEngineLabel = (engine: VoiceSpeechEngine) =>
@@ -411,6 +471,30 @@ export const getInitialVoiceRoutingMode = (): VoiceRoutingMode => {
 export const rememberVoiceRoutingMode = (routing: VoiceRoutingMode) => {
   if (typeof window !== "undefined") {
     window.localStorage.setItem("voiceRoutingMode", routing);
+  }
+};
+
+export const getInitialVoiceProfileId = (): VoiceProfileId => {
+  if (typeof window === "undefined") {
+    return "meeting-recorder";
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const urlProfile =
+    params.get("voiceProfile") ??
+    params.get("profileId") ??
+    params.get("callProfile");
+  if (isVoiceProfileId(urlProfile)) {
+    return urlProfile;
+  }
+
+  const storedProfile = window.localStorage.getItem("voiceProfileId");
+  return isVoiceProfileId(storedProfile) ? storedProfile : "meeting-recorder";
+};
+
+export const rememberVoiceProfileId = (profileId: VoiceProfileId) => {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem("voiceProfileId", profileId);
   }
 };
 

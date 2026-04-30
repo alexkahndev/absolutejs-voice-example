@@ -18,32 +18,42 @@ import type VueVoiceDemo from "../../frontend/vue/pages/VueVoiceDemo.vue";
 import {
   FRAMEWORKS,
   isVoiceModelProvider,
+  isVoiceProfileId,
   isVoiceRoutingMode,
   isVoiceSpeechEngine,
   type VoiceModelProvider,
+  type VoiceProfileId,
   type VoiceRoutingMode,
   type VoiceSpeechEngine,
 } from "../../shared/demo";
 
 type VoiceDemoSelectionProps = {
   initialModelProvider: VoiceModelProvider;
+  initialProfileId: VoiceProfileId;
   initialRoutingMode: VoiceRoutingMode;
   initialSpeechEngine: VoiceSpeechEngine;
 };
 
 const resolveVoiceDemoSelectionProps = (
   query: Record<string, unknown>,
-): VoiceDemoSelectionProps => ({
-  initialModelProvider: isVoiceModelProvider(query.provider)
-    ? query.provider
-    : "deterministic",
-  initialRoutingMode: isVoiceRoutingMode(query.routing)
-    ? query.routing
-    : "balanced",
-  initialSpeechEngine: isVoiceSpeechEngine(query.engine)
-    ? query.engine
-    : "cascaded",
-});
+): VoiceDemoSelectionProps => {
+  const profileId = query.voiceProfile ?? query.profileId ?? query.callProfile;
+
+  return {
+    initialModelProvider: isVoiceModelProvider(query.provider)
+      ? query.provider
+      : "deterministic",
+    initialProfileId: isVoiceProfileId(profileId)
+      ? profileId
+      : "meeting-recorder",
+    initialRoutingMode: isVoiceRoutingMode(query.routing)
+      ? query.routing
+      : "balanced",
+    initialSpeechEngine: isVoiceSpeechEngine(query.engine)
+      ? query.engine
+      : "cascaded",
+  };
+};
 
 export const pagesPlugin = (manifest: Record<string, string>) =>
   new Elysia()

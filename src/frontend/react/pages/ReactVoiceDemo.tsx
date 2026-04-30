@@ -45,11 +45,13 @@ import {
   getVoiceLeadMessage,
   getVoiceModeLabel,
   getVoiceModePrompt,
+  getVoiceProfileLabel,
   getVoiceProviderLabel,
   getVoiceRoutingLabel,
   getVoiceRoutePath,
   getVoiceSpeechEngineSampleRate,
   rememberVoiceModelProvider,
+  rememberVoiceProfileId,
   rememberVoiceRoutingMode,
   rememberVoiceSpeechEngine,
   VOICE_ASSISTANT_CONFIG,
@@ -63,10 +65,12 @@ import {
   VOICE_CALL_CONTROL_ACTIONS,
   VOICE_MODEL_PROVIDERS,
   VOICE_PROOF_DASHBOARDS,
+  VOICE_PROFILES,
   VOICE_ROUTING_MODES,
   VOICE_SPEECH_ENGINES,
   type VoiceDemoMode,
   type VoiceModelProvider,
+  type VoiceProfileId,
   type VoiceRoutingMode,
   type VoiceSpeechEngine,
   type VoiceAgentSquadDemoStatus,
@@ -76,6 +80,7 @@ import {
 type ReactVoiceDemoProps = {
   cssPath?: string;
   initialModelProvider?: VoiceModelProvider;
+  initialProfileId?: VoiceProfileId;
   initialRoutingMode?: VoiceRoutingMode;
   initialSpeechEngine?: VoiceSpeechEngine;
 };
@@ -117,6 +122,7 @@ const EMPTY_VOICE: ReactVoiceDemoStream = {
 export const ReactVoiceDemo = ({
   cssPath,
   initialModelProvider = "deterministic",
+  initialProfileId = "meeting-recorder",
   initialRoutingMode = "balanced",
   initialSpeechEngine = "cascaded",
 }: ReactVoiceDemoProps) => {
@@ -126,29 +132,40 @@ export const ReactVoiceDemo = ({
   const opsActionHistoryRef = useRef<HTMLDivElement | null>(null);
   const liveOpsPanelRef = useRef<HTMLDivElement | null>(null);
   const bargeInProofRef = useRef<HTMLDivElement | null>(null);
-  const bargeInRef = useRef<ReturnType<typeof createDemoBargeInEvidence> | null>(
-    null,
-  );
+  const bargeInRef = useRef<ReturnType<
+    typeof createDemoBargeInEvidence
+  > | null>(null);
   const liveLatencyRef = useRef<ReturnType<
     typeof createDemoLiveTurnLatencyEvidence
   > | null>(null);
   const activeModeRef = useRef<VoiceDemoMode | null>(null);
   const voicesRef = useRef({ general: EMPTY_VOICE, guided: EMPTY_VOICE });
   const [modelProvider] = useState<VoiceModelProvider>(initialModelProvider);
+  const [profileId] = useState<VoiceProfileId>(initialProfileId);
   const [routingMode] = useState<VoiceRoutingMode>(initialRoutingMode);
   const [speechEngine] = useState<VoiceSpeechEngine>(initialSpeechEngine);
   const guidedVoice =
     useVoiceStream<SavedIntake>(
-      getVoiceRoutePath("guided", modelProvider, routingMode, speechEngine),
+      getVoiceRoutePath(
+        "guided",
+        modelProvider,
+        routingMode,
+        speechEngine,
+        profileId,
+      ),
       { reconnectReportPath: "/api/voice/reconnect-traces" },
-    ) ??
-    EMPTY_VOICE;
+    ) ?? EMPTY_VOICE;
   const generalVoice =
     useVoiceStream<SavedIntake>(
-      getVoiceRoutePath("general", modelProvider, routingMode, speechEngine),
+      getVoiceRoutePath(
+        "general",
+        modelProvider,
+        routingMode,
+        speechEngine,
+        profileId,
+      ),
       { reconnectReportPath: "/api/voice/reconnect-traces" },
-    ) ??
-    EMPTY_VOICE;
+    ) ?? EMPTY_VOICE;
   voicesRef.current = { general: generalVoice, guided: guidedVoice };
   const campaignDialerProof = useVoiceCampaignDialerProof(
     "/api/voice/campaigns/dialer-proof",
@@ -265,7 +282,10 @@ export const ReactVoiceDemo = ({
         } else if (action === "escalate" || action === "operator-takeover") {
           voice.callControl({
             action: "escalate",
-            metadata: { source: "live-ops", takeover: action === "operator-takeover" },
+            metadata: {
+              source: "live-ops",
+              takeover: action === "operator-takeover",
+            },
             reason: detail,
           });
           stopMic();
@@ -295,7 +315,9 @@ export const ReactVoiceDemo = ({
             );
             liveLatencyRef.current.recordAudio(audio);
             setLiveLatencyHTML(
-              renderDemoLiveTurnLatencyHTML(liveLatencyRef.current.getSnapshot()),
+              renderDemoLiveTurnLatencyHTML(
+                liveLatencyRef.current.getSnapshot(),
+              ),
             );
             bargeInRef.current.sendAudio(audio);
           },
@@ -340,6 +362,16 @@ export const ReactVoiceDemo = ({
     rememberVoiceModelProvider(provider);
     const nextUrl = new URL(window.location.href);
     nextUrl.searchParams.set("provider", provider);
+    window.location.href = nextUrl.toString();
+  };
+
+  const changeProfileId = (nextProfileId: VoiceProfileId) => {
+    stopMic();
+    activeModeRef.current = null;
+    setActiveMode(null);
+    rememberVoiceProfileId(nextProfileId);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("voiceProfile", nextProfileId);
     window.location.href = nextUrl.toString();
   };
 
@@ -505,6 +537,21 @@ export const ReactVoiceDemo = ({
                 </select>
               </label>
               <label className="voice-provider-select">
+                <span>Voice profile</span>
+                <select
+                  value={profileId}
+                  onChange={(event) =>
+                    changeProfileId(event.currentTarget.value as VoiceProfileId)
+                  }
+                >
+                  {VOICE_PROFILES.map((profile) => (
+                    <option key={profile.id} value={profile.id}>
+                      {profile.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="voice-provider-select">
                 <span>STT routing</span>
                 <select
                   value={routingMode}
@@ -539,11 +586,9 @@ export const ReactVoiceDemo = ({
                 </select>
               </label>
               <p className="voice-footnote">
-                {VOICE_SPEECH_ENGINES.find((item) => item.id === speechEngine)
-                  ?.description ??
-                  VOICE_ROUTING_MODES.find((item) => item.id === routingMode)
-                    ?.description ??
-                  ""}
+                {getVoiceProfileLabel(profileId)} uses{" "}
+                {VOICE_PROFILES.find((item) => item.id === profileId)
+                  ?.description ?? "the selected real-call defaults."}
               </p>
             </article>
 
@@ -605,7 +650,9 @@ export const ReactVoiceDemo = ({
               <div className="voice-routing-grid">
                 <div>
                   <span>Current specialist</span>
-                  <strong>{agentSquadStatus?.currentAgentId ?? "front-desk"}</strong>
+                  <strong>
+                    {agentSquadStatus?.currentAgentId ?? "front-desk"}
+                  </strong>
                 </div>
                 <div>
                   <span>Context policy</span>
@@ -671,7 +718,9 @@ export const ReactVoiceDemo = ({
             />
 
             <article className="voice-card voice-provider-health-card">
-              <span className="voice-framework-pill">Campaign Dialer Proof</span>
+              <span className="voice-framework-pill">
+                Campaign Dialer Proof
+              </span>
               <h2>Carrier dialer dry-run</h2>
               <p className="voice-footnote">
                 Twilio, Telnyx, and Plivo campaign dials run through the shared
@@ -691,34 +740,41 @@ export const ReactVoiceDemo = ({
                   : "Run campaign dialer proof"}
               </button>
               <div className="voice-provider-health-list">
-                {(campaignDialerProof.report?.providers ?? []).map((provider) => (
-                  <div
-                    className="voice-provider-health-item"
-                    key={provider.provider}
-                  >
-                    <strong>{provider.provider}</strong>
-                    <span>
-                      {provider.outcomes.every((outcome) => outcome.applied)
-                        ? "passed"
-                        : "needs attention"}
-                    </span>
-                    <small>
-                      {provider.carrierRequests.length} dry-run carrier request
-                      {provider.carrierRequests.length === 1 ? "" : "s"}
-                    </small>
-                  </div>
-                ))}
+                {(campaignDialerProof.report?.providers ?? []).map(
+                  (provider) => (
+                    <div
+                      className="voice-provider-health-item"
+                      key={provider.provider}
+                    >
+                      <strong>{provider.provider}</strong>
+                      <span>
+                        {provider.outcomes.every((outcome) => outcome.applied)
+                          ? "passed"
+                          : "needs attention"}
+                      </span>
+                      <small>
+                        {provider.carrierRequests.length} dry-run carrier
+                        request
+                        {provider.carrierRequests.length === 1 ? "" : "s"}
+                      </small>
+                    </div>
+                  ),
+                )}
               </div>
               {campaignDialerProof.error ? (
                 <p className="voice-footnote">{campaignDialerProof.error}</p>
               ) : null}
               {!campaignDialerProof.report ? (
                 <p className="empty-copy">
-                  Ready for {(campaignDialerProof.status?.providers ?? [
-                    "twilio",
-                    "telnyx",
-                    "plivo",
-                  ]).join(", ")}.
+                  Ready for{" "}
+                  {(
+                    campaignDialerProof.status?.providers ?? [
+                      "twilio",
+                      "telnyx",
+                      "plivo",
+                    ]
+                  ).join(", ")}
+                  .
                 </p>
               ) : null}
               <p className="voice-footnote">
@@ -745,7 +801,10 @@ export const ReactVoiceDemo = ({
 
             <div ref={liveOpsPanelRef} />
 
-            <div className="voice-card voice-workflow-card" ref={opsActionHistoryRef} />
+            <div
+              className="voice-card voice-workflow-card"
+              ref={opsActionHistoryRef}
+            />
 
             <VoiceTraceTimeline
               className="voice-card voice-provider-health-card"

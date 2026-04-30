@@ -34,14 +34,17 @@ import {
   getVoiceLeadMessage,
   getVoiceModeLabel,
   getVoiceModePrompt,
+  getVoiceProfileLabel,
   getVoiceProviderLabel,
   getVoiceRoutingLabel,
   getVoiceRoutePath,
   getVoiceSpeechEngineSampleRate,
   getInitialVoiceModelProvider,
+  getInitialVoiceProfileId,
   getInitialVoiceRoutingMode,
   getInitialVoiceSpeechEngine,
   rememberVoiceModelProvider,
+  rememberVoiceProfileId,
   rememberVoiceRoutingMode,
   rememberVoiceSpeechEngine,
   VOICE_DEMO_GENERAL_LABEL,
@@ -50,8 +53,10 @@ import {
   VOICE_DEMO_MIC_LIVE,
   VOICE_DEMO_STOP_LABEL,
   VOICE_CALL_CONTROL_ACTIONS,
+  VOICE_PROFILES,
   VOICE_ROUTING_MODES,
   type VoiceModelProvider,
+  type VoiceProfileId,
   type VoiceRoutingMode,
   type VoiceSpeechEngine,
   type SavedIntake,
@@ -81,6 +86,7 @@ const intakesMetric = document.querySelector("#metric-intakes");
 const microphoneStatus = document.querySelector("#status-mic");
 const modelProviderMetric = document.querySelector("#metric-provider");
 const modelProviderSelect = document.querySelector("#model-provider-select");
+const voiceProfileSelect = document.querySelector("#voice-profile-select");
 const speechEngineSelect = document.querySelector("#speech-engine-select");
 const partialStatus = document.querySelector("#status-partial");
 const promptStatus = document.querySelector("#status-prompt");
@@ -100,11 +106,15 @@ const voiceWavePath = document.querySelector("#voice-wave-path");
 const workflowStatusHost = document.querySelector("#workflow-status-card");
 const platformCoverageHost = document.querySelector("#platform-coverage-card");
 const proofTrendsHost = document.querySelector("#proof-trends-card");
-const readinessFailuresHost = document.querySelector("#readiness-failures-card");
+const readinessFailuresHost = document.querySelector(
+  "#readiness-failures-card",
+);
 const providerCapabilitiesHost = document.querySelector(
   "#provider-capabilities-card",
 );
-const providerContractsHost = document.querySelector("#provider-contracts-card");
+const providerContractsHost = document.querySelector(
+  "#provider-contracts-card",
+);
 const providerStatusHost = document.querySelector("#provider-status-card");
 const campaignDialerProofHost = document.querySelector(
   "#campaign-dialer-proof-card",
@@ -130,6 +140,7 @@ if (
   !(microphoneStatus instanceof HTMLElement) ||
   !(modelProviderMetric instanceof HTMLElement) ||
   !(modelProviderSelect instanceof HTMLSelectElement) ||
+  !(voiceProfileSelect instanceof HTMLSelectElement) ||
   !(speechEngineSelect instanceof HTMLSelectElement) ||
   !(partialStatus instanceof HTMLElement) ||
   !(promptStatus instanceof HTMLElement) ||
@@ -169,22 +180,40 @@ if (
 }
 
 const modelProvider = getInitialVoiceModelProvider();
+const profileId = getInitialVoiceProfileId();
 const routingMode = getInitialVoiceRoutingMode();
 let speechEngine = getInitialVoiceSpeechEngine();
 modelProviderSelect.value = modelProvider;
+voiceProfileSelect.value = profileId;
 routingModeSelect.value = routingMode;
 speechEngineSelect.value = speechEngine;
 const guidedVoice = createVoiceStream<SavedIntake>(
-  getVoiceRoutePath("guided", modelProvider, routingMode, speechEngine),
+  getVoiceRoutePath(
+    "guided",
+    modelProvider,
+    routingMode,
+    speechEngine,
+    profileId,
+  ),
   { reconnectReportPath: "/api/voice/reconnect-traces" },
 );
 const generalVoice = createVoiceStream<SavedIntake>(
-  getVoiceRoutePath("general", modelProvider, routingMode, speechEngine),
+  getVoiceRoutePath(
+    "general",
+    modelProvider,
+    routingMode,
+    speechEngine,
+    profileId,
+  ),
   { reconnectReportPath: "/api/voice/reconnect-traces" },
 );
-const opsStatus = mountVoiceOpsStatus(workflowStatusHost, "/api/voice/ops-status", {
-  intervalMs: 5_000,
-});
+const opsStatus = mountVoiceOpsStatus(
+  workflowStatusHost,
+  "/api/voice/ops-status",
+  {
+    intervalMs: 5_000,
+  },
+);
 const proofTrends = mountVoiceProofTrends(
   proofTrendsHost,
   "/api/voice/proof-trends",
@@ -253,9 +282,13 @@ const routingStatus = mountVoiceRoutingStatus(
     intervalMs: 4_000,
   },
 );
-const turnQuality = mountVoiceTurnQuality(turnQualityHost, "/api/turn-quality", {
-  intervalMs: 5_000,
-});
+const turnQuality = mountVoiceTurnQuality(
+  turnQualityHost,
+  "/api/turn-quality",
+  {
+    intervalMs: 5_000,
+  },
+);
 const renderPlatformCoverage = () => {
   platformCoverageHost.innerHTML = renderVoicePlatformCoverageHTML(
     platformCoverage.getSnapshot(),
@@ -516,9 +549,10 @@ const render = () => {
     : (voice.call?.events.at(-1)?.type ?? "Not started");
   modelProviderMetric.textContent = getVoiceProviderLabel(modelProvider);
   routingModeMetric.textContent = getVoiceRoutingLabel(routingMode);
-  routingModeCopy.textContent =
-    VOICE_ROUTING_MODES.find((item) => item.id === routingMode)?.description ??
-    "";
+  routingModeCopy.textContent = `${getVoiceProfileLabel(profileId)} uses ${
+    VOICE_PROFILES.find((item) => item.id === profileId)?.description ??
+    "the selected real-call defaults."
+  }`;
   sessionMetric.textContent = activeMode
     ? getVoiceModeLabel(activeMode)
     : "Choose one";
@@ -558,6 +592,14 @@ modelProviderSelect.addEventListener("change", () => {
   rememberVoiceModelProvider(modelProviderSelect.value as VoiceModelProvider);
   const nextUrl = new URL(window.location.href);
   nextUrl.searchParams.set("provider", modelProviderSelect.value);
+  window.location.href = nextUrl.toString();
+});
+
+voiceProfileSelect.addEventListener("change", () => {
+  stopMic();
+  rememberVoiceProfileId(voiceProfileSelect.value as VoiceProfileId);
+  const nextUrl = new URL(window.location.href);
+  nextUrl.searchParams.set("voiceProfile", voiceProfileSelect.value);
   window.location.href = nextUrl.toString();
 });
 
