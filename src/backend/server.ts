@@ -3581,7 +3581,8 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
           </article>
         </section>
         <section class="panel" style="margin-top:14px">
-          <h2>Job Status</h2>
+          <h2>Recent Job Status</h2>
+          <p class="muted">Loaded from persisted recovery job history. Running jobs keep polling until they pass or fail.</p>
           <div id="jobs" class="jobs"></div>
         </section>
         <section class="panel" style="margin-top:14px">
@@ -3679,6 +3680,25 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
           \`;
         };
 
+        const loadJobs = async () => {
+          const response = await fetch(base + "/actions/jobs?limit=12");
+          const result = await response.json();
+          showPayload(result);
+          const recentJobs = result.jobs ?? [];
+          jobs.replaceChildren();
+          if (recentJobs.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "card";
+            empty.innerHTML = "<p class=\\"muted\\">No recovery jobs have been recorded yet.</p>";
+            jobs.append(empty);
+            return;
+          }
+          [...recentJobs].reverse().forEach(renderJob);
+          recentJobs
+            .filter((job) => job.status === "queued" || job.status === "running")
+            .forEach((job) => pollJob(job.id));
+        };
+
         const pollJob = (jobId) => {
           if (pollers.has(jobId)) return;
           const tick = async () => {
@@ -3698,9 +3718,11 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
         };
 
         const load = async () => {
-          const response = await fetch(base + "/actions");
-          const result = await response.json();
-          showPayload(result);
+          const [actionsResponse] = await Promise.all([
+            fetch(base + "/actions"),
+            loadJobs()
+          ]);
+          const result = await actionsResponse.json();
           recommended.replaceChildren(...(result.actions ?? []).map(actionCard));
           proofJobs.replaceChildren(...staticJobs.map(actionCard));
         };
