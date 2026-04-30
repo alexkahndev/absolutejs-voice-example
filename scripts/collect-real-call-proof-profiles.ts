@@ -32,18 +32,31 @@ const readNumber = (value: unknown) =>
 const readString = (value: unknown) =>
   typeof value === "string" ? value : undefined;
 
-const fetchJson = async (path: string): Promise<JsonRecord> => {
+const fetchJson = async (
+  path: string,
+  init: RequestInit = {},
+): Promise<JsonRecord | JsonRecord[]> => {
   const response = await fetch(`${baseUrl}${path}`, {
-    headers: { accept: "application/json" },
+    headers: {
+      accept: "application/json",
+      ...(init.headers ?? {}),
+    },
+    ...init,
   });
   if (!response.ok) {
     throw new Error(`${path} returned HTTP ${response.status}`);
   }
   const body = await response.json();
+  if (Array.isArray(body)) {
+    return body.filter(isRecord);
+  }
   return isRecord(body) ? body : {};
 };
 
-const readRows = (body: JsonRecord, keys: string[]) => {
+const readRows = (body: JsonRecord | JsonRecord[], keys: string[]) => {
+  if (Array.isArray(body)) {
+    return body;
+  }
   for (const key of keys) {
     const value = body[key];
     if (Array.isArray(value)) {
@@ -134,13 +147,20 @@ const inferProfileId = (session: JsonRecord) => {
 };
 
 const run = async () => {
-  const [sessionsBody, providerSlo, proofTrends] = await Promise.all([
+  await fetchJson("/api/provider-slo/proof", { method: "POST" }).catch(() => ({}));
+
+  const [sessionsBody, providerSloBody, proofTrendsBody] = await Promise.all([
     fetchJson("/api/voice-sessions?status=all"),
     fetchJson("/api/voice/provider-slos"),
     fetchJson("/api/voice/proof-trends").catch(() => ({})),
   ]);
+  const providerSlo = Array.isArray(providerSloBody) ? {} : providerSloBody;
+  const proofTrends = Array.isArray(proofTrendsBody) ? {} : proofTrendsBody;
   const sessions = readRows(sessionsBody, ["sessions", "items", "data"]).filter(
-    (session) => readString(session.sessionId),
+    (session) =>
+      readString(session.sessionId) &&
+      ((readNumber(session.turnCount) ?? 0) > 0 ||
+        (readNumber(session.transcriptCount) ?? 0) > 0),
   );
   const providers = readProviderRows(providerSlo);
   const proofTrendBody: JsonRecord = proofTrends;
