@@ -48,6 +48,7 @@ import {
   createVoiceRealtimeProviderContractRoutes,
   createVoicePlatformCoverageRoutes,
   createVoicePostCallAnalysisRoutes,
+  createVoiceProofTrendRecommendationRoutes,
   createVoiceProofTrendRoutes,
   createVoiceFileObservabilityExportDeliveryReceiptStore,
   buildVoiceCompetitiveCoverageReport,
@@ -9878,6 +9879,14 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
       name: "absolutejs-voice-example-proof-trends",
       path: "/api/voice/proof-trends",
       source: readLatestProofTrends,
+    }),
+  )
+  .use(
+    createVoiceProofTrendRecommendationRoutes({
+      maxAgeMs: proofTrendsMaxAgeMs,
+      name: "absolutejs-voice-example-proof-trend-recommendations",
+      source: readLatestProofTrends,
+      title: "AbsoluteJS Voice Provider Runtime Recommendations",
     }),
   )
   .use(

@@ -18,6 +18,7 @@ import {
   evaluateVoicePhoneAssistantEvidence,
   evaluateVoiceProductionReadinessEvidence,
   evaluateVoiceProofTrendEvidence,
+  buildVoiceProofTrendRecommendationReport,
   evaluateVoiceProviderContractMatrixEvidence,
   evaluateVoiceProviderRoutingContractEvidence,
   evaluateVoiceRealtimeChannelEvidence,
@@ -59,6 +60,7 @@ import {
   type VoiceProviderStackCapabilityGapReport,
   type VoiceProductionReadinessReport,
   type VoiceProofTrendReport,
+  type VoiceProofTrendRecommendationReport,
   type VoiceProviderSloReport,
   type VoiceSimulationSuiteReport,
   type VoiceTelephonyWebhookNormalizationEvidenceDecision,
@@ -761,6 +763,33 @@ const proofTargets: ProofTarget[] = [
     name: "proofTrendsMarkdown",
     path: "/voice/proof-trends.md",
     requiredText: ["AbsoluteJS Voice Sustained Proof Trends", "Runtime channel"],
+  },
+  {
+    kind: "json",
+    name: "proofTrendRecommendations",
+    path: "/api/voice/proof-trend-recommendations",
+  },
+  {
+    accept: "text/html,text/plain,*/*",
+    kind: "text",
+    name: "proofTrendRecommendationsPage",
+    path: "/voice/proof-trend-recommendations",
+    requiredText: [
+      "Provider Runtime Recommendations",
+      "Keep current provider path",
+      "Keep current runtime channel",
+    ],
+  },
+  {
+    accept: "text/markdown,text/plain,*/*",
+    kind: "text",
+    name: "proofTrendRecommendationsMarkdown",
+    path: "/voice/proof-trend-recommendations.md",
+    requiredText: [
+      "Voice Provider Runtime Recommendations",
+      "provider-path",
+      "runtime-channel",
+    ],
   },
   {
     kind: "json",
@@ -1625,6 +1654,7 @@ const renderMarkdown = (input: {
   telephonyWebhookVerificationEvidenceAssertion: JsonAssertionResult;
   productionReadinessEvidenceAssertion: JsonAssertionResult;
   proofTrendEvidenceAssertion: JsonAssertionResult;
+  proofTrendRecommendationAssertion: JsonAssertionResult;
   providerContractMatrixEvidenceAssertion: JsonAssertionResult;
   providerDecisionEvidenceAssertion: JsonAssertionResult;
   failureReplayEvidenceAssertion: JsonAssertionResult;
@@ -1737,6 +1767,8 @@ Outcome contract assertion: **${input.outcomeContractEvidenceAssertion.ok ? "pas
 Simulation suite assertion: **${input.simulationSuiteEvidenceAssertion.ok ? "pass" : "fail"}**.
 
 Sustained proof trend assertion: **${input.proofTrendEvidenceAssertion.ok ? "pass" : "fail"}**.
+
+Provider/runtime recommendation assertion: **${input.proofTrendRecommendationAssertion.ok ? "pass" : "fail"}**.
 
 Provider contract matrix assertion: **${input.providerContractMatrixEvidenceAssertion.ok ? "pass" : "fail"}**.
 
@@ -2646,6 +2678,50 @@ const proofTrendEvidenceAssertion: JsonAssertionResult = proofTrendReport
         issues: ["Missing proofTrends proof result body."],
       },
     };
+const proofTrendRecommendations = proofResults.find(
+  (result) => result.name === "proofTrendRecommendations",
+)?.body as VoiceProofTrendRecommendationReport | undefined;
+const builtProofTrendRecommendations = proofTrendReport
+  ? buildVoiceProofTrendRecommendationReport(proofTrendReport)
+  : undefined;
+const proofTrendRecommendationReport =
+  proofTrendRecommendations ?? builtProofTrendRecommendations;
+const proofTrendRecommendationIssues = [
+  !proofTrendRecommendationReport
+    ? "Missing proof trend recommendation report."
+    : undefined,
+  proofTrendRecommendationReport &&
+  proofTrendRecommendationReport.summary.keepCurrentProviderPath !== true
+    ? "Expected proof trend recommendations to keep the current provider path."
+    : undefined,
+  proofTrendRecommendationReport &&
+  proofTrendRecommendationReport.summary.keepCurrentRuntimeChannel !== true
+    ? "Expected proof trend recommendations to keep the current runtime channel."
+    : undefined,
+  proofTrendRecommendationReport &&
+  !proofTrendRecommendationReport.recommendations.some(
+    (item) => item.surface === "provider-path" && item.status === "pass",
+  )
+    ? "Missing passing provider-path recommendation."
+    : undefined,
+  proofTrendRecommendationReport &&
+  !proofTrendRecommendationReport.recommendations.some(
+    (item) => item.surface === "runtime-channel" && item.status === "pass",
+  )
+    ? "Missing passing runtime-channel recommendation."
+    : undefined,
+].filter((issue): issue is string => typeof issue === "string");
+const proofTrendRecommendationAssertion: JsonAssertionResult = {
+  kind: "json-assertion",
+  name: "proofTrendRecommendationEvidence",
+  ok: proofTrendRecommendationIssues.length === 0,
+  summary: {
+    issues: proofTrendRecommendationIssues,
+    recommendations: proofTrendRecommendationReport?.recommendations,
+    status: proofTrendRecommendationReport?.status,
+    summary: proofTrendRecommendationReport?.summary,
+  },
+};
 const providerContractMatrix = proofResults.find(
   (result) => result.name === "providerContracts",
 )?.body as VoiceProviderContractMatrixReport | undefined;
@@ -3023,6 +3099,7 @@ const ok =
   telephonyWebhookNormalizationEvidenceAssertion.ok &&
   telephonyWebhookVerificationEvidenceAssertion.ok &&
   proofTrendEvidenceAssertion.ok &&
+  proofTrendRecommendationAssertion.ok &&
   providerContractMatrixEvidenceAssertion.ok &&
   providerRoutingContractEvidenceAssertion.ok &&
   realtimeChannelEvidenceAssertion.ok &&
@@ -3060,6 +3137,7 @@ const summary = {
   productionReadinessEvidenceAssertion,
   productionReadinessGateExplanationAssertion,
   proofTrendEvidenceAssertion,
+  proofTrendRecommendationAssertion,
   providerContractMatrixEvidenceAssertion,
   providerDecisionEvidenceAssertion,
   providerOrchestrationEvidenceAssertion,
@@ -3105,6 +3183,7 @@ const markdown = renderMarkdown({
   productionReadinessEvidenceAssertion,
   productionReadinessGateExplanationAssertion,
   proofTrendEvidenceAssertion,
+  proofTrendRecommendationAssertion,
   providerContractMatrixEvidenceAssertion,
   providerDecisionEvidenceAssertion,
   providerOrchestrationEvidenceAssertion,
