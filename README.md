@@ -206,9 +206,9 @@ Use the proof pack runner when you need current artifacts for the competitive pl
 bun run proof:pack:server
 ```
 
-That starts the demo on `PORT=3004` when `PORT` is not already set, waits for `/api/production-readiness`, seeds proof endpoints in parallel, fetches the proof surfaces in parallel, writes timestamped artifacts under `.voice-runtime/proof-pack/<run-id>/`, and updates `.voice-runtime/proof-pack/latest.json` plus `.voice-runtime/proof-pack/latest.md`.
+That starts the demo on `PORT=3004` when `PORT` is not already set, waits for `/api/production-readiness`, refreshes browser-call profile evidence, seeds proof endpoints in parallel, fetches the proof surfaces in parallel, writes timestamped artifacts under `.voice-runtime/proof-pack/<run-id>/`, and updates `.voice-runtime/proof-pack/latest.json` plus `.voice-runtime/proof-pack/latest.md`.
 
-The headline proof includes production readiness, provider SLOs for LLM/STT/TTS latency and fallback budgets, customer-owned observability export, simulation results, data-control exports, campaign proof, delivery-runtime proof, and the operations-record incident bundle.
+The headline proof includes production readiness, six-framework browser microphone/WebSocket profile evidence, provider SLOs for LLM/STT/TTS latency and fallback budgets, customer-owned observability export, simulation results, data-control exports, campaign proof, delivery-runtime proof, and the operations-record incident bundle.
 
 If the demo server is already running, use:
 

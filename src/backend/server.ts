@@ -44,6 +44,7 @@ import {
   buildVoiceMediaPipelineReport,
   buildVoiceBrowserCallProfileReport,
   createVoiceBrowserCallProfileRoutes,
+  evaluateVoiceBrowserCallProfileEvidence,
   createVoiceRealtimeChannelRoutes,
   createVoiceMediaPipelineRoutes,
   createVoiceRealtimeProviderContractMatrixPreset,
@@ -210,6 +211,7 @@ import {
   type VoiceSloCalibrationSample,
   type VoiceProofTrendSummary,
   type VoiceBrowserCallProfileReport,
+  type VoiceProductionReadinessCheck,
   voice,
   voiceComplianceRedactionDefaults,
   voiceGuardrailPolicyPresets,
@@ -3539,6 +3541,44 @@ const readLatestProofTrends = async (): Promise<VoiceProofTrendReport> => {
     });
   }
 };
+
+const buildBrowserCallProfileReadinessCheck =
+  async (): Promise<VoiceProductionReadinessCheck> => {
+    const report = await readLatestBrowserCallProfiles();
+    const assertion = evaluateVoiceBrowserCallProfileEvidence(report, {
+      maxAgeMs: browserCallProfilesMaxAgeMs,
+      minOpenSocketsPerFramework: 1,
+      minSentBytesPerFramework: 1,
+      requiredFrameworks: ["react", "vue", "svelte", "angular", "html", "htmx"],
+    });
+
+    return {
+      detail: assertion.ok
+        ? `${assertion.passedFrameworks.length}/6 framework demos opened voice WebSockets and sent microphone audio bytes.`
+        : assertion.issues.join(" "),
+      gateExplanation: {
+        evidenceHref: "/voice/browser-call-profiles",
+        observed: assertion.passedFrameworks.length,
+        remediation:
+          "Run `bun run proof:profiles:browser-call` and fix any framework page that cannot open `/voice/realtime` or send microphone bytes.",
+        sourceHref: "/api/voice/browser-call-profiles",
+        threshold: 6,
+        thresholdLabel: "Required passing framework browser-call profiles",
+        unit: "count",
+      },
+      href: "/voice/browser-call-profiles",
+      label: "Browser call profile evidence",
+      proofSource: {
+        detail:
+          "Generated from real browser pages using fake microphone capture and `/voice/realtime` WebSocket byte evidence.",
+        href: "/api/voice/browser-call-profiles",
+        source: "browserCallProfiles",
+        sourceLabel: "Browser call profile proof",
+      },
+      status: assertion.ok ? "pass" : "fail",
+      value: `${assertion.passedFrameworks.length}/6 frameworks`,
+    };
+  };
 
 const readLongProofWindowCalibrationSamples = async (): Promise<
   VoiceSloCalibrationSample[]
@@ -7722,6 +7762,7 @@ const productionReadinessOptions = () => ({
     ],
     traceDeliveries: runtimeStorage.traceDeliveries,
   }),
+  additionalChecks: async () => [await buildBrowserCallProfileReadinessCheck()],
   agentSquadContracts: async () => [await runDemoAgentSquadContract()],
   bargeInReports: async () => [await buildDemoBargeInReport()],
   htmlPath: "/production-readiness",

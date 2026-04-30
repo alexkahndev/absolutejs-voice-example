@@ -14,6 +14,8 @@ const refreshTrends =
   process.env.VOICE_PROOF_PACK_REFRESH_TRENDS !== "false";
 const refreshObservabilityExport =
   process.env.VOICE_PROOF_PACK_REFRESH_OBSERVABILITY_EXPORT !== "false";
+const refreshBrowserCalls =
+  process.env.VOICE_PROOF_PACK_REFRESH_BROWSER_CALLS !== "false";
 const trendRefreshPasses = Math.max(
   1,
   Number(process.env.VOICE_PROOF_PACK_TREND_REFRESH_PASSES ?? 2),
@@ -131,12 +133,13 @@ const waitForServer = async (server?: ReturnType<typeof Bun.spawn>) => {
   );
 };
 
-const runScript = async (script: string) => {
+const runScript = async (script: string, env: Record<string, string> = {}) => {
   const child = Bun.spawn(["bun", "run", script], {
     env: {
       ...process.env,
       PORT: process.env.PORT ?? "3004",
       VOICE_DEMO_URL: baseUrl,
+      ...env,
     },
     stderr: "inherit",
     stdout: "inherit",
@@ -214,6 +217,16 @@ try {
       if (pass === trendRefreshPasses) {
         exitCode = trendExitCode;
       }
+    }
+  }
+
+  if (refreshBrowserCalls) {
+    console.log("Refreshing browser-call profile evidence before proof pack.");
+    const browserCallExitCode = await runScript("proof:profiles:browser-call", {
+      VOICE_BROWSER_CALL_USE_EXISTING_SERVER: "1",
+    });
+    if (browserCallExitCode !== 0) {
+      exitCode = browserCallExitCode;
     }
   }
 

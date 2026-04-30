@@ -6,6 +6,7 @@ import {
   evaluateVoiceAgentSquadContractEvidence,
   evaluateVoiceCampaignDialerProofEvidence,
   evaluateVoiceCampaignReadinessEvidence,
+  evaluateVoiceBrowserCallProfileEvidence,
   evaluateVoiceCompetitiveCoverage,
   evaluateVoiceDataControlEvidence,
   evaluateVoiceOperationsRecordGuardrails,
@@ -37,6 +38,7 @@ import {
   type VoiceAgentSquadContractReport,
   type VoiceCampaignDialerProofReport,
   type VoiceCampaignReadinessProofReport,
+  type VoiceBrowserCallProfileReport,
   type VoiceDataControlReport,
   type VoiceFailureReplayReport,
   type VoiceObservabilityExportDeliveryHistory,
@@ -768,6 +770,34 @@ const proofTargets: ProofTarget[] = [
     kind: "json",
     name: "proofTrendRecommendations",
     path: "/api/voice/proof-trend-recommendations",
+  },
+  {
+    kind: "json",
+    name: "browserCallProfiles",
+    path: "/api/voice/browser-call-profiles",
+  },
+  {
+    accept: "text/html,text/plain,*/*",
+    kind: "text",
+    name: "browserCallProfilesPage",
+    path: "/voice/browser-call-profiles",
+    requiredText: [
+      "Browser Call Profiles",
+      "Real browser microphone proof",
+      "Framework parity proof",
+    ],
+  },
+  {
+    accept: "text/markdown,text/plain,*/*",
+    kind: "text",
+    name: "browserCallProfilesMarkdown",
+    path: "/voice/browser-call-profiles.md",
+    requiredText: [
+      "Voice Browser Call Profiles",
+      "Passed frameworks",
+      "react",
+      "angular",
+    ],
   },
   {
     accept: "text/html,text/plain,*/*",
@@ -1655,6 +1685,7 @@ const renderMarkdown = (input: {
   telephonyWebhookNormalizationEvidenceAssertion: JsonAssertionResult;
   telephonyWebhookVerificationEvidenceAssertion: JsonAssertionResult;
   productionReadinessEvidenceAssertion: JsonAssertionResult;
+  browserCallProfileEvidenceAssertion: JsonAssertionResult;
   proofTrendEvidenceAssertion: JsonAssertionResult;
   proofTrendRecommendationAssertion: JsonAssertionResult;
   providerContractMatrixEvidenceAssertion: JsonAssertionResult;
@@ -1739,6 +1770,8 @@ Failure replay evidence assertion: **${input.failureReplayEvidenceAssertion.ok ?
 Operations-record provider decision assertion: **${input.operationsRecordProviderDecisionEvidenceAssertion.ok ? "pass" : "fail"}**.
 
 Production readiness evidence assertion: **${input.productionReadinessEvidenceAssertion.ok ? "pass" : "fail"}**.
+
+Browser call profile evidence assertion: **${input.browserCallProfileEvidenceAssertion.ok ? "pass" : "fail"}**.
 
 Production readiness gate explanations assertion: **${input.productionReadinessGateExplanationAssertion.ok ? "pass" : "fail"}**.
 
@@ -2094,6 +2127,34 @@ const productionReadinessEvidenceAssertion: JsonAssertionResult =
         ok: false,
         summary: {
           issues: ["Missing productionReadiness proof result body."],
+        },
+      };
+const browserCallProfileReport = proofResults.find(
+  (result) => result.name === "browserCallProfiles",
+)?.body as VoiceBrowserCallProfileReport | undefined;
+const browserCallProfileEvidenceReport = browserCallProfileReport
+  ? evaluateVoiceBrowserCallProfileEvidence(browserCallProfileReport, {
+      maxAgeMs: 24 * 60 * 60 * 1000,
+      minOpenSocketsPerFramework: 1,
+      minSentBytesPerFramework: 1,
+      requiredFrameworks: ["react", "vue", "svelte", "angular", "html", "htmx"],
+    })
+  : undefined;
+const browserCallProfileEvidenceAssertion: JsonAssertionResult =
+  browserCallProfileReport
+    ? {
+        kind: "json-assertion",
+        name: "browserCallProfileEvidence",
+        ok: browserCallProfileEvidenceReport?.ok === true,
+        summary:
+          browserCallProfileEvidenceReport as unknown as Record<string, unknown>,
+      }
+    : {
+        kind: "json-assertion",
+        name: "browserCallProfileEvidence",
+        ok: false,
+        summary: {
+          issues: ["Missing browserCallProfiles proof result body."],
         },
       };
 const productionReadinessGateExplanationReport =
@@ -3099,6 +3160,7 @@ const ok =
   failureReplayEvidenceAssertion.ok &&
   operationsRecordProviderDecisionEvidenceAssertion.ok &&
   productionReadinessEvidenceAssertion.ok &&
+  browserCallProfileEvidenceAssertion.ok &&
   campaignReadinessEvidenceAssertion.ok &&
   campaignDialerProofEvidenceAssertion.ok &&
   dataControlEvidenceAssertion.ok &&
@@ -3151,6 +3213,7 @@ const summary = {
   telephonyWebhookNormalizationEvidenceAssertion,
   telephonyWebhookVerificationEvidenceAssertion,
   productionReadinessEvidenceAssertion,
+  browserCallProfileEvidenceAssertion,
   productionReadinessGateExplanationAssertion,
   proofTrendEvidenceAssertion,
   proofTrendRecommendationAssertion,
@@ -3197,6 +3260,7 @@ const markdown = renderMarkdown({
   telephonyWebhookNormalizationEvidenceAssertion,
   telephonyWebhookVerificationEvidenceAssertion,
   productionReadinessEvidenceAssertion,
+  browserCallProfileEvidenceAssertion,
   productionReadinessGateExplanationAssertion,
   proofTrendEvidenceAssertion,
   proofTrendRecommendationAssertion,

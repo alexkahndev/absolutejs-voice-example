@@ -66,6 +66,10 @@ const concurrency = Math.max(
   1,
   Number(process.env.VOICE_BROWSER_CALL_CONCURRENCY ?? 2),
 );
+const maxRetries = Math.max(
+  0,
+  Number(process.env.VOICE_BROWSER_CALL_RETRIES ?? 2),
+);
 const outputRoot =
   process.env.VOICE_BROWSER_CALL_PROFILE_OUTPUT_DIR ??
   ".voice-runtime/browser-call-profiles";
@@ -408,7 +412,8 @@ const captureFramework = async (framework: FrameworkId) => {
       () => evaluate<JsonRecord>(session, captureExpression),
       (capture) => {
         const sockets = Array.isArray(capture.sockets) ? capture.sockets : [];
-        return summarizeSockets(sockets).openSockets > 0;
+        const summary = summarizeSockets(sockets);
+        return summary.openSockets > 0 && summary.sentBytes > 0;
       },
       8_000,
     );
@@ -475,6 +480,34 @@ const run = async () => {
     );
 
     const captureWithFailureResult = async (framework: FrameworkId) => {
+      let latestFailure: unknown;
+      for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+        try {
+          return await captureFramework(framework);
+        } catch (error) {
+          latestFailure = error;
+          if (attempt < maxRetries) {
+            await wait(1_000);
+          }
+        }
+      }
+
+      const error = latestFailure;
+      return {
+        error: error instanceof Error ? error.message : String(error),
+        framework,
+        ok: false,
+        summary: {
+          messageCount: 0,
+          openSockets: 0,
+          receivedBytes: 0,
+          sentBytes: 0,
+          sockets: [],
+        },
+        url: `${appOrigin}/${framework}?engine=openai-realtime&provider=openai&routing=fastest`,
+      };
+    };
+    const captureOnceWithFailureResult = async (framework: FrameworkId) => {
       try {
         return await captureFramework(framework);
       } catch (error) {
@@ -496,7 +529,7 @@ const run = async () => {
     const results = await mapConcurrent(
       frameworks,
       concurrency,
-      captureWithFailureResult,
+      captureOnceWithFailureResult,
     );
     for (const [index, result] of results.entries()) {
       if (result.ok) {
