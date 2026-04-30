@@ -8516,6 +8516,190 @@ const runProfileSwitchGuard = async (
   });
 };
 
+const runProfileSwitchPolicyProof = async () => {
+  const defaults = await readRealCallProfileDefaultsReport();
+  const observed = {
+    currentProfileId: "meeting-recorder",
+    fallbackUsed: true,
+    providerP95Ms: 950,
+    turnWarnings: 3,
+  };
+  const cases = [
+    {
+      description: "Strong evidence can auto-apply a better profile.",
+      id: "auto-switch",
+      input: {
+        mode: "auto" as const,
+      },
+      label: "Auto switch",
+      expectedAction: "switch",
+    },
+    {
+      description: "Recommend mode leaves the active profile unchanged.",
+      id: "recommend-only",
+      input: {
+        mode: "recommend" as const,
+      },
+      label: "Recommend only",
+      expectedAction: "recommend",
+    },
+    {
+      description: "Off mode records the decision without changing anything.",
+      id: "disabled",
+      input: {
+        mode: "off" as const,
+      },
+      label: "Disabled",
+      expectedAction: "disabled",
+    },
+    {
+      description: "Allowed-profile policy prevents switching outside scope.",
+      id: "allowed-policy",
+      input: {
+        allowedProfileIds: ["meeting-recorder"],
+        mode: "auto" as const,
+      },
+      label: "Allowed profiles",
+      expectedAction: "blocked",
+      expectedBlockedByPolicy: "allowed-profiles",
+    },
+    {
+      description: "Blocked-profile policy rejects unsafe target profiles.",
+      id: "blocked-policy",
+      input: {
+        blockedProfileIds: ["noisy-phone-call"],
+        mode: "auto" as const,
+      },
+      label: "Blocked profiles",
+      expectedAction: "blocked",
+      expectedBlockedByPolicy: "blocked-profiles",
+    },
+    {
+      description: "Max-switch budget stops repeated automatic changes.",
+      id: "max-switches",
+      input: {
+        autoSwitchCount: 1,
+        maxAutoSwitchesPerSession: 1,
+        mode: "auto" as const,
+      },
+      label: "Max switches",
+      expectedAction: "blocked",
+      expectedBlockedByPolicy: "max-switches",
+    },
+  ];
+
+  const results = await Promise.all(
+    cases.map(async (item) => {
+      const decision = await applyVoiceProfileSwitchGuard({
+        allowedProfileIds: [...demoVoiceProfileIds],
+        audit: runtimeStorage.audit,
+        defaults,
+        maxAutoSwitchesPerSession: 1,
+        metadata: {
+          caseId: item.id,
+          proof: "profile-switch-policy",
+        },
+        minConfidence: 0.75,
+        observed,
+        sessionId: `profile-policy-proof-${item.id}`,
+        ...item.input,
+      });
+      const ok =
+        decision.action === item.expectedAction &&
+        (!item.expectedBlockedByPolicy ||
+          decision.blockedByPolicy === item.expectedBlockedByPolicy);
+
+      return {
+        ...item,
+        decision,
+        ok,
+      };
+    }),
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    ok: results.every((item) => item.ok),
+    observed,
+    results,
+    summary: {
+      failed: results.filter((item) => !item.ok).length,
+      passed: results.filter((item) => item.ok).length,
+      total: results.length,
+    },
+  };
+};
+
+const renderProfileSwitchPolicyProofHTML = async () => {
+  const report = await runProfileSwitchPolicyProof();
+  const rows = report.results
+    .map(
+      (item) => `<tr>
+        <td><strong>${escapeHtml(item.label)}</strong><p>${escapeHtml(item.description)}</p></td>
+        <td>${escapeHtml(item.expectedAction)}</td>
+        <td>${escapeHtml(item.decision.action)}</td>
+        <td>${escapeHtml(item.decision.selectedProfileId ?? "none")}</td>
+        <td>${escapeHtml(item.decision.blockedByPolicy ?? "none")}</td>
+        <td>${Math.round(item.decision.confidence * 100)}%</td>
+        <td><span class="status ${item.ok ? "pass" : "fail"}">${item.ok ? "PASS" : "FAIL"}</span></td>
+      </tr>`,
+    )
+    .join("");
+
+  return `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Voice Profile Switch Policy Proof</title>
+      <style>
+        :root{color-scheme:dark;background:#07110e;color:#e8fff5;font-family:ui-sans-serif,system-ui,sans-serif}
+        body{margin:0;padding:32px;background:radial-gradient(circle at top left,rgba(45,212,191,.2),transparent 34%),#07110e}
+        main{max-width:1120px;margin:0 auto}
+        a{color:#67e8f9}
+        .hero,.card{border:1px solid rgba(148,163,184,.24);border-radius:24px;background:rgba(15,23,42,.72);box-shadow:0 24px 90px rgba(0,0,0,.24);padding:24px;margin-bottom:18px}
+        .metric-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+        .metric{border:1px solid rgba(148,163,184,.2);border-radius:18px;padding:16px;background:rgba(8,47,73,.34)}
+        .metric span{display:block;color:#9ca3af;font-size:.78rem;text-transform:uppercase;letter-spacing:.08em}
+        .metric strong{display:block;margin-top:8px;font-size:1.6rem}
+        table{width:100%;border-collapse:collapse;overflow:hidden;border-radius:18px}
+        th,td{padding:14px;text-align:left;border-bottom:1px solid rgba(148,163,184,.18);vertical-align:top}
+        th{color:#a7f3d0;text-transform:uppercase;font-size:.75rem;letter-spacing:.08em}
+        td p{margin:.4rem 0 0;color:#a7b5ae}
+        pre{white-space:pre-wrap;overflow:auto;border-radius:18px;background:#020617;padding:18px;color:#d1fae5}
+        .status{display:inline-flex;border-radius:999px;padding:5px 10px;font-weight:800;font-size:.75rem}
+        .pass{background:rgba(34,197,94,.18);color:#bbf7d0}
+        .fail{background:rgba(239,68,68,.18);color:#fecaca}
+      </style>
+    </head>
+    <body>
+      <main>
+        <p><a href="/">Back to demo</a> · <a href="/api/voice/profile-switch-policy-proof">JSON</a> · <a href="/voice/proof-trends">Proof trends</a></p>
+        <section class="hero">
+          <h1>Voice Profile Switch Policy Proof</h1>
+          <p>This page proves profile switching is production-bounded: teams can disable it, run recommend-only, auto-apply with confidence, restrict allowed targets, block unsafe targets, and cap automatic switches per session.</p>
+          <div class="metric-grid">
+            <div class="metric"><span>Status</span><strong>${report.ok ? "PASS" : "FAIL"}</strong></div>
+            <div class="metric"><span>Cases</span><strong>${report.summary.passed}/${report.summary.total}</strong></div>
+            <div class="metric"><span>Generated</span><strong>${escapeHtml(report.generatedAt)}</strong></div>
+          </div>
+        </section>
+        <section class="card">
+          <h2>Policy Cases</h2>
+          <table>
+            <thead><tr><th>Case</th><th>Expected</th><th>Actual</th><th>Selected</th><th>Blocked by</th><th>Confidence</th><th>Status</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </section>
+        <section class="card">
+          <h2>Raw Report</h2>
+          <pre>${stringifyForHtml(report)}</pre>
+        </section>
+      </main>
+    </body>
+  </html>`;
+};
+
 const createDemoProfileSwitchGuard = (endpoint: string) => ({
   actor: {
     id: "absolutejs-voice-example",
@@ -10292,6 +10476,17 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
   )
   .post("/api/voice/profile-switch-guard", async ({ query }) =>
     await runProfileSwitchGuard(query),
+  )
+  .get(
+    "/api/voice/profile-switch-policy-proof",
+    async () => await runProfileSwitchPolicyProof(),
+  )
+  .get(
+    "/voice/profile-switch-policy",
+    async () =>
+      new Response(await renderProfileSwitchPolicyProofHTML(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
   )
   .get("/api/assistant-config", () => assistantConfig)
   .get("/api/assistant-summary", async () => summarizeAssistantRuns())

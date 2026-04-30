@@ -236,6 +236,12 @@ export const VOICE_PROOF_DASHBOARDS = [
     href: "/provider-contracts",
     label: "Provider contracts",
   },
+  {
+    description:
+      "Auto, recommend, off, allowed, blocked, and max-switch guard policies.",
+    href: "/voice/profile-switch-policy",
+    label: "Profile policy",
+  },
 ] as const;
 
 export const isVoiceModelProvider = (

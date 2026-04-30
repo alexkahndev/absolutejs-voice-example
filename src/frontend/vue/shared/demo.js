@@ -141,6 +141,11 @@ export const VOICE_PROOF_DASHBOARDS = [
     description: "Configured provider capability and fallback matrix.",
     href: "/provider-contracts",
     label: "Provider contracts"
+  },
+  {
+    description: "Auto, recommend, off, allowed, blocked, and max-switch guard policies.",
+    href: "/voice/profile-switch-policy",
+    label: "Profile policy"
   }
 ];
 export const isVoiceModelProvider = (value) => value === "deterministic" || value === "openai" || value === "anthropic" || value === "gemini";
