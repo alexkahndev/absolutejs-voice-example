@@ -42,6 +42,8 @@ import {
   buildVoiceRealtimeChannelReport,
   buildVoiceRealtimeChannelRuntimeSamplesFromTrace,
   buildVoiceMediaPipelineReport,
+  buildVoiceBrowserCallProfileReport,
+  createVoiceBrowserCallProfileRoutes,
   createVoiceRealtimeChannelRoutes,
   createVoiceMediaPipelineRoutes,
   createVoiceRealtimeProviderContractMatrixPreset,
@@ -207,6 +209,7 @@ import {
   type VoiceProofTrendReport,
   type VoiceSloCalibrationSample,
   type VoiceProofTrendSummary,
+  type VoiceBrowserCallProfileReport,
   voice,
   voiceComplianceRedactionDefaults,
   voiceGuardrailPolicyPresets,
@@ -3434,6 +3437,8 @@ type VapiCoverageSummary = VoicePlatformCoverageSummary & {
 
 const latestProofPackJsonPath = ".voice-runtime/proof-pack/latest.json";
 const longProofWindowRoot = ".voice-runtime/long-proof-window";
+const latestBrowserCallProfilesJsonPath =
+  ".voice-runtime/browser-call-profiles/latest.json";
 const latestProofTrendsJsonPath = ".voice-runtime/proof-trends/latest.json";
 const latestProofTrendsMarkdownPath = ".voice-runtime/proof-trends/latest.md";
 const configuredProofTrendsMaxAgeMs = Number(
@@ -3460,6 +3465,32 @@ const liveLatencyReadinessMaxAgeMs =
   configuredLiveLatencyReadinessMaxAgeMs > 0
     ? configuredLiveLatencyReadinessMaxAgeMs
     : 30 * 60 * 1000;
+const browserCallProfilesMaxAgeMs = 24 * 60 * 60 * 1000;
+
+const readLatestBrowserCallProfiles =
+  async (): Promise<VoiceBrowserCallProfileReport> => {
+    const file = Bun.file(latestBrowserCallProfilesJsonPath);
+
+    if (!(await file.exists())) {
+      return buildVoiceBrowserCallProfileReport({
+        maxAgeMs: browserCallProfilesMaxAgeMs,
+        source: latestBrowserCallProfilesJsonPath,
+      });
+    }
+
+    try {
+      return buildVoiceBrowserCallProfileReport({
+        ...((await file.json()) as Record<string, unknown>),
+        maxAgeMs: browserCallProfilesMaxAgeMs,
+        source: latestBrowserCallProfilesJsonPath,
+      });
+    } catch {
+      return buildVoiceBrowserCallProfileReport({
+        maxAgeMs: browserCallProfilesMaxAgeMs,
+        source: latestBrowserCallProfilesJsonPath,
+      });
+    }
+  };
 
 const readLatestProofTrends = async (): Promise<VoiceProofTrendReport> => {
   const file = Bun.file(latestProofTrendsJsonPath);
@@ -9887,6 +9918,14 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
       name: "absolutejs-voice-example-proof-trend-recommendations",
       source: readLatestProofTrends,
       title: "AbsoluteJS Voice Provider Runtime Recommendations",
+    }),
+  )
+  .use(
+    createVoiceBrowserCallProfileRoutes({
+      maxAgeMs: browserCallProfilesMaxAgeMs,
+      name: "absolutejs-voice-example-browser-call-profiles",
+      source: readLatestBrowserCallProfiles,
+      title: "AbsoluteJS Voice Browser Call Profiles",
     }),
   )
   .use(

@@ -1,5 +1,6 @@
 export {};
 
+import { buildVoiceBrowserCallProfileReport } from "@absolutejs/voice";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
@@ -60,6 +61,10 @@ const profileId = process.env.VOICE_BROWSER_CALL_PROFILE_ID ?? "meeting-recorder
 const durationMs = Math.max(
   1_000,
   Number(process.env.VOICE_BROWSER_CALL_DURATION_MS ?? 1_500),
+);
+const concurrency = Math.max(
+  1,
+  Number(process.env.VOICE_BROWSER_CALL_CONCURRENCY ?? 2),
 );
 const outputRoot =
   process.env.VOICE_BROWSER_CALL_PROFILE_OUTPUT_DIR ??
@@ -326,6 +331,31 @@ const waitFor = async <T>(
   throw new Error(`Timed out waiting for browser capture condition. Latest: ${JSON.stringify(latest)}`);
 };
 
+const mapConcurrent = async <Input, Output>(
+  values: Input[],
+  limit: number,
+  runItem: (value: Input) => Promise<Output>,
+) => {
+  const results = new Array<Output>(values.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(limit, values.length);
+
+  await Promise.all(
+    Array.from({ length: workerCount }, async () => {
+      while (nextIndex < values.length) {
+        const index = nextIndex++;
+        const value = values[index];
+        if (value === undefined) {
+          continue;
+        }
+        results[index] = await runItem(value);
+      }
+    }),
+  );
+
+  return results.filter((result): result is Output => result !== undefined);
+};
+
 const summarizeSockets = (sockets: unknown[]) => {
   const voiceSockets = sockets.filter(
     (socket): socket is JsonRecord =>
@@ -363,7 +393,7 @@ const captureFramework = async (framework: FrameworkId) => {
       source: installBrowserCaptureTracker,
     });
     await session.send("Page.navigate", { url });
-    await wait(framework === "angular" ? 4_000 : 2_500);
+    await wait(framework === "angular" ? 5_000 : 3_500);
 
     const clicked = await waitFor(
       () => evaluate<boolean>(session, clickGeneralStartExpression),
@@ -444,12 +474,11 @@ const run = async () => {
       () => startedChrome?.hasExited() ?? false,
     );
 
-    const results = [];
-    for (const framework of frameworks) {
+    const captureWithFailureResult = async (framework: FrameworkId) => {
       try {
-        results.push(await captureFramework(framework));
+        return await captureFramework(framework);
       } catch (error) {
-        results.push({
+        return {
           error: error instanceof Error ? error.message : String(error),
           framework,
           ok: false,
@@ -461,16 +490,28 @@ const run = async () => {
             sockets: [],
           },
           url: `${appOrigin}/${framework}?engine=openai-realtime&provider=openai&routing=fastest`,
-        });
+        };
       }
+    };
+    const results = await mapConcurrent(
+      frameworks,
+      concurrency,
+      captureWithFailureResult,
+    );
+    for (const [index, result] of results.entries()) {
+      if (result.ok) {
+        continue;
+      }
+
+      await wait(1_000);
+      results[index] = await captureWithFailureResult(result.framework);
     }
 
     const generatedAt = new Date().toISOString();
-    const report = {
+    const report = buildVoiceBrowserCallProfileReport({
       baseUrl: appOrigin,
       frameworks,
       generatedAt,
-      ok: results.every((result) => result.ok),
       outputDir,
       profileId,
       results,
@@ -501,7 +542,7 @@ const run = async () => {
         ),
         totalFrameworks: results.length,
       },
-    };
+    });
 
     await mkdir(outputDir, { recursive: true });
     await mkdir(outputRoot, { recursive: true });
