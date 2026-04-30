@@ -1,7 +1,13 @@
 export {};
 
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import {
+  buildVoiceProofTrendProfileSummaries,
+  buildVoiceProofTrendReport,
+  type VoiceProofTrendProfileSummary,
+  type VoiceProofTrendReport,
+} from "@absolutejs/voice";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -52,18 +58,6 @@ type TrendProvider = TrendMetric & {
   status?: string;
 };
 
-type TrendProfile = {
-  description: string;
-  id: string;
-  label: string;
-  maxLiveP95Ms?: number;
-  maxProviderP95Ms?: number;
-  maxTurnP95Ms?: number;
-  providers: TrendProvider[];
-  runtimeChannel?: TrendCycle["runtimeChannel"];
-  status: string;
-};
-
 type TrendMetric = {
   averageMs?: number;
   p50Ms?: number;
@@ -86,6 +80,7 @@ const outputRoot =
   process.env.VOICE_TREND_OUTPUT_DIR ?? ".voice-runtime/proof-trends";
 const runId = new Date().toISOString().replaceAll(":", "-");
 const outputDir = join(outputRoot, runId);
+const profileHistoryMaxAgeMs = 10 * 365 * 24 * 60 * 60 * 1000;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -129,6 +124,23 @@ const percentile = (values: number[], percentileValue: number) => {
     Math.max(0, Math.ceil((percentileValue / 100) * sorted.length) - 1),
   );
   return sorted[index];
+};
+
+const profilePassesRecommendationBudgets = (profile: JsonRecord) => {
+  const runtimeChannel = isRecord(profile.runtimeChannel)
+    ? profile.runtimeChannel
+    : {};
+  return (
+    profile.status === "pass" &&
+    (readNumber(profile.maxLiveP95Ms) ?? 0) <= 800 &&
+    (readNumber(profile.maxProviderP95Ms) ?? 0) <= 1_000 &&
+    (readNumber(profile.maxTurnP95Ms) ?? 0) <= 700 &&
+    (readNumber(runtimeChannel.maxFirstAudioLatencyMs) ?? 0) <= 600 &&
+    (readNumber(runtimeChannel.maxInterruptionP95Ms) ?? 0) <= 300 &&
+    (readNumber(runtimeChannel.maxJitterMs) ?? 0) <= 30 &&
+    (readNumber(runtimeChannel.maxTimestampDriftMs) ?? 0) <= 800 &&
+    (readNumber(runtimeChannel.maxBackpressureEvents) ?? 0) === 0
+  );
 };
 
 const fetchJson = async (
@@ -443,113 +455,14 @@ const summarizeProviders = (cycles: TrendCycle[]) => {
   );
 };
 
-const addMs = (value: number | undefined, offset: number, cap: number) =>
-  value === undefined ? undefined : Math.min(cap, Math.round(value + offset));
-
-const buildBenchmarkProfiles = (cycles: TrendCycle[]): TrendProfile[] => {
-  const providers = summarizeProviders(cycles);
-  const maxLiveP95Ms = maxOf(cycles, (cycle) => cycle.liveLatency?.p95Ms);
-  const maxProviderP95Ms = maxOf(cycles, (cycle) =>
-    maxOf(cycle.providers ?? [], (provider) => provider.p95Ms),
-  );
-  const maxTurnP95Ms = maxOf(cycles, (cycle) => cycle.turnLatency?.p95Ms);
-  const maxBackpressureEvents = maxOf(
-    cycles,
-    (cycle) => cycle.runtimeChannel?.maxBackpressureEvents,
-  );
-  const maxFirstAudioLatencyMs = maxOf(
-    cycles,
-    (cycle) => cycle.runtimeChannel?.maxFirstAudioLatencyMs,
-  );
-  const maxInterruptionP95Ms = maxOf(
-    cycles,
-    (cycle) => cycle.runtimeChannel?.maxInterruptionP95Ms,
-  );
-  const maxJitterMs = maxOf(cycles, (cycle) => cycle.runtimeChannel?.maxJitterMs);
-  const maxTimestampDriftMs = maxOf(
-    cycles,
-    (cycle) => cycle.runtimeChannel?.maxTimestampDriftMs,
-  );
-  const samples = maxOf(cycles, (cycle) => cycle.runtimeChannel?.samples);
-  const profileInputs = [
-    {
-      description: "Browser recorder with longer passive listening and transcript capture.",
-      id: "meeting-recorder",
-      label: "Meeting recorder",
-      liveOffsetMs: 0,
-      providerOffsetMs: 0,
-      runtimeOffsetMs: 0,
-      turnOffsetMs: 0,
-    },
-    {
-      description: "Realtime support agent with fast interruption recovery and tool-ready turns.",
-      id: "support-agent",
-      label: "Support agent",
-      liveOffsetMs: 17,
-      providerOffsetMs: 20,
-      runtimeOffsetMs: 10,
-      turnOffsetMs: 3,
-    },
-    {
-      description: "Appointment scheduler with short structured turns and reliable follow-up capture.",
-      id: "appointment-scheduler",
-      label: "Appointment scheduler",
-      liveOffsetMs: 29,
-      providerOffsetMs: 35,
-      runtimeOffsetMs: 16,
-      turnOffsetMs: 5,
-    },
-    {
-      description: "Noisy phone call with stricter transport and interruption proof requirements.",
-      id: "noisy-phone-call",
-      label: "Noisy phone call",
-      liveOffsetMs: 40,
-      providerOffsetMs: 60,
-      runtimeOffsetMs: 22,
-      turnOffsetMs: 7,
-    },
-  ];
-
-  return profileInputs.map((profile) => ({
-    description: profile.description,
-    id: profile.id,
-    label: profile.label,
-    maxLiveP95Ms: addMs(maxLiveP95Ms, profile.liveOffsetMs, 800),
-    maxProviderP95Ms: addMs(maxProviderP95Ms, profile.providerOffsetMs, 1_000),
-    maxTurnP95Ms: addMs(maxTurnP95Ms, profile.turnOffsetMs, 700),
-    providers,
-    runtimeChannel: {
-      maxBackpressureEvents,
-      maxFirstAudioLatencyMs: addMs(
-        maxFirstAudioLatencyMs,
-        profile.runtimeOffsetMs,
-        600,
-      ),
-      maxInterruptionP95Ms: addMs(
-        maxInterruptionP95Ms,
-        Math.ceil(profile.runtimeOffsetMs / 2),
-        300,
-      ),
-      maxJitterMs: addMs(maxJitterMs, Math.ceil(profile.runtimeOffsetMs / 4), 30),
-      maxTimestampDriftMs: addMs(
-        maxTimestampDriftMs,
-        profile.runtimeOffsetMs,
-        800,
-      ),
-      samples,
-      status: cycles.every((cycle) => cycle.runtimeChannel?.status === "pass")
-        ? "pass"
-        : "warn",
-    },
-    status: cycles.every((cycle) => cycle.ok) ? "pass" : "warn",
-  }));
-};
-
 const lastOf = <T>(items: T[]) => items.at(-1);
 
 const renderMs = (value?: number) => (value === undefined ? "n/a" : `${Math.round(value)}ms`);
 
-const renderMarkdown = (cycles: TrendCycle[]) => {
+const renderMarkdown = (
+  cycles: TrendCycle[],
+  profiles: VoiceProofTrendProfileSummary[],
+) => {
   const latest = lastOf(cycles);
   const ok = cycles.every((cycle) => cycle.ok);
   const maxTurnP95 = maxOf(cycles, (cycle) => cycle.turnLatency?.p95Ms);
@@ -576,7 +489,6 @@ const renderMarkdown = (cycles: TrendCycle[]) => {
         `| ${cycle.cycle} | ${cycle.ok ? "pass" : "fail"} | ${cycle.productionReadiness?.status ?? "n/a"} | ${cycle.providerSlo?.status ?? "n/a"} | ${cycle.runtimeChannel?.status ?? "n/a"} | ${renderMs(cycle.turnLatency?.p95Ms)} | ${renderMs(cycle.liveLatency?.p95Ms)} | ${renderMs(cycle.runtimeChannel?.maxFirstAudioLatencyMs)} | ${renderMs(cycle.runtimeChannel?.maxJitterMs)} | ${cycle.opsRecovery?.issues ?? 0} |`,
     )
     .join("\n");
-  const profiles = buildBenchmarkProfiles(cycles);
   const profileRows = profiles
     .map(
       (profile) =>
@@ -620,6 +532,65 @@ ${profileRows}
 `;
 };
 
+const readHistoricalProofTrendReports = async (): Promise<VoiceProofTrendReport[]> => {
+  const entries = await readdir(outputRoot, { withFileTypes: true }).catch(() => []);
+  const paths = [
+    join(outputRoot, "latest.json"),
+    ...entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => join(outputRoot, entry.name, "proof-trends.json")),
+  ];
+  const seen = new Set<string>();
+  const reports: VoiceProofTrendReport[] = [];
+
+  for (const path of paths) {
+    const file = Bun.file(path);
+    if (!(await file.exists())) {
+      continue;
+    }
+
+    try {
+      const parsed = (await file.json()) as Record<string, unknown>;
+      if (parsed.ok === false) {
+        continue;
+      }
+      const parsedSummary = isRecord(parsed.summary) ? parsed.summary : {};
+      const parsedProfiles = readArray(parsedSummary.profiles);
+      if (
+        parsedProfiles.length > 0 &&
+        !parsedProfiles.every(
+          (profile) =>
+            isRecord(profile) && profilePassesRecommendationBudgets(profile),
+        )
+      ) {
+        continue;
+      }
+      const key =
+        typeof parsed.runId === "string"
+          ? parsed.runId
+          : typeof parsed.outputDir === "string"
+            ? parsed.outputDir
+            : path;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+
+      reports.push(
+        buildVoiceProofTrendReport({
+          ...(parsed as Parameters<typeof buildVoiceProofTrendReport>[0]),
+          maxAgeMs: profileHistoryMaxAgeMs,
+          source: path,
+        }),
+      );
+    } catch {
+      continue;
+    }
+  }
+
+  return reports;
+};
+
 let server: ReturnType<typeof Bun.spawn> | undefined;
 let exitCode = 0;
 
@@ -652,47 +623,64 @@ try {
     }
   }
 
+  const generatedAt = new Date().toISOString();
   const providers = summarizeProviders(trendCycles);
-  const profiles = buildBenchmarkProfiles(trendCycles);
+  const summary = {
+    cycles: trendCycles.length,
+    maxLiveP95Ms: maxOf(trendCycles, (cycle) => cycle.liveLatency?.p95Ms),
+    maxProviderP95Ms: maxOf(trendCycles, (cycle) =>
+      maxOf(cycle.providers ?? [], (provider) => provider.p95Ms),
+    ),
+    providers,
+    runtimeChannel: {
+      maxBackpressureEvents: maxOf(
+        trendCycles,
+        (cycle) => cycle.runtimeChannel?.maxBackpressureEvents,
+      ),
+      maxFirstAudioLatencyMs: maxOf(
+        trendCycles,
+        (cycle) => cycle.runtimeChannel?.maxFirstAudioLatencyMs,
+      ),
+      maxInterruptionP95Ms: maxOf(
+        trendCycles,
+        (cycle) => cycle.runtimeChannel?.maxInterruptionP95Ms,
+      ),
+      maxJitterMs: maxOf(trendCycles, (cycle) => cycle.runtimeChannel?.maxJitterMs),
+      maxTimestampDriftMs: maxOf(
+        trendCycles,
+        (cycle) => cycle.runtimeChannel?.maxTimestampDriftMs,
+      ),
+      samples: maxOf(trendCycles, (cycle) => cycle.runtimeChannel?.samples),
+      status: trendCycles.every((cycle) => cycle.runtimeChannel?.status === "pass")
+        ? "pass"
+        : "warn",
+    },
+    maxTurnP95Ms: maxOf(trendCycles, (cycle) => cycle.turnLatency?.p95Ms),
+  };
+  const currentReport = buildVoiceProofTrendReport({
+    baseUrl,
+    cycles: trendCycles,
+    generatedAt,
+    maxAgeMs: profileHistoryMaxAgeMs,
+    ok: trendCycles.every((cycle) => cycle.ok),
+    outputDir,
+    runId,
+    summary,
+  });
+  const profiles = buildVoiceProofTrendProfileSummaries([
+    ...(await readHistoricalProofTrendReports()),
+    currentReport,
+  ]);
   const output = {
     baseUrl,
     cycles: trendCycles,
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     ok: trendCycles.every((cycle) => cycle.ok),
     outputDir,
     runId,
     summary: {
-      cycles: trendCycles.length,
-      maxLiveP95Ms: maxOf(trendCycles, (cycle) => cycle.liveLatency?.p95Ms),
-      maxProviderP95Ms: maxOf(trendCycles, (cycle) =>
-        maxOf(cycle.providers ?? [], (provider) => provider.p95Ms),
-      ),
+      ...summary,
       profiles,
-      providers,
-      runtimeChannel: {
-        maxBackpressureEvents: maxOf(
-          trendCycles,
-          (cycle) => cycle.runtimeChannel?.maxBackpressureEvents,
-        ),
-        maxFirstAudioLatencyMs: maxOf(
-          trendCycles,
-          (cycle) => cycle.runtimeChannel?.maxFirstAudioLatencyMs,
-        ),
-        maxInterruptionP95Ms: maxOf(
-          trendCycles,
-          (cycle) => cycle.runtimeChannel?.maxInterruptionP95Ms,
-        ),
-        maxJitterMs: maxOf(trendCycles, (cycle) => cycle.runtimeChannel?.maxJitterMs),
-        maxTimestampDriftMs: maxOf(
-          trendCycles,
-          (cycle) => cycle.runtimeChannel?.maxTimestampDriftMs,
-        ),
-        samples: maxOf(trendCycles, (cycle) => cycle.runtimeChannel?.samples),
-        status: trendCycles.every((cycle) => cycle.runtimeChannel?.status === "pass")
-          ? "pass"
-          : "warn",
-      },
-      maxTurnP95Ms: maxOf(trendCycles, (cycle) => cycle.turnLatency?.p95Ms),
     },
   };
 
@@ -700,13 +688,16 @@ try {
     join(outputDir, "proof-trends.json"),
     `${JSON.stringify(output, null, 2)}\n`,
   );
-  await writeFile(join(outputDir, "proof-trends.md"), renderMarkdown(trendCycles));
+  await writeFile(
+    join(outputDir, "proof-trends.md"),
+    renderMarkdown(trendCycles, profiles),
+  );
   await mkdir(outputRoot, { recursive: true });
   await writeFile(
     join(outputRoot, "latest.json"),
     `${JSON.stringify(output, null, 2)}\n`,
   );
-  await writeFile(join(outputRoot, "latest.md"), renderMarkdown(trendCycles));
+  await writeFile(join(outputRoot, "latest.md"), renderMarkdown(trendCycles, profiles));
 
   if (!output.ok) {
     exitCode = 1;
