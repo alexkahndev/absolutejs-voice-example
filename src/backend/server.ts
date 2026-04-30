@@ -42,8 +42,8 @@ import {
   buildVoiceRealtimeChannelReport,
   buildVoiceRealtimeChannelRuntimeSamplesFromTrace,
   createVoiceRealtimeChannelRoutes,
+  createVoiceRealtimeProviderContractMatrixPreset,
   createVoiceRealtimeProviderContractRoutes,
-  buildVoiceRealtimeProviderContractMatrix,
   createVoicePlatformCoverageRoutes,
   createVoicePostCallAnalysisRoutes,
   createVoiceProofTrendRoutes,
@@ -189,7 +189,6 @@ import {
   type VoicePlatformCoverageSummary,
   type VoiceCompetitiveCoverageReport,
   type VoiceCompetitiveSurface,
-  type VoiceRealtimeProviderContractMatrixInput,
   type VoicePostCallAnalysisOptions,
   type VoiceGuardrailDecision,
   type VoiceProofTrendCycle,
@@ -5858,84 +5857,51 @@ const buildDemoGeminiRealtimeChannelReport = async () =>
     provider: "gemini-live",
   });
 
-const buildDemoRealtimeProviderContractMatrixInput =
-  async (): Promise<VoiceRealtimeProviderContractMatrixInput> => ({
-  contracts: [
-    {
-      capabilities: [
+const buildDemoRealtimeProviderContractMatrixInput = async () =>
+  createVoiceRealtimeProviderContractMatrixPreset({
+    capabilities: {
+      "pipecat-bridge": [
         "browser-format-negotiation",
         "raw-pcm",
         "duplex-audio",
         "turn-commit",
         "first-audio-latency",
         "trace-evidence",
-        "reconnect",
-        "barge-in",
       ],
-      configured: Boolean(openAIRealtime),
-      env: process.env,
-      fallbackProviders: ["cascaded-stt-llm-tts"],
-      latencyBudgetMs: 800,
-      provider: "openai-realtime",
-      readinessHref: "/production-readiness",
-      realtimeChannel: await buildDemoRealtimeChannelReport(),
-      requiredEnv: ["OPENAI_API_KEY"],
-      selected: true,
-      traceHref: "/traces?sessionId=proof-realtime-channel",
     },
-    {
-      capabilities: [
-        "browser-format-negotiation",
-        "raw-pcm",
-        "duplex-audio",
-        "turn-commit",
-        "first-audio-latency",
-        "trace-evidence",
-        "reconnect",
-        "barge-in",
-      ],
-      configured: Boolean(geminiRealtime),
-      env: {
-        GEMINI_API_KEY: geminiApiKey,
-      },
-      fallbackProviders: ["openai-realtime", "cascaded-stt-llm-tts"],
-      implementationStatus: geminiRealtime ? undefined : "planned",
-      latencyBudgetMs: 900,
-      provider: "gemini-live",
-      readinessHref: "/production-readiness",
-      realtimeChannel: geminiRealtime
+    configured: {
+      "gemini-live": Boolean(geminiRealtime),
+      "openai-realtime": Boolean(openAIRealtime),
+      "pipecat-bridge": false,
+    },
+    env: {
+      ...process.env,
+      GEMINI_API_KEY: geminiApiKey,
+    },
+    fallbackProviders: {
+      "gemini-live": ["openai-realtime", "cascaded-stt-llm-tts"],
+      "openai-realtime": ["cascaded-stt-llm-tts"],
+      "pipecat-bridge": ["openai-realtime", "cascaded-stt-llm-tts"],
+    },
+    implementationStatus: {
+      "gemini-live": geminiRealtime ? "available" : "planned",
+      "pipecat-bridge": "planned",
+    },
+    latencyBudgets: {
+      "gemini-live": 900,
+      "openai-realtime": 800,
+      "pipecat-bridge": 850,
+    },
+    readinessHref: "/production-readiness",
+    realtimeChannels: {
+      "gemini-live": geminiRealtime
         ? await buildDemoGeminiRealtimeChannelReport()
         : undefined,
-      requiredEnv: ["GEMINI_API_KEY"],
-      selected: false,
-      traceHref: "/traces?sessionId=proof-realtime-channel",
+      "openai-realtime": await buildDemoRealtimeChannelReport(),
     },
-    {
-      capabilities: [
-        "browser-format-negotiation",
-        "raw-pcm",
-        "duplex-audio",
-        "turn-commit",
-        "first-audio-latency",
-        "trace-evidence",
-      ],
-      configured: false,
-      fallbackProviders: ["openai-realtime", "cascaded-stt-llm-tts"],
-      implementationStatus: "planned",
-      latencyBudgetMs: 850,
-      provider: "pipecat-bridge",
-      readinessHref: "/production-readiness",
-      requiredEnv: [],
-      selected: false,
-      traceHref: "/traces?sessionId=proof-realtime-channel",
-    },
-  ],
-});
-
-const buildDemoRealtimeProviderContractMatrix = async () =>
-  buildVoiceRealtimeProviderContractMatrix(
-    await buildDemoRealtimeProviderContractMatrixInput(),
-  );
+    selected: "openai-realtime",
+    traceHref: "/traces?sessionId=proof-realtime-channel",
+  });
 
 type ProofCallDisposition = Exclude<
   NonNullable<VoiceSessionRecord["call"]>["disposition"],
