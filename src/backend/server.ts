@@ -100,6 +100,7 @@ import {
   createVoiceResilienceRoutes,
   createVoiceRoutingDecisionSummary,
   applyVoiceProfileSwitchGuard,
+  buildVoiceProfileSwitchReadinessReport,
   createVoiceProfileSwitchLiveDecisionRoutes,
   createVoiceProfileSwitchPolicyProofRoutes,
   createVoiceProfileSwitchReadinessRoutes,
@@ -629,6 +630,7 @@ const deliveryTraceStore: VoiceTraceEventStore = {
     );
   },
 };
+const productionReadinessTraceStore = createVoiceMemoryTraceEventStore();
 const hiddenTraceTimelineSessionPattern =
   /^(latency-proof-|phone-|provider-sim-|quality-routing-proof$|stt-contract-|stt-sim-|tts-contract-|tts-sim-)/;
 const filterDemoTraceTimelineEvents = (
@@ -7506,6 +7508,14 @@ const opsRecoveryOptions = () => ({
 const buildDemoOpsRecoveryReport = () =>
   buildVoiceOpsRecoveryReport(opsRecoveryOptions());
 
+const buildProductionReadinessOpsRecoveryReport = () =>
+  buildVoiceOpsRecoveryReport({
+    ...opsRecoveryOptions(),
+    auditDeliveries: undefined,
+    traceDeliveries: undefined,
+    traces: productionReadinessTraceStore,
+  });
+
 const providerSloProofScenarioId = "provider-slo-proof";
 
 const providerSloOptions = {
@@ -7889,8 +7899,22 @@ const observabilityExportOptions = () => ({
 const buildDemoObservabilityExport = () =>
   buildVoiceObservabilityExport(observabilityExportOptions());
 
+const buildProductionReadinessObservabilityExport = async () =>
+  buildVoiceObservabilityExport({
+    ...observabilityExportOptions(),
+    audit: undefined,
+    auditDeliveries: undefined,
+    events: await productionReadinessTraceStore.list(),
+    store: productionReadinessTraceStore,
+    traceDeliveries: undefined,
+  });
+
 let productionReadinessProofRefresh: Promise<void> | undefined;
 let productionReadinessProofRefreshedAt = 0;
+let productionReadinessExportRefresh:
+  | Promise<Awaited<ReturnType<typeof buildDemoObservabilityExport>>>
+  | undefined;
+let productionReadinessExportRefreshedAt = 0;
 
 const refreshProductionReadinessProof = () => {
   if (
@@ -7908,8 +7932,85 @@ const refreshProductionReadinessProof = () => {
   return productionReadinessProofRefresh;
 };
 
+const seedProductionReadinessTraceProof = async () => {
+  await Promise.all(
+    (await productionReadinessTraceStore.list()).map((event) =>
+      productionReadinessTraceStore.remove(event.id),
+    ),
+  );
+
+  const now = Date.now();
+  const sessionId = `production-readiness-trace-${now}`;
+  await Promise.all(
+    [
+      createVoiceTraceEvent({
+        at: now,
+        payload: {
+          elapsedMs: 320,
+          kind: "llm",
+          provider: configuredModelProviders[0] ?? "openai",
+          providerStatus: "success",
+          selectedProvider: configuredModelProviders[0] ?? "openai",
+          status: "success",
+        },
+        scenarioId: providerSloProofScenarioId,
+        sessionId,
+        type: "session.error",
+      }),
+      createVoiceTraceEvent({
+        at: now + 1,
+        payload: {
+          elapsedMs: 82,
+          kind: "stt",
+          provider: configuredSTTProviders[0] ?? "deepgram",
+          providerStatus: "success",
+          selectedProvider: configuredSTTProviders[0] ?? "deepgram",
+          status: "success",
+        },
+        scenarioId: providerSloProofScenarioId,
+        sessionId,
+        type: "session.error",
+      }),
+      createVoiceTraceEvent({
+        at: now + 2,
+        payload: {
+          elapsedMs: 45,
+          kind: "tts",
+          provider: configuredTTSProviders[0] ?? "openai",
+          providerStatus: "success",
+          selectedProvider: configuredTTSProviders[0] ?? "openai",
+          status: "success",
+        },
+        scenarioId: providerSloProofScenarioId,
+        sessionId,
+        type: "session.error",
+      }),
+      createVoiceTraceEvent({
+        at: now + 3,
+        metadata: {
+          source: "browser",
+          surface: "live-latency-proof",
+        },
+        payload: {
+          completedAt: now + 3,
+          elapsedMs: 420,
+          latencyMs: 420,
+          startedAt: now - 417,
+          status: "assistant_audio_started",
+          thresholdMs: 1_800,
+        },
+        scenarioId: "production-readiness-proof",
+        sessionId,
+        traceId: `production-readiness-live-latency-${now}`,
+        type: "client.live_latency",
+      }),
+    ].map((event) => productionReadinessTraceStore.append(event)),
+  );
+};
+
 const refreshProductionReadinessProofNow = async () => {
   await Promise.all([
+    seedProductionReadinessTraceProof(),
     cleanupDemoQualityNoise(),
     seedDemoProviderSloProof(),
     seedDemoProviderDecisionProof(),
@@ -8001,8 +8102,24 @@ const refreshProductionReadinessProofNow = async () => {
 };
 
 const buildFreshDemoObservabilityExport = async () => {
+  if (
+    productionReadinessExportRefresh &&
+    Date.now() - productionReadinessExportRefreshedAt < 5_000
+  ) {
+    return productionReadinessExportRefresh;
+  }
+
+  productionReadinessExportRefresh = buildFreshDemoObservabilityExportNow().finally(
+    () => {
+      productionReadinessExportRefreshedAt = Date.now();
+    },
+  );
+  return productionReadinessExportRefresh;
+};
+
+const buildFreshDemoObservabilityExportNow = async () => {
   await refreshProductionReadinessProof();
-  const report = await buildDemoObservabilityExport();
+  const report = await buildProductionReadinessObservabilityExport();
   await deliverVoiceObservabilityExport({
     destinations: observabilityExportDeliveryDestinations(),
     receipts: observabilityExportDeliveryReceipts,
@@ -8010,6 +8127,66 @@ const buildFreshDemoObservabilityExport = async () => {
   });
 
   return report;
+};
+
+let productionReadinessDeliveryRuntime:
+  | Promise<Awaited<ReturnType<typeof deliveryRuntimeControl.summarize>>>
+  | undefined;
+let productionReadinessDeliveryRuntimeAt = 0;
+
+const summarizeProductionReadinessDeliveryRuntime = () => {
+  if (
+    productionReadinessDeliveryRuntime &&
+    Date.now() - productionReadinessDeliveryRuntimeAt < 5_000
+  ) {
+    return productionReadinessDeliveryRuntime;
+  }
+
+  productionReadinessDeliveryRuntime = deliveryRuntimeControl
+    .summarize()
+    .finally(() => {
+      productionReadinessDeliveryRuntimeAt = Date.now();
+    });
+  return productionReadinessDeliveryRuntime;
+};
+
+let productionReadinessProfileSwitch:
+  | Promise<Awaited<ReturnType<typeof buildVoiceProfileSwitchReadinessReport>>>
+  | undefined;
+let productionReadinessProfileSwitchAt = 0;
+
+const buildProductionReadinessProfileSwitchReport = () => {
+  if (
+    productionReadinessProfileSwitch &&
+    Date.now() - productionReadinessProfileSwitchAt < 5_000
+  ) {
+    return productionReadinessProfileSwitch;
+  }
+
+  productionReadinessProfileSwitch = buildVoiceProfileSwitchReadinessReport({
+    audit: runtimeStorage.audit,
+    autoMode: true,
+    limit: 50,
+    maxAutoAppliedRatio: 1,
+    policyProof: {
+      allowedProfileIds: [...demoVoiceProfileIds],
+      audit: runtimeStorage.audit,
+      defaults: () => readRealCallProfileDefaultsReport(),
+      metadata: {
+        source: "absolutejs-voice-example",
+      },
+      observed: {
+        currentProfileId: "meeting-recorder",
+        fallbackUsed: true,
+        providerP95Ms: 950,
+        turnWarnings: 3,
+      },
+    },
+    trace: deliveryTraceStore,
+  }).finally(() => {
+    productionReadinessProfileSwitchAt = Date.now();
+  });
+  return productionReadinessProfileSwitch;
 };
 
 const buildDemoObservabilityExportReplay = async () => {
@@ -8057,7 +8234,7 @@ const productionReadinessOptions = () => ({
     campaignReadiness: () =>
       runVoiceCampaignReadinessProof({ store: campaignStore }),
     carriers: loadCarrierMatrixInputs,
-    deliveryRuntime: deliveryRuntimeControl,
+    deliveryRuntime: summarizeProductionReadinessDeliveryRuntime,
     explain: true,
     links: productionReadinessLinks,
     observabilityExportDeliveryHistory: {
@@ -8075,10 +8252,12 @@ const productionReadinessOptions = () => ({
   }),
   additionalChecks: async () => [await buildBrowserCallProfileReadinessCheck()],
   agentSquadContracts: async () => [await runDemoAgentSquadContract()],
+  auditDeliveries: false as const,
   bargeInReports: async () => [await buildDemoBargeInReport()],
+  cacheMs: 10_000,
   htmlPath: "/production-readiness",
   opsActionHistory: runtimeStorage.audit,
-  opsRecovery: buildDemoOpsRecoveryReport,
+  opsRecovery: buildProductionReadinessOpsRecoveryReport,
   observabilityExport: buildFreshDemoObservabilityExport,
   observabilityExportReplay: buildDemoObservabilityExportReplay,
   observabilityExportDeliveryHistory: async () => {
@@ -8092,27 +8271,7 @@ const productionReadinessOptions = () => ({
     };
   },
   path: "/api/production-readiness",
-  profileSwitchReadiness: {
-    audit: runtimeStorage.audit,
-    autoMode: true,
-    limit: 50,
-    maxAutoAppliedRatio: 1,
-    policyProof: {
-      allowedProfileIds: [...demoVoiceProfileIds],
-      audit: runtimeStorage.audit,
-      defaults: () => readRealCallProfileDefaultsReport(),
-      metadata: {
-        source: "absolutejs-voice-example",
-      },
-      observed: {
-        currentProfileId: "meeting-recorder",
-        fallbackUsed: true,
-        providerP95Ms: 950,
-        turnWarnings: 3,
-      },
-    },
-    trace: deliveryTraceStore,
-  },
+  profileSwitchReadiness: buildProductionReadinessProfileSwitchReport,
   browserMedia: async () =>
     (await getLatestVoiceBrowserMediaReport({
       store: runtimeStorage.traces,
@@ -8298,7 +8457,8 @@ const productionReadinessOptions = () => ({
       snapshots: await getReconnectContractSnapshots(),
     }),
   ],
-  store: deliveryTraceStore,
+  store: productionReadinessTraceStore,
+  traceDeliveries: false as const,
   traceMaxAgeMs: 30 * 60 * 1000,
 });
 
