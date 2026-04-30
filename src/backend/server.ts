@@ -57,6 +57,7 @@ import {
   createVoiceProofTrendRoutes,
   createVoiceRealCallProfileHistoryRoutes,
   buildVoiceRealCallProfileHistoryReport,
+  buildVoiceRealCallProfileReadinessCheck,
   loadVoiceRealCallProfileEvidenceFromTraceStore,
   createVoiceFileObservabilityExportDeliveryReceiptStore,
   buildVoiceCompetitiveCoverageReport,
@@ -3820,6 +3821,20 @@ const buildBrowserCallProfileReadinessCheck =
       value: `${assertion.passedFrameworks.length}/6 frameworks`,
     };
   };
+
+const buildRealCallProfileReadinessCheck =
+  async (): Promise<VoiceProductionReadinessCheck> =>
+    buildVoiceRealCallProfileReadinessCheck(
+      await readRealCallProfileDefaultsReport(),
+      {
+        href: "/voice/real-call-profile-history",
+        minActionableProfiles: 2,
+        minCycles: 10,
+        requiredProfileIds: ["meeting-recorder", "support-agent"],
+        requiredProviderRoles: ["llm", "stt", "tts"],
+        sourceHref: "/api/voice/real-call-profile-history",
+      },
+    );
 
 const readLongProofWindowCalibrationSamples = async (): Promise<
   VoiceSloCalibrationSample[]
@@ -8179,6 +8194,7 @@ const productionReadinessOptions = () => ({
   additionalChecks: async () => [
     await productionReadinessProofRuntime.buildFreshnessCheck(),
     await buildBrowserCallProfileReadinessCheck(),
+    await buildRealCallProfileReadinessCheck(),
   ],
   agentSquadContracts: async () => [await runDemoAgentSquadContract()],
   auditDeliveries: false as const,
