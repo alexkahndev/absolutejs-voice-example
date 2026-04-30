@@ -73,6 +73,7 @@ import {
   createVoiceProviderOrchestrationRoutes,
   createVoiceProviderDecisionTraceEvent,
   createVoiceMediaFrame,
+  createVoiceMediaTransport,
   createVoiceProviderDecisionTraceRoutes,
   createVoiceProviderSloRoutes,
   createVoiceSloCalibrationRoutes,
@@ -5961,6 +5962,22 @@ const buildDemoMediaPipelineReportOptions = async () => {
       return undefined;
     })
     .filter((frame): frame is VoiceMediaFrame => frame !== undefined);
+  const transport = createVoiceMediaTransport({
+    inputFormat: realtimeChannelFormat,
+    maxBufferedFrames: Math.max(frames.length + 1, 1),
+    name: "absolutejs-browser-realtime-transport",
+    outputFormat: realtimeChannelFormat,
+  });
+
+  await transport.connect?.();
+  for (const frame of frames) {
+    if (frame.kind === "input-audio") {
+      await transport.receive(frame);
+    }
+    if (frame.kind === "assistant-audio") {
+      await transport.send(frame);
+    }
+  }
 
   return {
     expectedInputFormat: realtimeChannelFormat,
@@ -5974,6 +5991,7 @@ const buildDemoMediaPipelineReportOptions = async () => {
     requireInterruptionFrame: true,
     requireTraceEvidence: true,
     surface: "direct-realtime-media-pipeline",
+    transport: transport.report(),
     maxSilenceFrames: 1,
     minSpeechFrames: 1,
     maxInterruptionLatencyMs: 250,

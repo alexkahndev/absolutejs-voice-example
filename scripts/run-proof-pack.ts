@@ -2713,13 +2713,17 @@ const mediaPipelineCalibrationEvidence = mediaPipelineCalibration
   ? evaluateVoiceMediaPipelineEvidence(mediaPipelineCalibration, {
       maxFirstAudioLatencyMs: 800,
       maxInterruptionLatencyMs: 250,
+      maxTransportBackpressureEvents: 0,
       minAssistantAudioFrames: 1,
       minInputAudioFrames: 1,
+      minTransportInputFrames: 1,
+      minTransportOutputFrames: 1,
       minTraceLinkedFrames: 4,
       minVadSegments: 1,
       requireInterruptionFrame: true,
       requirePass: true,
       requireResamplingReady: true,
+      requireTransportConnected: true,
     })
   : undefined;
 const mediaPipelineCalibrationAssertion: JsonAssertionResult = {
