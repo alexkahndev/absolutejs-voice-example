@@ -43,7 +43,10 @@ import {
   type VoiceOpsStatusReport,
   type VoiceLiveOpsActionResult,
   type VoiceLiveOpsControlState,
+  type VoiceMediaInterruptionReport,
   type VoiceMediaPipelineCalibrationReport,
+  type VoiceMediaResamplingPlan,
+  type VoiceMediaVadReport,
   type VoiceOutcomeContractSuiteReport,
   type VoicePhoneAgentSetupReport,
   type VoicePhoneAgentProductionSmokeReport,
@@ -62,6 +65,16 @@ import {
   type VoiceTelephonyWebhookVerificationEvidenceAttempt,
   type VoiceToolContractSuiteReport,
 } from "@absolutejs/voice";
+
+type DemoMediaPipelineReport = {
+  calibration: VoiceMediaPipelineCalibrationReport;
+  frames: number;
+  interruption: VoiceMediaInterruptionReport;
+  ok: boolean;
+  resampling: VoiceMediaResamplingPlan;
+  status: "fail" | "pass" | "warn";
+  vad: VoiceMediaVadReport;
+};
 
 type ProofMethod = "GET" | "POST";
 
@@ -2683,32 +2696,45 @@ const realtimeChannelEvidenceAssertion: JsonAssertionResult = realtimeChannel
     };
 const mediaPipelineCalibration = proofResults.find(
   (result) => result.name === "mediaPipelineCalibration",
-)?.body as VoiceMediaPipelineCalibrationReport | undefined;
+)?.body as DemoMediaPipelineReport | undefined;
 const mediaPipelineCalibrationIssues = mediaPipelineCalibration
   ? [
       ...(mediaPipelineCalibration.status === "pass"
         ? []
         : [`Expected pass status, found ${mediaPipelineCalibration.status}.`]),
-      ...(mediaPipelineCalibration.inputAudioFrames >= 1
+      ...(mediaPipelineCalibration.calibration.inputAudioFrames >= 1
         ? []
         : ["Expected at least one input audio frame."]),
-      ...(mediaPipelineCalibration.assistantAudioFrames >= 1
+      ...(mediaPipelineCalibration.calibration.assistantAudioFrames >= 1
         ? []
         : ["Expected at least one assistant audio frame."]),
-      ...(mediaPipelineCalibration.turnCommitFrames >= 1
+      ...(mediaPipelineCalibration.calibration.turnCommitFrames >= 1
         ? []
         : ["Expected at least one turn commit frame."]),
-      ...(mediaPipelineCalibration.traceLinkedFrames >= 3
+      ...(mediaPipelineCalibration.calibration.traceLinkedFrames >= 4
         ? []
-        : ["Expected at least three trace-linked media frames."]),
-      ...(mediaPipelineCalibration.resamplingRequired
+        : ["Expected at least four trace-linked media frames."]),
+      ...(mediaPipelineCalibration.calibration.interruptionFrames >= 1
+        ? []
+        : ["Expected at least one interruption frame."]),
+      ...(mediaPipelineCalibration.vad.segments.length >= 1
+        ? []
+        : ["Expected at least one VAD speech segment."]),
+      ...(mediaPipelineCalibration.interruption.status === "pass"
+        ? []
+        : ["Expected interruption report to pass."]),
+      ...(mediaPipelineCalibration.resampling.required
         ? ["Expected no required resampling for calibrated realtime format."]
         : []),
-      ...(mediaPipelineCalibration.firstAudioLatencyMs !== undefined &&
-      mediaPipelineCalibration.firstAudioLatencyMs <= 800
+      ...(mediaPipelineCalibration.calibration.firstAudioLatencyMs !==
+        undefined &&
+      mediaPipelineCalibration.calibration.firstAudioLatencyMs <= 800
         ? []
         : ["Expected first assistant audio latency at or below 800ms."]),
-      ...mediaPipelineCalibration.issues
+      ...mediaPipelineCalibration.calibration.issues
+        .filter((issue) => issue.severity === "error")
+        .map((issue) => issue.message),
+      ...mediaPipelineCalibration.interruption.issues
         .filter((issue) => issue.severity === "error")
         .map((issue) => issue.message),
     ]

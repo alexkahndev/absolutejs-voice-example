@@ -41,7 +41,10 @@ import {
   createVoiceCompetitiveCoverageRoutes,
   buildVoiceRealtimeChannelReport,
   buildVoiceRealtimeChannelRuntimeSamplesFromTrace,
+  buildVoiceMediaInterruptionReport,
   buildVoiceMediaPipelineCalibrationReport,
+  buildVoiceMediaResamplingPlan,
+  buildVoiceMediaVadReport,
   createVoiceRealtimeChannelRoutes,
   createVoiceRealtimeProviderContractMatrixPreset,
   createVoiceRealtimeProviderContractRoutes,
@@ -5796,6 +5799,23 @@ const seedDemoRealtimeChannelProof = async () => {
     turnId,
     type: "client.reconnect",
   });
+  await appendProofTrace({
+    at: committedAt + 500,
+    metadata: { proof: "realtime-channel", realtime: true },
+    payload: {
+      at: committedAt + 500,
+      id: "realtime-media-pipeline-interruption",
+      latencyMs: 190,
+      reason: "media-pipeline-proof",
+      sessionId: session.id,
+      status: "stopped",
+      thresholdMs: 250,
+    },
+    scenarioId: "realtime-channel-proof",
+    sessionId: session.id,
+    turnId,
+    type: "client.barge_in",
+  });
 
   return { ok: true, sessionId: session.id, turnId };
 };
@@ -5861,7 +5881,7 @@ const buildDemoGeminiRealtimeChannelReport = async () =>
     provider: "gemini-live",
   });
 
-const buildDemoMediaPipelineCalibrationReport = async () => {
+const buildDemoMediaPipelineReport = async () => {
   const events = (
     await runtimeStorage.traces.list({ limit: 500 })
   ).filter(
@@ -5887,6 +5907,7 @@ const buildDemoMediaPipelineCalibrationReport = async () => {
         return createVoiceMediaFrame({
           ...base,
           kind: "input-audio",
+          metadata: { ...base.metadata, speechProbability: 0.92 },
           source: "browser",
         } as VoiceMediaFrame);
       }
@@ -5923,11 +5944,26 @@ const buildDemoMediaPipelineCalibrationReport = async () => {
         } as VoiceMediaFrame);
       }
 
+      if (event.type === "client.barge_in") {
+        return createVoiceMediaFrame({
+          ...base,
+          kind: "interruption",
+          latencyMs:
+            event.payload &&
+            typeof event.payload === "object" &&
+            "latencyMs" in event.payload &&
+            typeof event.payload.latencyMs === "number"
+              ? event.payload.latencyMs
+              : undefined,
+          source: "voice-runtime",
+        } as VoiceMediaFrame);
+      }
+
       return undefined;
     })
     .filter((frame): frame is VoiceMediaFrame => frame !== undefined);
 
-  return buildVoiceMediaPipelineCalibrationReport({
+  const calibration = buildVoiceMediaPipelineCalibrationReport({
     expectedInputFormat: realtimeChannelFormat,
     expectedOutputFormat: realtimeChannelFormat,
     frames,
@@ -5936,9 +5972,43 @@ const buildDemoMediaPipelineCalibrationReport = async () => {
     maxFirstAudioLatencyMs: 800,
     maxJitterMs: 40,
     outputFormat: realtimeChannelFormat,
+    requireInterruptionFrame: true,
     requireTraceEvidence: true,
     surface: "direct-realtime-media-pipeline",
   });
+  const vad = buildVoiceMediaVadReport({
+    frames,
+    maxSilenceFrames: 1,
+    minSpeechFrames: 1,
+  });
+  const interruption = buildVoiceMediaInterruptionReport({
+    frames,
+    maxInterruptionLatencyMs: 250,
+  });
+  const resampling = buildVoiceMediaResamplingPlan({
+    inputFormat: realtimeChannelFormat,
+    outputFormat: realtimeChannelFormat,
+  });
+  const status =
+    calibration.status === "fail" || interruption.status === "fail"
+      ? "fail"
+      : calibration.status === "warn" ||
+          vad.status === "warn" ||
+          interruption.status === "warn" ||
+          resampling.status === "warn"
+        ? "warn"
+        : "pass";
+
+  return {
+    calibration,
+    checkedAt: Date.now(),
+    frames: frames.length,
+    interruption,
+    ok: status === "pass",
+    resampling,
+    status,
+    vad,
+  };
 };
 
 const buildDemoRealtimeProviderContractMatrixInput = async () =>
@@ -6646,27 +6716,28 @@ const createAuditDeliveryWorker = () =>
 const createTraceDeliveryWorker = () =>
   deliveryWorkerRuntime?.trace ?? demoTraceDeliveryWorker;
 
+const isDemoBargeInProofTrace = (trace: VoiceTraceEvent) =>
+  trace.type === "client.barge_in" &&
+  trace.payload &&
+  typeof trace.payload === "object" &&
+  "id" in trace.payload &&
+  trace.payload.id !== "barge-in-proof-seed" &&
+  "latencyMs" in trace.payload &&
+  typeof trace.payload.latencyMs === "number" &&
+  "status" in trace.payload &&
+  trace.payload.status === "stopped" &&
+  trace.metadata?.source !== "demo" &&
+  trace.metadata?.proof !== "barge-in-seed";
+
 const getBargeInReportEvents = async () => {
   const traces = await runtimeStorage.traces.list();
-  const live = traces.filter(
-    (trace) =>
-      trace.type === "client.barge_in" &&
-      trace.payload.id !== "barge-in-proof-seed" &&
-      trace.metadata?.source !== "demo" &&
-      trace.metadata?.proof !== "barge-in-seed",
-  );
+  const live = traces.filter(isDemoBargeInProofTrace);
 
   return live.length > 0 ? live : traces;
 };
 
 const getBargeInProofSource = async () =>
-  (await getBargeInReportEvents()).some(
-    (trace) =>
-      trace.type === "client.barge_in" &&
-      trace.payload.id !== "barge-in-proof-seed" &&
-      trace.metadata?.source !== "demo" &&
-      trace.metadata?.proof !== "barge-in-seed",
-  )
+  (await getBargeInReportEvents()).some(isDemoBargeInProofTrace)
     ? "live"
     : "demo";
 
@@ -9589,7 +9660,7 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
     seedDemoRealtimeChannelProof(),
   )
   .get("/api/voice/media-pipeline-calibration", async () =>
-    buildDemoMediaPipelineCalibrationReport(),
+    buildDemoMediaPipelineReport(),
   )
   .use(
     createVoiceRealtimeChannelRoutes({
