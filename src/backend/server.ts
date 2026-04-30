@@ -60,6 +60,7 @@ import {
   createVoiceSQLiteRealCallProfileRecoveryJobStore,
   buildVoiceRealCallProfileHistoryReport,
   buildVoiceRealCallProfileReadinessCheck,
+  buildVoiceRealCallProfileRecoveryJobHistoryCheck,
   loadVoiceRealCallProfileEvidenceFromTraceStore,
   createVoiceFileObservabilityExportDeliveryReceiptStore,
   buildVoiceCompetitiveCoverageReport,
@@ -8502,6 +8503,14 @@ const productionReadinessOptions = () => ({
     await productionReadinessProofRuntime.buildFreshnessCheck(),
     await buildBrowserCallProfileReadinessCheck(),
     await buildRealCallProfileReadinessCheck(),
+    await buildVoiceRealCallProfileRecoveryJobHistoryCheck(
+      realCallProfileRecoveryJobStore,
+      {
+        href: "/voice/real-call-profile-recovery",
+        minCompletedJobs: 1,
+        sourceHref: "/api/voice/real-call-profile-history/actions/jobs",
+      },
+    ),
   ],
   agentSquadContracts: async () => [await runDemoAgentSquadContract()],
   auditDeliveries: false as const,
