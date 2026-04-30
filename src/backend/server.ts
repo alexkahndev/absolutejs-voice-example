@@ -54,6 +54,7 @@ import {
   createVoiceProofTrendRecommendationRoutes,
   createVoiceProofTrendRoutes,
   createVoiceRealCallProfileHistoryRoutes,
+  buildVoiceRealCallProfileHistoryReport,
   createVoiceFileObservabilityExportDeliveryReceiptStore,
   buildVoiceCompetitiveCoverageReport,
   buildVoiceFailureReplay,
@@ -146,6 +147,7 @@ import {
   signVoicePlivoWebhook,
   buildVoiceProofTrendReport,
   formatVoiceProofTrendAge,
+  resolveVoiceRealCallProfileProviderRoute,
   getVoiceCampaignDialerProofStatus,
   runVoiceCampaignDialerProof,
   runVoiceCampaignProof,
@@ -1547,6 +1549,7 @@ const sttLatencyBudgets = {
 };
 type VoiceSTTProvider = "deepgram" | "assemblyai";
 const sessionRoutingModes = new Map<string, VoiceRoutingMode>();
+const sessionVoiceProfileIds = new Map<string, string>();
 const configuredModelProviders: VoiceModelProvider[] = [
   "deterministic",
   openAIApiKey ? "openai" : undefined,
@@ -1652,7 +1655,18 @@ const telephonyTTS = createVoiceTTSProviderRouter<VoiceTTSProvider>({
     ...(openAITelephonyTTS ? { openai: openAITelephonyTTS } : {}),
     emergency: createEmergencyTelephonyTTS(),
   },
-  fallback: openAITelephonyTTS ? ["openai", "emergency"] : ["emergency"],
+  fallback: async (input) => {
+    const profileProvider = await resolveProfileProviderRoute({
+      availableProviders: configuredTTSProviders,
+      fallbackProvider: openAITelephonyTTS ? "openai" : "emergency",
+      profileId: sessionVoiceProfileIds.get(input.sessionId),
+      role: "tts",
+    });
+    return [
+      profileProvider,
+      ...(openAITelephonyTTS ? ["openai", "emergency"] : ["emergency"]),
+    ].filter(Boolean) as VoiceTTSProvider[];
+  },
   onProviderEvent: async (event, input) => {
     await deliveryTraceStore.append({
       at: event.at,
@@ -1685,7 +1699,13 @@ const telephonyTTS = createVoiceTTSProviderRouter<VoiceTTSProvider>({
       timeoutMs: readPositiveNumberEnv("VOICE_OPENAI_TTS_TIMEOUT_MS", 6_000),
     },
   },
-  selectProvider: () => (openAITelephonyTTS ? "openai" : "emergency"),
+  selectProvider: (input) =>
+    resolveProfileProviderRoute({
+      availableProviders: configuredTTSProviders,
+      fallbackProvider: openAITelephonyTTS ? "openai" : "emergency",
+      profileId: sessionVoiceProfileIds.get(input.sessionId),
+      role: "tts",
+    }),
 });
 const voiceProviderFeatures = {
   anthropic: ["tool calling", "JSON result shaping", "fallback routing"],
@@ -2006,6 +2026,85 @@ const providerFallbackOrder = (provider: VoiceModelProvider) => [
       candidate !== provider && configuredModelProviders.includes(candidate),
   ),
 ];
+const voiceProfileProviderAliases = {
+  "llm:deterministic+openai": ["openai", "deterministic"],
+  "deterministic+openai": ["openai", "deterministic"],
+} satisfies Record<string, readonly VoiceModelProvider[]>;
+const queryFromContext = (context: unknown) =>
+  context &&
+  typeof context === "object" &&
+  "query" in context &&
+  context.query &&
+  typeof context.query === "object"
+    ? (context.query as Record<PropertyKey, unknown>)
+    : undefined;
+const readQueryString = (
+  query: Record<PropertyKey, unknown> | undefined,
+  keys: readonly string[],
+) => {
+  for (const key of keys) {
+    const value = query?.[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return undefined;
+};
+const resolveVoiceProfileIdFromContext = (context: unknown) => {
+  const query = queryFromContext(context);
+  const explicit = readQueryString(query, [
+    "voiceProfile",
+    "profileId",
+    "callProfile",
+  ]);
+  if (explicit) {
+    return explicit;
+  }
+
+  const scenarioId = readQueryString(query, ["scenarioId"]);
+  return scenarioId === "guided" ? "support-agent" : "meeting-recorder";
+};
+let realCallProfileDefaultsCache:
+  | { expiresAt: number; report: ReturnType<typeof buildVoiceRealCallProfileHistoryReport> }
+  | undefined;
+const readRealCallProfileDefaultsReport = async () => {
+  const now = Date.now();
+  if (realCallProfileDefaultsCache && realCallProfileDefaultsCache.expiresAt > now) {
+    return realCallProfileDefaultsCache.report;
+  }
+
+  const report = buildVoiceRealCallProfileHistoryReport(
+    await readRealCallProfileHistory(),
+  );
+  realCallProfileDefaultsCache = {
+    expiresAt: now + 5_000,
+    report,
+  };
+  return report;
+};
+const resolveProfileProviderRoute = async <TProvider extends string>(input: {
+  availableProviders: readonly TProvider[];
+  fallbackProvider?: TProvider;
+  profileId?: string;
+  providerAliases?: Partial<Record<string, TProvider | readonly TProvider[]>>;
+  role: string;
+}) =>
+  resolveVoiceRealCallProfileProviderRoute({
+    availableProviders: input.availableProviders,
+    defaults: await readRealCallProfileDefaultsReport(),
+    fallbackProvider: input.fallbackProvider,
+    profileId: input.profileId,
+    providerAliases: input.providerAliases,
+    role: input.role,
+  });
+const rememberSessionVoiceProfileId = (input: {
+  context: unknown;
+  sessionId: string;
+}) => {
+  const profileId = resolveVoiceProfileIdFromContext(input.context);
+  sessionVoiceProfileIds.set(input.sessionId, profileId);
+  return profileId;
+};
 const intakeModel: VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake> = {
   generate: ({ context, session, turn, system }) => {
     const result = decideIntakeTurn(session, turn, undefined, context);
@@ -2094,8 +2193,18 @@ const assistantModel = createVoiceProviderRouter<
   VoiceModelProvider
 >({
   allowProviders: () => configuredModelProviders,
-  fallback: ({ context }) =>
-    providerFallbackOrder(resolveRequestedProvider(context)),
+  fallback: async ({ context, session }) =>
+    providerFallbackOrder(
+      (await resolveProfileProviderRoute({
+        availableProviders: configuredModelProviders,
+        fallbackProvider: resolveRequestedProvider(context),
+        profileId:
+          sessionVoiceProfileIds.get(session.id) ??
+          resolveVoiceProfileIdFromContext(context),
+        providerAliases: voiceProfileProviderAliases,
+        role: "llm",
+      })) ?? resolveRequestedProvider(context),
+    ),
   fallbackMode: "provider-error",
   isProviderError: (error, provider) =>
     provider !== "deterministic" && isAssistantProviderError(error),
@@ -2133,7 +2242,16 @@ const assistantModel = createVoiceProviderRouter<
     },
   },
   providers: providerModels,
-  selectProvider: ({ context }) => resolveRequestedProvider(context),
+  selectProvider: async ({ context, session }) =>
+    resolveProfileProviderRoute({
+      availableProviders: configuredModelProviders,
+      fallbackProvider: resolveRequestedProvider(context),
+      profileId:
+        sessionVoiceProfileIds.get(session.id) ??
+        resolveVoiceProfileIdFromContext(context),
+      providerAliases: voiceProfileProviderAliases,
+      role: "llm",
+    }),
 });
 const sttProviderAdapters = {
   deepgram: deepgram({
@@ -2173,7 +2291,17 @@ const traceSTTProviderEvent = async (
 const createDemoSTTRouter = (routing: VoiceRoutingMode): STTAdapter =>
   createVoiceSTTProviderRouter<VoiceSTTProvider>({
     adapters: sttProviderAdapters,
-    fallback: configuredSTTProviders,
+    fallback: async (input) => {
+      const profileProvider = await resolveProfileProviderRoute({
+        availableProviders: configuredSTTProviders,
+        fallbackProvider: selectedSTTProvider,
+        profileId: sessionVoiceProfileIds.get(input.sessionId),
+        role: "stt",
+      });
+      return [profileProvider, ...configuredSTTProviders].filter(
+        Boolean,
+      ) as VoiceSTTProvider[];
+    },
     onProviderEvent: traceSTTProviderEvent,
     policy:
       routing === "fastest"
@@ -2203,6 +2331,13 @@ const createDemoSTTRouter = (routing: VoiceRoutingMode): STTAdapter =>
         timeoutMs: sttLatencyBudgets.assemblyai,
       },
     },
+    selectProvider: (input) =>
+      resolveProfileProviderRoute({
+        availableProviders: configuredSTTProviders,
+        fallbackProvider: selectedSTTProvider,
+        profileId: sessionVoiceProfileIds.get(input.sessionId),
+        role: "stt",
+      }),
   });
 const sttRouters: Record<VoiceRoutingMode, STTAdapter> = {
   balanced: createDemoSTTRouter("balanced"),
@@ -2221,20 +2356,14 @@ const rememberSessionRoutingMode = (input: {
   context: unknown;
   sessionId: string;
 }) => {
-  const query =
-    input.context &&
-    typeof input.context === "object" &&
-    "query" in input.context &&
-    input.context.query &&
-    typeof input.context.query === "object"
-      ? input.context.query
-      : undefined;
+  const query = queryFromContext(input.context);
   const routing =
     query && "routing" in query && isVoiceRoutingMode(query.routing)
       ? query.routing
       : "balanced";
 
   sessionRoutingModes.set(input.sessionId, routing);
+  rememberSessionVoiceProfileId(input);
   return routing;
 };
 const providerFailureSimulator = createVoiceProviderFailureSimulator({
@@ -9142,7 +9271,10 @@ const server = new Elysia()
           onTurn: contractAwareOnTurn,
           ops: assistant.ops,
           path: "/voice/realtime",
-          phraseHints: () => VOICE_DEMO_PHRASE_HINTS,
+          phraseHints: (input) => {
+            rememberSessionRoutingMode(input);
+            return VOICE_DEMO_PHRASE_HINTS;
+          },
           preset: "reliability",
           realtime: openAIRealtime,
           realtimeInputFormat: realtimeChannelFormat,
