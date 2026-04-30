@@ -56,6 +56,7 @@ import {
   createVoiceProofTrendRoutes,
   createVoiceRealCallProfileHistoryRoutes,
   buildVoiceRealCallProfileHistoryReport,
+  loadVoiceRealCallProfileEvidenceFromTraceStore,
   createVoiceFileObservabilityExportDeliveryReceiptStore,
   buildVoiceCompetitiveCoverageReport,
   buildVoiceFailureReplay,
@@ -3726,6 +3727,16 @@ const readRealCallProfileHistory = async () => {
   );
 
   return {
+    evidence: await loadVoiceRealCallProfileEvidenceFromTraceStore({
+      defaultProfileId: "meeting-recorder",
+      defaultProfileLabel: "Meeting recorder",
+      limit: 5000,
+      profileDescriptions: {
+        "meeting-recorder":
+          "Default real browser or phone call profile inferred from the shared trace store.",
+      },
+      store: runtimeStorage.traces,
+    }),
     generatedAt: new Date().toISOString(),
     maxAgeMs: proofTrendsMaxAgeMs,
     reports: reports.filter(
