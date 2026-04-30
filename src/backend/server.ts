@@ -53,6 +53,7 @@ import {
   createVoicePostCallAnalysisRoutes,
   createVoiceProofTrendRecommendationRoutes,
   createVoiceProofTrendRoutes,
+  createVoiceRealCallProfileHistoryRoutes,
   createVoiceFileObservabilityExportDeliveryReceiptStore,
   buildVoiceCompetitiveCoverageReport,
   buildVoiceFailureReplay,
@@ -3441,6 +3442,7 @@ const latestProofPackJsonPath = ".voice-runtime/proof-pack/latest.json";
 const longProofWindowRoot = ".voice-runtime/long-proof-window";
 const latestBrowserCallProfilesJsonPath =
   ".voice-runtime/browser-call-profiles/latest.json";
+const realCallProfilesRoot = ".voice-runtime/real-call-profiles";
 const latestProofTrendsJsonPath = ".voice-runtime/proof-trends/latest.json";
 const latestProofTrendsMarkdownPath = ".voice-runtime/proof-trends/latest.md";
 const configuredProofTrendsMaxAgeMs = Number(
@@ -3540,6 +3542,39 @@ const readLatestProofTrends = async (): Promise<VoiceProofTrendReport> => {
       source: latestProofTrendsJsonPath,
     });
   }
+};
+
+const readRealCallProfileHistory = async () => {
+  const entries = await readdir(realCallProfilesRoot, {
+    withFileTypes: true,
+  }).catch(() => []);
+  const reportPaths = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => `${realCallProfilesRoot}/${entry.name}/real-call-profiles.json`)
+    .sort();
+  const reports = await Promise.all(
+    reportPaths.map(async (path) => {
+      try {
+        const parsed = (await Bun.file(path).json()) as Record<string, unknown>;
+        return buildVoiceProofTrendReport({
+          ...parsed,
+          maxAgeMs: proofTrendsMaxAgeMs,
+          source: path,
+        });
+      } catch {
+        return undefined;
+      }
+    }),
+  );
+
+  return {
+    generatedAt: new Date().toISOString(),
+    maxAgeMs: proofTrendsMaxAgeMs,
+    reports: reports.filter(
+      (report): report is VoiceProofTrendReport => report !== undefined,
+    ),
+    source: realCallProfilesRoot,
+  };
 };
 
 const buildBrowserCallProfileReadinessCheck =
@@ -9959,6 +9994,14 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
       name: "absolutejs-voice-example-proof-trend-recommendations",
       source: readLatestProofTrends,
       title: "AbsoluteJS Voice Provider Runtime Recommendations",
+    }),
+  )
+  .use(
+    createVoiceRealCallProfileHistoryRoutes({
+      maxAgeMs: proofTrendsMaxAgeMs,
+      name: "absolutejs-voice-example-real-call-profile-history",
+      source: readRealCallProfileHistory,
+      title: "AbsoluteJS Voice Real-Call Profile History",
     }),
   )
   .use(

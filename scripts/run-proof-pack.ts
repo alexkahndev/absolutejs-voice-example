@@ -773,6 +773,33 @@ const proofTargets: ProofTarget[] = [
   },
   {
     kind: "json",
+    name: "realCallProfileHistory",
+    path: "/api/voice/real-call-profile-history",
+  },
+  {
+    accept: "text/html,text/plain,*/*",
+    kind: "text",
+    name: "realCallProfileHistoryPage",
+    path: "/voice/real-call-profile-history",
+    requiredText: [
+      "Real-Call Profile History",
+      "Real-call benchmark history",
+      "Profiles",
+    ],
+  },
+  {
+    accept: "text/markdown,text/plain,*/*",
+    kind: "text",
+    name: "realCallProfileHistoryMarkdown",
+    path: "/voice/real-call-profile-history.md",
+    requiredText: [
+      "Voice Real-Call Profile History",
+      "Profiles",
+      "Recommendations",
+    ],
+  },
+  {
+    kind: "json",
     name: "browserCallProfiles",
     path: "/api/voice/browser-call-profiles",
   },

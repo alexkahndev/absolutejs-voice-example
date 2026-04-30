@@ -16,6 +16,8 @@ const refreshObservabilityExport =
   process.env.VOICE_PROOF_PACK_REFRESH_OBSERVABILITY_EXPORT !== "false";
 const refreshBrowserCalls =
   process.env.VOICE_PROOF_PACK_REFRESH_BROWSER_CALLS !== "false";
+const refreshRealCallProfiles =
+  process.env.VOICE_PROOF_PACK_REFRESH_REAL_CALL_PROFILES !== "false";
 const useExistingServer =
   process.env.VOICE_PROOF_PACK_USE_EXISTING_SERVER === "1";
 const trendRefreshPasses = Math.max(
@@ -283,6 +285,16 @@ try {
       if (pass === trendRefreshPasses) {
         exitCode = trendExitCode;
       }
+    }
+  }
+
+  if (refreshRealCallProfiles) {
+    console.log("Refreshing real-call profile history before proof pack.");
+    const realCallProfileExitCode = await runScript("proof:profiles:real-calls", {
+      VOICE_REAL_CALL_BROWSER_CAPTURE: "0",
+    });
+    if (realCallProfileExitCode !== 0) {
+      exitCode = realCallProfileExitCode;
     }
   }
 
