@@ -25,15 +25,42 @@ type ManagedProcess = {
 };
 
 type JsonRecord = Record<string, unknown>;
+type FrameworkId = "react" | "vue" | "svelte" | "angular" | "html" | "htmx";
 
 const appOrigin = (
   process.env.VOICE_DEMO_URL ?? `http://127.0.0.1:${process.env.PORT ?? "3004"}`
 ).replace(/\/$/, "");
 const browserHost =
   process.env.VOICE_BROWSER_CALL_BROWSER_HOST ?? "http://127.0.0.1:9224";
-const framework = process.env.VOICE_BROWSER_CALL_FRAMEWORK ?? "html";
+const defaultFrameworks: FrameworkId[] = [
+  "react",
+  "vue",
+  "svelte",
+  "angular",
+  "html",
+  "htmx",
+];
+const frameworks = (
+  process.env.VOICE_BROWSER_CALL_FRAMEWORKS ??
+  process.env.VOICE_BROWSER_CALL_FRAMEWORK ??
+  "all"
+)
+  .split(",")
+  .flatMap((value) => {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "all" || normalized === "*"
+      ? defaultFrameworks
+      : [normalized];
+  })
+  .filter((value, index, values): value is FrameworkId => {
+    const valid = defaultFrameworks.includes(value as FrameworkId);
+    return valid && values.indexOf(value) === index;
+  });
 const profileId = process.env.VOICE_BROWSER_CALL_PROFILE_ID ?? "meeting-recorder";
-const durationMs = Math.max(1_000, Number(process.env.VOICE_BROWSER_CALL_DURATION_MS ?? 4_500));
+const durationMs = Math.max(
+  1_000,
+  Number(process.env.VOICE_BROWSER_CALL_DURATION_MS ?? 1_500),
+);
 const outputRoot =
   process.env.VOICE_BROWSER_CALL_PROFILE_OUTPUT_DIR ??
   ".voice-runtime/browser-call-profiles";
@@ -254,6 +281,34 @@ const clickExpression = (selector: string) => `(() => {
   return true;
 })()`;
 
+const clickButtonByTextExpression = (text: string) => `(() => {
+  const expected = ${JSON.stringify(text)}.toLowerCase();
+  for (const button of document.querySelectorAll('button')) {
+    const label = button.textContent?.trim().toLowerCase() ?? '';
+    if (label.includes(expected)) {
+      button.click();
+      return true;
+    }
+  }
+  return false;
+})()`;
+
+const clickGeneralStartExpression = `(() => {
+  const direct = document.querySelector('#start-general');
+  if (direct instanceof HTMLElement) {
+    direct.click();
+    return true;
+  }
+  for (const button of document.querySelectorAll('button')) {
+    const label = button.textContent?.trim().toLowerCase() ?? '';
+    if (label.includes('general')) {
+      button.click();
+      return true;
+    }
+  }
+  return false;
+})()`;
+
 const waitFor = async <T>(
   read: () => Promise<T>,
   accept: (value: T) => boolean,
@@ -298,7 +353,71 @@ const summarizeSockets = (sockets: unknown[]) => {
   };
 };
 
+const captureFramework = async (framework: FrameworkId) => {
+  const url = `${appOrigin}/${framework}?engine=openai-realtime&provider=openai&routing=fastest`;
+  const session = await createChromeSession(url);
+  try {
+    await session.send("Runtime.enable");
+    await session.send("Page.enable");
+    await session.send("Page.addScriptToEvaluateOnNewDocument", {
+      source: installBrowserCaptureTracker,
+    });
+    await session.send("Page.navigate", { url });
+    await wait(framework === "angular" ? 4_000 : 2_500);
+
+    const clicked = await waitFor(
+      () => evaluate<boolean>(session, clickGeneralStartExpression),
+      (value) => value,
+      8_000,
+    );
+    if (!clicked) {
+      throw new Error(`Could not click #start-general on ${url}`);
+    }
+
+    await waitFor(
+      () => evaluate<JsonRecord>(session, captureExpression),
+      (capture) => {
+        const sockets = Array.isArray(capture.sockets) ? capture.sockets : [];
+        return summarizeSockets(sockets).openSockets > 0;
+      },
+      8_000,
+    );
+    await wait(durationMs);
+    await evaluate<boolean>(session, clickExpression("#stop-mic")).catch(
+      async () =>
+        await evaluate<boolean>(
+          session,
+          clickButtonByTextExpression("stop microphone"),
+        ),
+    );
+    await wait(500);
+
+    const capture = await evaluate<JsonRecord>(session, captureExpression);
+    const sockets = Array.isArray(capture.sockets) ? capture.sockets : [];
+    const socketSummary = summarizeSockets(sockets);
+
+    return {
+      framework,
+      ok: socketSummary.openSockets > 0 && socketSummary.sentBytes > 0,
+      summary: {
+        ...socketSummary,
+        lifecycle: capture.lifecycle,
+        microphone: capture.microphone,
+        reconnect: capture.reconnect,
+        status: capture.status,
+      },
+      url,
+    };
+  } finally {
+    await session.close();
+  }
+};
+
 const run = async () => {
+  if (frameworks.length === 0) {
+    throw new Error("No valid VOICE_BROWSER_CALL_FRAMEWORKS were provided.");
+  }
+
   const startedServer =
     process.env.VOICE_BROWSER_CALL_USE_EXISTING_SERVER === "1"
       ? null
@@ -325,67 +444,79 @@ const run = async () => {
       () => startedChrome?.hasExited() ?? false,
     );
 
-    const url = `${appOrigin}/${framework}?engine=openai-realtime&provider=openai&routing=fastest`;
-    const session = await createChromeSession(url);
-    try {
-      await session.send("Runtime.enable");
-      await session.send("Page.enable");
-      await session.send("Page.addScriptToEvaluateOnNewDocument", {
-        source: installBrowserCaptureTracker,
-      });
-      await session.send("Page.navigate", { url });
-      await wait(framework === "angular" ? 4_000 : 2_500);
-
-      const clicked = await evaluate<boolean>(session, clickExpression("#start-general"));
-      if (!clicked) {
-        throw new Error(`Could not click #start-general on ${url}`);
+    const results = [];
+    for (const framework of frameworks) {
+      try {
+        results.push(await captureFramework(framework));
+      } catch (error) {
+        results.push({
+          error: error instanceof Error ? error.message : String(error),
+          framework,
+          ok: false,
+          summary: {
+            messageCount: 0,
+            openSockets: 0,
+            receivedBytes: 0,
+            sentBytes: 0,
+            sockets: [],
+          },
+          url: `${appOrigin}/${framework}?engine=openai-realtime&provider=openai&routing=fastest`,
+        });
       }
+    }
 
-      await waitFor(
-        () => evaluate<JsonRecord>(session, captureExpression),
-        (capture) => {
-          const sockets = Array.isArray(capture.sockets) ? capture.sockets : [];
-          return summarizeSockets(sockets).openSockets > 0;
-        },
-        8_000,
-      );
-      await wait(durationMs);
-      await evaluate<boolean>(session, clickExpression("#stop-mic")).catch(() => false);
-      await wait(500);
+    const generatedAt = new Date().toISOString();
+    const report = {
+      baseUrl: appOrigin,
+      frameworks,
+      generatedAt,
+      ok: results.every((result) => result.ok),
+      outputDir,
+      profileId,
+      results,
+      runId,
+      source: "browser-cdp-fake-microphone",
+      summary: {
+        failedFrameworks: results
+          .filter((result) => !result.ok)
+          .map((result) => result.framework),
+        messageCount: results.reduce(
+          (total, result) => total + (readNumber(result.summary.messageCount) ?? 0),
+          0,
+        ),
+        openSockets: results.reduce(
+          (total, result) => total + (readNumber(result.summary.openSockets) ?? 0),
+          0,
+        ),
+        passedFrameworks: results
+          .filter((result) => result.ok)
+          .map((result) => result.framework),
+        receivedBytes: results.reduce(
+          (total, result) => total + (readNumber(result.summary.receivedBytes) ?? 0),
+          0,
+        ),
+        sentBytes: results.reduce(
+          (total, result) => total + (readNumber(result.summary.sentBytes) ?? 0),
+          0,
+        ),
+        totalFrameworks: results.length,
+      },
+    };
 
-      const capture = await evaluate<JsonRecord>(session, captureExpression);
-      const sockets = Array.isArray(capture.sockets) ? capture.sockets : [];
-      const socketSummary = summarizeSockets(sockets);
-      const generatedAt = new Date().toISOString();
-      const report = {
-        baseUrl: appOrigin,
-        framework,
-        generatedAt,
-        ok: socketSummary.openSockets > 0 && socketSummary.sentBytes > 0,
-        outputDir,
-        profileId,
-        runId,
-        source: "browser-cdp-fake-microphone",
-        summary: {
-          ...socketSummary,
-          lifecycle: capture.lifecycle,
-          microphone: capture.microphone,
-          reconnect: capture.reconnect,
-          status: capture.status,
-        },
-      };
+    await mkdir(outputDir, { recursive: true });
+    await mkdir(outputRoot, { recursive: true });
+    await writeFile(
+      join(outputDir, "browser-call-profile.json"),
+      `${JSON.stringify(report, null, 2)}\n`,
+    );
+    await writeFile(
+      join(outputRoot, "latest.json"),
+      `${JSON.stringify(report, null, 2)}\n`,
+    );
+    console.log(JSON.stringify(report, null, 2));
 
-      await mkdir(outputDir, { recursive: true });
-      await mkdir(outputRoot, { recursive: true });
-      await writeFile(join(outputDir, "browser-call-profile.json"), `${JSON.stringify(report, null, 2)}\n`);
-      await writeFile(join(outputRoot, "latest.json"), `${JSON.stringify(report, null, 2)}\n`);
-      console.log(JSON.stringify(report, null, 2));
-
-      if (!report.ok) {
-        process.exitCode = 1;
-      }
-    } finally {
-      await session.close();
+    if (!report.ok) {
+      process.exitCode = 1;
     }
   } finally {
     startedChrome?.stop();

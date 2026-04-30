@@ -196,6 +196,14 @@ const readLatestBrowserCallProfile = async () => {
   return parsed;
 };
 
+const readBrowserCallProfiles = (browserCallProfile: JsonRecord | undefined) => {
+  if (!browserCallProfile) {
+    return [];
+  }
+  const results = readArray(browserCallProfile.results).filter(isRecord);
+  return results.length > 0 ? results : [browserCallProfile];
+};
+
 const buildBrowserCallEvidence = (
   browserCallProfile: JsonRecord | undefined,
   input: {
@@ -205,44 +213,46 @@ const buildBrowserCallEvidence = (
     runtimeChannel?: VoiceProofTrendRuntimeChannelSummary;
   },
 ): VoiceProofTrendRealCallProfileEvidence[] => {
-  if (!browserCallProfile) {
+  const browserCallProfiles = readBrowserCallProfiles(browserCallProfile).filter(
+    (profile) => profile.ok === true,
+  );
+  if (browserCallProfiles.length === 0) {
     return [];
   }
 
-  const summary = isRecord(browserCallProfile.summary)
-    ? browserCallProfile.summary
-    : {};
-  const sentBytes = readNumber(summary.sentBytes) ?? 0;
-  const receivedBytes = readNumber(summary.receivedBytes) ?? 0;
-  const messageCount = readNumber(summary.messageCount) ?? 0;
-  const transportSamples =
-    sentBytes > 0 || receivedBytes > 0 || messageCount > 0 ? 1 : 0;
-  const runtimeChannel: VoiceProofTrendRuntimeChannelSummary = {
-    ...input.runtimeChannel,
-    maxBackpressureEvents: input.runtimeChannel?.maxBackpressureEvents ?? 0,
-    samples: Math.max(input.runtimeChannel?.samples ?? 0, transportSamples),
-    status:
-      input.runtimeChannel?.status === "fail"
-        ? "fail"
-        : transportSamples > 0
-          ? "pass"
-          : input.runtimeChannel?.status,
-  };
+  return browserCallProfiles.map((profile) => {
+    const summary = isRecord(profile.summary) ? profile.summary : {};
+    const sentBytes = readNumber(summary.sentBytes) ?? 0;
+    const receivedBytes = readNumber(summary.receivedBytes) ?? 0;
+    const messageCount = readNumber(summary.messageCount) ?? 0;
+    const transportSamples =
+      sentBytes > 0 || receivedBytes > 0 || messageCount > 0 ? 1 : 0;
+    const framework = readString(profile.framework) ?? "browser";
+    const runtimeChannel: VoiceProofTrendRuntimeChannelSummary = {
+      ...input.runtimeChannel,
+      maxBackpressureEvents: input.runtimeChannel?.maxBackpressureEvents ?? 0,
+      samples: Math.max(input.runtimeChannel?.samples ?? 0, transportSamples),
+      status:
+        input.runtimeChannel?.status === "fail"
+          ? "fail"
+          : transportSamples > 0
+            ? "pass"
+            : input.runtimeChannel?.status,
+    };
 
-  return [
-    {
-      generatedAt: readString(browserCallProfile.generatedAt) ?? input.generatedAt,
+    return {
+      generatedAt: readString(browserCallProfile?.generatedAt) ?? input.generatedAt,
       liveP95Ms: readNumber(input.proofSummary.maxLiveP95Ms),
       ok: true,
       operationsRecordHref: "/voice-operations/latest",
-      profileId: readString(browserCallProfile.profileId) ?? "meeting-recorder",
+      profileId: readString(browserCallProfile?.profileId) ?? "meeting-recorder",
       providerP95Ms: readNumber(input.proofSummary.maxProviderP95Ms),
       providers: input.providers,
       runtimeChannel,
-      sessionId: `browser-cdp-${readString(browserCallProfile.runId) ?? "latest"}`,
+      sessionId: `browser-cdp-${framework}-${readString(browserCallProfile?.runId) ?? "latest"}`,
       turnP95Ms: readNumber(input.proofSummary.maxTurnP95Ms),
-    },
-  ];
+    };
+  });
 };
 
 const run = async () => {
@@ -265,6 +275,7 @@ const run = async () => {
   const sessions = readRows(sessionsBody, ["sessions", "items", "data"]).filter(
     (session) =>
       readString(session.sessionId) &&
+      readString(session.status) !== "failed" &&
       ((readNumber(session.turnCount) ?? 0) > 0 ||
         (readNumber(session.transcriptCount) ?? 0) > 0),
   );
@@ -327,6 +338,9 @@ const run = async () => {
         ok: report.ok,
         outputDir,
         realBrowserCapture: browserCallProfile ? "included" : "missing",
+        realBrowserFrameworks: readBrowserCallProfiles(browserCallProfile)
+          .filter((profile) => profile.ok === true)
+          .map((profile) => readString(profile.framework) ?? "browser"),
         profiles: report.summary.profiles?.map((profile) => ({
           id: profile.id,
           samples: profile.providers?.[0]?.samples,
