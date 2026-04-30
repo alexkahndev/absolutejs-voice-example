@@ -2097,6 +2097,14 @@ const resolveProfileProviderRoute = async <TProvider extends string>(input: {
     providerAliases: input.providerAliases,
     role: input.role,
   });
+const findVoiceProfileDefault = async (profileId?: string) => {
+  const report = await readRealCallProfileDefaultsReport();
+  return (
+    report.defaults.profiles.find((profile) => profile.profileId === profileId) ??
+    report.defaults.profiles.find((profile) => profile.status === "pass") ??
+    report.defaults.profiles[0]
+  );
+};
 const rememberSessionVoiceProfileId = (input: {
   context: unknown;
   sessionId: string;
@@ -8359,11 +8367,25 @@ const summarizeProviderHealth = async (): Promise<
     store: deliveryTraceStore,
   });
 
-const getLatestRoutingDecision = () =>
-  createVoiceRoutingDecisionSummary({
+const getLatestRoutingDecision = async () => {
+  const decision = await createVoiceRoutingDecisionSummary({
     kind: "stt",
     store: deliveryTraceStore,
   });
+  if (!decision) {
+    return decision;
+  }
+
+  const profileId =
+    sessionVoiceProfileIds.get(decision.sessionId) ?? "meeting-recorder";
+  const profile = await findVoiceProfileDefault(profileId);
+  return {
+    ...decision,
+    profileId: profile?.profileId ?? profileId,
+    profileLabel: profile?.label,
+    providerRoutes: profile?.providerRoutes,
+  };
+};
 
 const sttProviderSimulationStatus = () =>
   (["deepgram", "assemblyai"] as const).map((provider) => ({

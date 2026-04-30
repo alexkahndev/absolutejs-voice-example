@@ -591,6 +591,11 @@ const proofTargets: ProofTarget[] = [
   },
   {
     kind: "json",
+    name: "routingStatus",
+    path: "/api/routing/latest",
+  },
+  {
+    kind: "json",
     name: "providerOrchestration",
     path: "/api/voice/provider-orchestration",
   },

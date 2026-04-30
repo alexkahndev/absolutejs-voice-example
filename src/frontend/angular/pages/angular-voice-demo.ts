@@ -421,6 +421,16 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
                   <strong>{{ decision.status }}</strong>
                 </div>
                 <div>
+                  <span>Voice profile</span>
+                  <strong>{{
+                    decision.profileLabel ?? decision.profileId ?? "None"
+                  }}</strong>
+                </div>
+                <div>
+                  <span>Default routes</span>
+                  <strong>{{ formatProviderRoutes(decision.providerRoutes) }}</strong>
+                </div>
+                <div>
                   <span>Latency budget</span>
                   <strong>{{
                     decision.latencyBudgetMs
@@ -1350,6 +1360,17 @@ export class AngularVoiceDemoComponent {
     return typeof value === "number" && Number.isFinite(value)
       ? `${Math.round(value)}ms`
       : "n/a";
+  }
+  formatProviderRoutes(routes: unknown) {
+    if (!routes || typeof routes !== "object") {
+      return "None";
+    }
+
+    return (
+      Object.entries(routes as Record<string, unknown>)
+        .map(([role, provider]) => `${role}: ${String(provider)}`)
+        .join(", ") || "None"
+    );
   }
   currentVoice = computed(() =>
     this.activeMode() === "general" ? this.generalVoice : this.guidedVoice,
