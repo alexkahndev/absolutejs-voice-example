@@ -39,8 +39,11 @@ import {
   createVoiceObservabilityExportRoutes,
   createVoiceObservabilityExportReplayRoutes,
   createVoiceCompetitiveCoverageRoutes,
+  buildVoiceRealtimeChannelReport,
   buildVoiceRealtimeChannelRuntimeSamplesFromTrace,
   createVoiceRealtimeChannelRoutes,
+  createVoiceRealtimeProviderContractRoutes,
+  buildVoiceRealtimeProviderContractMatrix,
   createVoicePlatformCoverageRoutes,
   createVoicePostCallAnalysisRoutes,
   createVoiceProofTrendRoutes,
@@ -187,6 +190,7 @@ import {
   type VoicePlatformCoverageSummary,
   type VoiceCompetitiveCoverageReport,
   type VoiceCompetitiveSurface,
+  type VoiceRealtimeProviderContractMatrixInput,
   type VoicePostCallAnalysisOptions,
   type VoiceGuardrailDecision,
   type VoiceProofTrendCycle,
@@ -3948,15 +3952,17 @@ const competitiveCoverageSurfaces = [
       { href: "/api/voice/realtime-channel", kind: "proof", name: "realtimeChannel", required: true, status: "pass" },
       { href: "/voice/realtime-channel", kind: "proof", name: "realtimeChannelPage", status: "pass" },
       { href: "/voice/realtime-channel.md", kind: "proof", name: "realtimeChannelMarkdown", status: "pass" },
+      { href: "/api/voice/realtime-provider-contracts", kind: "proof", name: "realtimeProviderContracts", required: true, status: "pass" },
+      { href: "/voice/realtime-provider-contracts", kind: "proof", name: "realtimeProviderContractsPage", status: "pass" },
       { href: "/provider-contracts", kind: "proof", name: "providerContracts", status: "pass" },
       { href: "/voice/provider-orchestration", kind: "readiness", name: "providerOrchestrationRealtimeSurface", status: "pass" },
     ],
-    frameworkPrimitives: ["server adapters", "provider profiles", "runtime-channel proof"],
+    frameworkPrimitives: ["server adapters", "provider profiles", "runtime-channel proof", "realtime provider contracts"],
     operationsRecord: "linked",
     readinessGate: "present",
     surface: "Direct realtime/duplex providers",
-    why: "OpenAI Realtime adapter path, browser capture negotiation, raw PCM realtime format proof, first assistant audio latency, and cascaded STT/LLM/TTS fallback are all app-owned.",
-    nextMove: "Build longer-running live-provider history across more realtime providers.",
+    why: "OpenAI Realtime adapter path, browser capture negotiation, raw PCM realtime format proof, first assistant audio latency, provider contracts, and cascaded STT/LLM/TTS fallback are all app-owned.",
+    nextMove: "Add Gemini Live and Pipecat bridge rows as adapters land.",
   },
   {
     buyerNeed: "Build visual workflows without code.",
@@ -5829,6 +5835,42 @@ const buildDemoRealtimeChannelReportOptions = async () => {
           ],
   };
 };
+
+const buildDemoRealtimeChannelReport = async () =>
+  buildVoiceRealtimeChannelReport(await buildDemoRealtimeChannelReportOptions());
+
+const buildDemoRealtimeProviderContractMatrixInput =
+  async (): Promise<VoiceRealtimeProviderContractMatrixInput> => ({
+  contracts: [
+    {
+      capabilities: [
+        "browser-format-negotiation",
+        "raw-pcm",
+        "duplex-audio",
+        "turn-commit",
+        "first-audio-latency",
+        "trace-evidence",
+        "reconnect",
+        "barge-in",
+      ],
+      configured: Boolean(openAIRealtime),
+      env: process.env,
+      fallbackProviders: ["cascaded-stt-llm-tts"],
+      latencyBudgetMs: 800,
+      provider: "openai-realtime",
+      readinessHref: "/production-readiness",
+      realtimeChannel: await buildDemoRealtimeChannelReport(),
+      requiredEnv: ["OPENAI_API_KEY"],
+      selected: true,
+      traceHref: "/traces?sessionId=proof-realtime-channel",
+    },
+  ],
+});
+
+const buildDemoRealtimeProviderContractMatrix = async () =>
+  buildVoiceRealtimeProviderContractMatrix(
+    await buildDemoRealtimeProviderContractMatrixInput(),
+  );
 
 type ProofCallDisposition = Exclude<
   NonNullable<VoiceSessionRecord["call"]>["disposition"],
@@ -9451,6 +9493,13 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
       provider: "openai-realtime",
       source: buildDemoRealtimeChannelReportOptions,
       title: "AbsoluteJS Voice Realtime Channel Proof",
+    }),
+  )
+  .use(
+    createVoiceRealtimeProviderContractRoutes({
+      matrix: buildDemoRealtimeProviderContractMatrixInput,
+      name: "absolutejs-voice-example-realtime-provider-contracts",
+      title: "AbsoluteJS Voice Realtime Provider Contracts",
     }),
   )
   .use(

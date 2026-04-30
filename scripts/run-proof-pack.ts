@@ -21,6 +21,7 @@ import {
   evaluateVoiceProviderContractMatrixEvidence,
   evaluateVoiceProviderRoutingContractEvidence,
   evaluateVoiceRealtimeChannelEvidence,
+  evaluateVoiceRealtimeProviderContractEvidence,
   evaluateVoiceProviderSloEvidence,
   evaluateVoiceProviderStackEvidence,
   evaluateVoiceSimulationSuiteEvidence,
@@ -50,6 +51,7 @@ import {
   type VoiceProviderOrchestrationReport,
   type VoiceProviderRoutingContractReport,
   type VoiceRealtimeChannelReport,
+  type VoiceRealtimeProviderContractMatrixReport,
   type VoiceProviderStackCapabilityGapReport,
   type VoiceProductionReadinessReport,
   type VoiceProofTrendReport,
@@ -502,6 +504,23 @@ const proofTargets: ProofTarget[] = [
     kind: "json",
     name: "realtimeChannel",
     path: "/api/voice/realtime-channel",
+  },
+  {
+    kind: "json",
+    name: "realtimeProviderContracts",
+    path: "/api/voice/realtime-provider-contracts",
+  },
+  {
+    accept: "text/html,text/plain,*/*",
+    kind: "text",
+    name: "realtimeProviderContractsPage",
+    path: "/voice/realtime-provider-contracts",
+    requiredText: [
+      "AbsoluteJS Voice Realtime Provider Contracts",
+      "Realtime provider contracts",
+      "openai-realtime",
+      "Trace evidence",
+    ],
   },
   {
     accept: "text/html,text/plain,*/*",
@@ -1059,6 +1078,8 @@ const vapiCoverageSurfaces: VapiCoverageSurface[] = [
       "realtimeChannel",
       "realtimeChannelPage",
       "realtimeChannelMarkdown",
+      "realtimeProviderContracts",
+      "realtimeProviderContractsPage",
       "providerSlo",
       "providerSloMarkdown",
       "competitiveCoverage",
@@ -1430,6 +1451,7 @@ const renderMarkdown = (input: {
   operationsRecordProviderDecisionEvidenceAssertion: JsonAssertionResult;
   providerOrchestrationEvidenceAssertion: JsonAssertionResult;
   realtimeChannelEvidenceAssertion: JsonAssertionResult;
+  realtimeProviderContractEvidenceAssertion: JsonAssertionResult;
   providerRoutingContractEvidenceAssertion: JsonAssertionResult;
   providerSloEvidenceAssertion: JsonAssertionResult;
   providerStackEvidenceAssertion: JsonAssertionResult;
@@ -1491,6 +1513,8 @@ Provider SLO evidence assertion: **${input.providerSloEvidenceAssertion.ok ? "pa
 Provider orchestration evidence assertion: **${input.providerOrchestrationEvidenceAssertion.ok ? "pass" : "fail"}**.
 
 Realtime channel evidence assertion: **${input.realtimeChannelEvidenceAssertion.ok ? "pass" : "fail"}**.
+
+Realtime provider contract assertion: **${input.realtimeProviderContractEvidenceAssertion.ok ? "pass" : "fail"}**.
 
 Provider decision evidence assertion: **${input.providerDecisionEvidenceAssertion.ok ? "pass" : "fail"}**.
 
@@ -2647,6 +2671,48 @@ const realtimeChannelEvidenceAssertion: JsonAssertionResult = realtimeChannel
         issues: ["Missing realtimeChannel proof result body."],
       },
     };
+const realtimeProviderContracts = proofResults.find(
+  (result) => result.name === "realtimeProviderContracts",
+)?.body as VoiceRealtimeProviderContractMatrixReport | undefined;
+const realtimeProviderContractEvidenceReport = realtimeProviderContracts
+  ? evaluateVoiceRealtimeProviderContractEvidence(realtimeProviderContracts, {
+      maxFailed: 0,
+      maxWarned: 0,
+      minRows: 1,
+      requiredCheckKeys: [
+        "configured",
+        "env",
+        "capabilities",
+        "realtimeChannel",
+        "latencyBudget",
+        "fallback",
+        "traceEvidence",
+        "readiness",
+      ],
+      requiredProviders: ["openai-realtime"],
+      requireSelected: true,
+    })
+  : undefined;
+const realtimeProviderContractEvidenceAssertion: JsonAssertionResult =
+  realtimeProviderContracts
+    ? {
+        kind: "json-assertion",
+        name: "realtimeProviderContractEvidence",
+        ok: realtimeProviderContractEvidenceReport?.ok === true,
+        summary:
+          realtimeProviderContractEvidenceReport as unknown as Record<
+            string,
+            unknown
+          >,
+      }
+    : {
+        kind: "json-assertion",
+        name: "realtimeProviderContractEvidence",
+        ok: false,
+        summary: {
+          issues: ["Missing realtimeProviderContracts proof result body."],
+        },
+      };
 const ok =
   seedResults.every((result) => result.ok) &&
   proofResults.every((result) => result.ok) &&
@@ -2676,6 +2742,7 @@ const ok =
   providerContractMatrixEvidenceAssertion.ok &&
   providerRoutingContractEvidenceAssertion.ok &&
   realtimeChannelEvidenceAssertion.ok &&
+  realtimeProviderContractEvidenceAssertion.ok &&
   providerStackEvidenceAssertion.ok &&
   productionReadinessGateExplanationAssertion.ok &&
   agentSquadContractEvidenceAssertion.ok &&
@@ -2711,6 +2778,7 @@ const summary = {
   providerDecisionEvidenceAssertion,
   providerOrchestrationEvidenceAssertion,
   realtimeChannelEvidenceAssertion,
+  realtimeProviderContractEvidenceAssertion,
   providerRoutingContractEvidenceAssertion,
   providerSloEvidenceAssertion,
   providerStackEvidenceAssertion,
@@ -2753,6 +2821,7 @@ const markdown = renderMarkdown({
   providerDecisionEvidenceAssertion,
   providerOrchestrationEvidenceAssertion,
   realtimeChannelEvidenceAssertion,
+  realtimeProviderContractEvidenceAssertion,
   providerRoutingContractEvidenceAssertion,
   providerSloEvidenceAssertion,
   providerStackEvidenceAssertion,

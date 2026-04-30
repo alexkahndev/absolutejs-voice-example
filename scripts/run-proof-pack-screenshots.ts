@@ -111,6 +111,17 @@ const screenshotTargets: ScreenshotTarget[] = [
     ],
   },
   {
+    file: "realtime-provider-contracts.png",
+    name: "Realtime Provider Contracts",
+    path: "/voice/realtime-provider-contracts",
+    requiredText: [
+      "AbsoluteJS Voice Realtime Provider Contracts",
+      "Realtime provider contracts",
+      "openai-realtime",
+      "Trace evidence",
+    ],
+  },
+  {
     file: "proof-trends.png",
     name: "Sustained Proof Trends",
     path: "/voice/proof-trends",
