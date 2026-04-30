@@ -188,6 +188,35 @@ const seedTargets: ProofTarget[] = [
   {
     body: {
       at: Date.now(),
+      continuity: {
+        checkedAt: Date.now(),
+        inboundAudioStreams: 1,
+        issues: [],
+        maxObservedGapMs: 1000,
+        outboundAudioStreams: 1,
+        stalledInboundStreams: 0,
+        stalledOutboundStreams: 0,
+        status: "pass",
+        streams: [
+          {
+            currentPackets: 999,
+            direction: "inbound",
+            id: "demo-browser-inbound-audio",
+            packetDelta: 40,
+            previousPackets: 959,
+            timeDeltaMs: 1000,
+          },
+          {
+            currentPackets: 1000,
+            direction: "outbound",
+            id: "demo-browser-outbound-audio",
+            packetDelta: 45,
+            previousPackets: 955,
+            timeDeltaMs: 1000,
+          },
+        ],
+        totalStats: 4,
+      },
       report: {
         activeCandidatePairs: 1,
         bytesReceived: 240000,
@@ -554,6 +583,8 @@ const proofTargets: ProofTarget[] = [
       "AbsoluteJS Voice Browser Media Proof",
       "RTCPeerConnection.getStats()",
       "Candidate pairs",
+      "Inbound streams",
+      "Stalled streams",
       "Loss",
     ],
   },
