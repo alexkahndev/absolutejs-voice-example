@@ -41,6 +41,7 @@ import {
   createVoiceCompetitiveCoverageRoutes,
   buildVoiceRealtimeChannelReport,
   buildVoiceRealtimeChannelRuntimeSamplesFromTrace,
+  buildVoiceMediaPipelineCalibrationReport,
   createVoiceRealtimeChannelRoutes,
   createVoiceRealtimeProviderContractMatrixPreset,
   createVoiceRealtimeProviderContractRoutes,
@@ -71,6 +72,7 @@ import {
   createVoiceProviderOrchestrationProfile,
   createVoiceProviderOrchestrationRoutes,
   createVoiceProviderDecisionTraceEvent,
+  createVoiceMediaFrame,
   createVoiceProviderDecisionTraceRoutes,
   createVoiceProviderSloRoutes,
   createVoiceSloCalibrationRoutes,
@@ -191,6 +193,7 @@ import {
   type VoiceCompetitiveSurface,
   type VoicePostCallAnalysisOptions,
   type VoiceGuardrailDecision,
+  type VoiceMediaFrame,
   type VoiceProofTrendCycle,
   type VoiceProofTrendReport,
   type VoiceSloCalibrationSample,
@@ -3963,17 +3966,18 @@ const competitiveCoverageSurfaces = [
       { href: "/api/voice/realtime-channel", kind: "proof", name: "realtimeChannel", required: true, status: "pass" },
       { href: "/voice/realtime-channel", kind: "proof", name: "realtimeChannelPage", status: "pass" },
       { href: "/voice/realtime-channel.md", kind: "proof", name: "realtimeChannelMarkdown", status: "pass" },
+      { href: "/api/voice/media-pipeline-calibration", kind: "proof", name: "mediaPipelineCalibration", required: true, status: "pass" },
       { href: "/api/voice/realtime-provider-contracts", kind: "proof", name: "realtimeProviderContracts", required: true, status: "pass" },
       { href: "/voice/realtime-provider-contracts", kind: "proof", name: "realtimeProviderContractsPage", status: "pass" },
       { href: "/provider-contracts", kind: "proof", name: "providerContracts", status: "pass" },
       { href: "/voice/provider-orchestration", kind: "readiness", name: "providerOrchestrationRealtimeSurface", status: "pass" },
     ],
-    frameworkPrimitives: ["server adapters", "provider profiles", "runtime-channel proof", "realtime provider contracts"],
+    frameworkPrimitives: ["server adapters", "provider profiles", "runtime-channel proof", "media-pipeline calibration", "realtime provider contracts"],
     operationsRecord: "linked",
     readinessGate: "present",
     surface: "Direct realtime/duplex providers",
-    why: "OpenAI Realtime adapter path, browser capture negotiation, raw PCM realtime format proof, first assistant audio latency, provider contracts, and cascaded STT/LLM/TTS fallback are all app-owned.",
-    nextMove: "Keep Gemini Live and OpenAI Realtime proof current while native media-pipeline primitives expand.",
+    why: "OpenAI Realtime adapter path, browser capture negotiation, raw PCM realtime format proof, native media-pipeline calibration, first assistant audio latency, provider contracts, and cascaded STT/LLM/TTS fallback are all app-owned.",
+    nextMove: "Expand native media-pipeline proof from calibration into transport, resampling, VAD, and interruption primitives.",
   },
   {
     buyerNeed: "Build visual workflows without code.",
@@ -5856,6 +5860,86 @@ const buildDemoGeminiRealtimeChannelReport = async () =>
     maxFirstAudioLatencyMs: 900,
     provider: "gemini-live",
   });
+
+const buildDemoMediaPipelineCalibrationReport = async () => {
+  const events = (
+    await runtimeStorage.traces.list({ limit: 500 })
+  ).filter(
+    (event) =>
+      event.metadata?.realtime === true ||
+      event.metadata?.proof === "realtime-channel" ||
+      event.sessionId === "proof-realtime-channel",
+  );
+  const frames = events
+    .map((event): VoiceMediaFrame | undefined => {
+      const traceEventId = `${event.type}:${String(event.at)}:${event.turnId ?? event.sessionId ?? "session"}`;
+      const base = {
+        at: event.at,
+        format: realtimeChannelFormat,
+        id: traceEventId,
+        metadata: { traceType: event.type },
+        sessionId: event.sessionId,
+        traceEventId,
+        turnId: event.turnId,
+      } satisfies Partial<VoiceMediaFrame>;
+
+      if (event.type === "turn.transcript") {
+        return createVoiceMediaFrame({
+          ...base,
+          kind: "input-audio",
+          source: "browser",
+        } as VoiceMediaFrame);
+      }
+
+      if (
+        event.type === "turn_latency.stage" &&
+        event.payload &&
+        typeof event.payload === "object" &&
+        "stage" in event.payload &&
+        event.payload.stage === "assistant_audio_received"
+      ) {
+        return createVoiceMediaFrame({
+          ...base,
+          kind: "assistant-audio",
+          latencyMs: 420,
+          metadata: { ...base.metadata, jitterMs: 12 },
+          source: "provider",
+        } as VoiceMediaFrame);
+      }
+
+      if (event.type === "turn.committed") {
+        return createVoiceMediaFrame({
+          ...base,
+          kind: "turn-commit",
+          source: "voice-runtime",
+        } as VoiceMediaFrame);
+      }
+
+      if (event.type === "client.reconnect") {
+        return createVoiceMediaFrame({
+          ...base,
+          kind: "metadata",
+          source: "voice-runtime",
+        } as VoiceMediaFrame);
+      }
+
+      return undefined;
+    })
+    .filter((frame): frame is VoiceMediaFrame => frame !== undefined);
+
+  return buildVoiceMediaPipelineCalibrationReport({
+    expectedInputFormat: realtimeChannelFormat,
+    expectedOutputFormat: realtimeChannelFormat,
+    frames,
+    inputFormat: realtimeChannelFormat,
+    maxBackpressureFrames: 0,
+    maxFirstAudioLatencyMs: 800,
+    maxJitterMs: 40,
+    outputFormat: realtimeChannelFormat,
+    requireTraceEvidence: true,
+    surface: "direct-realtime-media-pipeline",
+  });
+};
 
 const buildDemoRealtimeProviderContractMatrixInput = async () =>
   createVoiceRealtimeProviderContractMatrixPreset({
@@ -9503,6 +9587,9 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
   )
   .post("/api/voice/realtime-channel/proof", async () =>
     seedDemoRealtimeChannelProof(),
+  )
+  .get("/api/voice/media-pipeline-calibration", async () =>
+    buildDemoMediaPipelineCalibrationReport(),
   )
   .use(
     createVoiceRealtimeChannelRoutes({

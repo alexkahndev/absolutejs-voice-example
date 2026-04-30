@@ -43,6 +43,7 @@ import {
   type VoiceOpsStatusReport,
   type VoiceLiveOpsActionResult,
   type VoiceLiveOpsControlState,
+  type VoiceMediaPipelineCalibrationReport,
   type VoiceOutcomeContractSuiteReport,
   type VoicePhoneAgentSetupReport,
   type VoicePhoneAgentProductionSmokeReport,
@@ -504,6 +505,11 @@ const proofTargets: ProofTarget[] = [
     kind: "json",
     name: "realtimeChannel",
     path: "/api/voice/realtime-channel",
+  },
+  {
+    kind: "json",
+    name: "mediaPipelineCalibration",
+    path: "/api/voice/media-pipeline-calibration",
   },
   {
     kind: "json",
@@ -1451,6 +1457,7 @@ const renderMarkdown = (input: {
   providerDecisionEvidenceAssertion: JsonAssertionResult;
   operationsRecordProviderDecisionEvidenceAssertion: JsonAssertionResult;
   providerOrchestrationEvidenceAssertion: JsonAssertionResult;
+  mediaPipelineCalibrationAssertion: JsonAssertionResult;
   realtimeChannelEvidenceAssertion: JsonAssertionResult;
   realtimeProviderContractEvidenceAssertion: JsonAssertionResult;
   providerRoutingContractEvidenceAssertion: JsonAssertionResult;
@@ -1514,6 +1521,8 @@ Provider SLO evidence assertion: **${input.providerSloEvidenceAssertion.ok ? "pa
 Provider orchestration evidence assertion: **${input.providerOrchestrationEvidenceAssertion.ok ? "pass" : "fail"}**.
 
 Realtime channel evidence assertion: **${input.realtimeChannelEvidenceAssertion.ok ? "pass" : "fail"}**.
+
+Media pipeline calibration assertion: **${input.mediaPipelineCalibrationAssertion.ok ? "pass" : "fail"}**.
 
 Realtime provider contract assertion: **${input.realtimeProviderContractEvidenceAssertion.ok ? "pass" : "fail"}**.
 
@@ -2672,6 +2681,52 @@ const realtimeChannelEvidenceAssertion: JsonAssertionResult = realtimeChannel
         issues: ["Missing realtimeChannel proof result body."],
       },
     };
+const mediaPipelineCalibration = proofResults.find(
+  (result) => result.name === "mediaPipelineCalibration",
+)?.body as VoiceMediaPipelineCalibrationReport | undefined;
+const mediaPipelineCalibrationIssues = mediaPipelineCalibration
+  ? [
+      ...(mediaPipelineCalibration.status === "pass"
+        ? []
+        : [`Expected pass status, found ${mediaPipelineCalibration.status}.`]),
+      ...(mediaPipelineCalibration.inputAudioFrames >= 1
+        ? []
+        : ["Expected at least one input audio frame."]),
+      ...(mediaPipelineCalibration.assistantAudioFrames >= 1
+        ? []
+        : ["Expected at least one assistant audio frame."]),
+      ...(mediaPipelineCalibration.turnCommitFrames >= 1
+        ? []
+        : ["Expected at least one turn commit frame."]),
+      ...(mediaPipelineCalibration.traceLinkedFrames >= 3
+        ? []
+        : ["Expected at least three trace-linked media frames."]),
+      ...(mediaPipelineCalibration.resamplingRequired
+        ? ["Expected no required resampling for calibrated realtime format."]
+        : []),
+      ...(mediaPipelineCalibration.firstAudioLatencyMs !== undefined &&
+      mediaPipelineCalibration.firstAudioLatencyMs <= 800
+        ? []
+        : ["Expected first assistant audio latency at or below 800ms."]),
+      ...mediaPipelineCalibration.issues
+        .filter((issue) => issue.severity === "error")
+        .map((issue) => issue.message),
+    ]
+  : ["Missing mediaPipelineCalibration proof result body."];
+const mediaPipelineCalibrationAssertion: JsonAssertionResult = {
+  kind: "json-assertion",
+  name: "mediaPipelineCalibration",
+  ok: mediaPipelineCalibrationIssues.length === 0,
+  summary: mediaPipelineCalibration
+    ? {
+        ...mediaPipelineCalibration,
+        ok: mediaPipelineCalibrationIssues.length === 0,
+        proofIssues: mediaPipelineCalibrationIssues,
+      }
+    : {
+        issues: mediaPipelineCalibrationIssues,
+      },
+};
 const realtimeProviderContracts = proofResults.find(
   (result) => result.name === "realtimeProviderContracts",
 )?.body as VoiceRealtimeProviderContractMatrixReport | undefined;
@@ -2744,6 +2799,7 @@ const ok =
   providerContractMatrixEvidenceAssertion.ok &&
   providerRoutingContractEvidenceAssertion.ok &&
   realtimeChannelEvidenceAssertion.ok &&
+  mediaPipelineCalibrationAssertion.ok &&
   realtimeProviderContractEvidenceAssertion.ok &&
   providerStackEvidenceAssertion.ok &&
   productionReadinessGateExplanationAssertion.ok &&
@@ -2779,6 +2835,7 @@ const summary = {
   providerContractMatrixEvidenceAssertion,
   providerDecisionEvidenceAssertion,
   providerOrchestrationEvidenceAssertion,
+  mediaPipelineCalibrationAssertion,
   realtimeChannelEvidenceAssertion,
   realtimeProviderContractEvidenceAssertion,
   providerRoutingContractEvidenceAssertion,
@@ -2822,6 +2879,7 @@ const markdown = renderMarkdown({
   providerContractMatrixEvidenceAssertion,
   providerDecisionEvidenceAssertion,
   providerOrchestrationEvidenceAssertion,
+  mediaPipelineCalibrationAssertion,
   realtimeChannelEvidenceAssertion,
   realtimeProviderContractEvidenceAssertion,
   providerRoutingContractEvidenceAssertion,
