@@ -146,6 +146,11 @@ export const VOICE_PROOF_DASHBOARDS = [
     description: "Auto, recommend, off, allowed, blocked, and max-switch guard policies.",
     href: "/voice/profile-switch-policy",
     label: "Profile policy"
+  },
+  {
+    description: "Real profile guard decisions from audit and trace evidence.",
+    href: "/voice/profile-switch-live-decisions",
+    label: "Profile decisions"
   }
 ];
 export const isVoiceModelProvider = (value) => value === "deterministic" || value === "openai" || value === "anthropic" || value === "gemini";

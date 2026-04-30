@@ -242,6 +242,12 @@ export const VOICE_PROOF_DASHBOARDS = [
     href: "/voice/profile-switch-policy",
     label: "Profile policy",
   },
+  {
+    description:
+      "Real profile guard decisions from audit and trace evidence.",
+    href: "/voice/profile-switch-live-decisions",
+    label: "Profile decisions",
+  },
 ] as const;
 
 export const isVoiceModelProvider = (

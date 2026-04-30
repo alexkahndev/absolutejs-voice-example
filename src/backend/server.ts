@@ -99,6 +99,7 @@ import {
   createVoiceResilienceRoutes,
   createVoiceRoutingDecisionSummary,
   applyVoiceProfileSwitchGuard,
+  createVoiceProfileSwitchLiveDecisionRoutes,
   createVoiceProfileSwitchPolicyProofRoutes,
   recommendVoiceProfileSwitch,
   summarizeVoiceTurnQuality,
@@ -10309,6 +10310,14 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
         turnWarnings: 3,
       },
       title: "Voice Profile Switch Policy Proof",
+    }),
+  )
+  .use(
+    createVoiceProfileSwitchLiveDecisionRoutes({
+      audit: runtimeStorage.audit,
+      limit: 50,
+      title: "Voice Profile Switch Live Decisions",
+      trace: deliveryTraceStore,
     }),
   )
   .get("/api/assistant-config", () => assistantConfig)
