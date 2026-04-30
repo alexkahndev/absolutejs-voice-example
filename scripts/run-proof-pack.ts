@@ -703,7 +703,7 @@ const proofTargets: ProofTarget[] = [
       "AbsoluteJS Voice Realtime Channel Proof",
       "Realtime / duplex readiness",
       "openai-realtime",
-      "persisted-trace-store",
+      "Runtime Samples",
     ],
   },
   {
@@ -2103,6 +2103,7 @@ const productionReadinessEvidenceReport = productionReadinessReport
       requireStatus: "pass",
       requiredChecks: [
         "Browser media transport",
+        "Browser call profile evidence",
         "Campaign readiness proof",
         "Media pipeline quality",
         "Ops recovery",

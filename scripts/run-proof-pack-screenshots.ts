@@ -107,7 +107,7 @@ const screenshotTargets: ScreenshotTarget[] = [
       "AbsoluteJS Voice Realtime Channel Proof",
       "Realtime / duplex readiness",
       "openai-realtime",
-      "persisted-trace-store",
+      "Runtime Samples",
     ],
   },
   {
