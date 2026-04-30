@@ -126,23 +126,6 @@ const percentile = (values: number[], percentileValue: number) => {
   return sorted[index];
 };
 
-const profilePassesRecommendationBudgets = (profile: JsonRecord) => {
-  const runtimeChannel = isRecord(profile.runtimeChannel)
-    ? profile.runtimeChannel
-    : {};
-  return (
-    profile.status === "pass" &&
-    (readNumber(profile.maxLiveP95Ms) ?? 0) <= 800 &&
-    (readNumber(profile.maxProviderP95Ms) ?? 0) <= 1_000 &&
-    (readNumber(profile.maxTurnP95Ms) ?? 0) <= 700 &&
-    (readNumber(runtimeChannel.maxFirstAudioLatencyMs) ?? 0) <= 600 &&
-    (readNumber(runtimeChannel.maxInterruptionP95Ms) ?? 0) <= 300 &&
-    (readNumber(runtimeChannel.maxJitterMs) ?? 0) <= 30 &&
-    (readNumber(runtimeChannel.maxTimestampDriftMs) ?? 0) <= 800 &&
-    (readNumber(runtimeChannel.maxBackpressureEvents) ?? 0) === 0
-  );
-};
-
 const fetchJson = async (
   path: string,
   init: RequestInit = {},
@@ -552,17 +535,6 @@ const readHistoricalProofTrendReports = async (): Promise<VoiceProofTrendReport[
     try {
       const parsed = (await file.json()) as Record<string, unknown>;
       if (parsed.ok === false) {
-        continue;
-      }
-      const parsedSummary = isRecord(parsed.summary) ? parsed.summary : {};
-      const parsedProfiles = readArray(parsedSummary.profiles);
-      if (
-        parsedProfiles.length > 0 &&
-        !parsedProfiles.every(
-          (profile) =>
-            isRecord(profile) && profilePassesRecommendationBudgets(profile),
-        )
-      ) {
         continue;
       }
       const key =
