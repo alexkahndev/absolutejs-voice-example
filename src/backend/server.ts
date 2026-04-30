@@ -32,6 +32,7 @@ import {
   createVoiceFileAssistantMemoryStore,
   createVoiceFileRuntimeStorage,
   createVoiceMemoryTraceEventStore,
+  createVoiceProductionReadinessProofRuntime,
   createVoiceOpsConsoleRoutes,
   createVoiceOpsActionAuditRoutes,
   createVoiceOpsRecoveryRoutes,
@@ -630,7 +631,12 @@ const deliveryTraceStore: VoiceTraceEventStore = {
     );
   },
 };
-const productionReadinessTraceStore = createVoiceMemoryTraceEventStore();
+const productionReadinessProofRuntime =
+  createVoiceProductionReadinessProofRuntime({
+    cacheMs: 10_000,
+    traceMaxAgeMs: 30 * 60 * 1000,
+  });
+const productionReadinessTraceStore = productionReadinessProofRuntime.store;
 const hiddenTraceTimelineSessionPattern =
   /^(latency-proof-|phone-|provider-sim-|quality-routing-proof$|stt-contract-|stt-sim-|tts-contract-|tts-sim-)/;
 const filterDemoTraceTimelineEvents = (
@@ -7909,116 +7915,15 @@ const buildProductionReadinessObservabilityExport = async () =>
     traceDeliveries: undefined,
   });
 
-let productionReadinessProofRefresh: Promise<void> | undefined;
-let productionReadinessProofRefreshedAt = 0;
-let productionReadinessProofMetadata:
-  | {
-      generatedAt: string;
-      refreshedAt: number;
-      runId: string;
-      source: string;
-    }
-  | undefined;
-let productionReadinessExportRefresh:
-  | Promise<Awaited<ReturnType<typeof buildDemoObservabilityExport>>>
-  | undefined;
-let productionReadinessExportRefreshedAt = 0;
-
-const refreshProductionReadinessProof = () => {
-  if (
-    productionReadinessProofRefresh &&
-    Date.now() - productionReadinessProofRefreshedAt < 5_000
-  ) {
-    return productionReadinessProofRefresh;
-  }
-
-  productionReadinessProofRefresh = refreshProductionReadinessProofNow().finally(
-    () => {
-      productionReadinessProofRefreshedAt = Date.now();
-    },
-  );
-  return productionReadinessProofRefresh;
-};
-
-const seedProductionReadinessTraceProof = async () => {
-  await Promise.all(
-    (await productionReadinessTraceStore.list()).map((event) =>
-      productionReadinessTraceStore.remove(event.id),
-    ),
-  );
-
-  const now = Date.now();
-  const sessionId = `production-readiness-trace-${now}`;
-  await Promise.all(
-    [
-      createVoiceTraceEvent({
-        at: now,
-        payload: {
-          elapsedMs: 320,
-          kind: "llm",
-          provider: configuredModelProviders[0] ?? "openai",
-          providerStatus: "success",
-          selectedProvider: configuredModelProviders[0] ?? "openai",
-          status: "success",
-        },
+const refreshProductionReadinessProof = () =>
+  productionReadinessProofRuntime.refresh(async (metadata) => {
+    await Promise.all([
+      productionReadinessProofRuntime.seedTraceProof({
+        llmProvider: configuredModelProviders[0] ?? "openai",
         scenarioId: providerSloProofScenarioId,
-        sessionId,
-        type: "session.error",
+        sttProvider: configuredSTTProviders[0] ?? "deepgram",
+        ttsProvider: configuredTTSProviders[0] ?? "openai",
       }),
-      createVoiceTraceEvent({
-        at: now + 1,
-        payload: {
-          elapsedMs: 82,
-          kind: "stt",
-          provider: configuredSTTProviders[0] ?? "deepgram",
-          providerStatus: "success",
-          selectedProvider: configuredSTTProviders[0] ?? "deepgram",
-          status: "success",
-        },
-        scenarioId: providerSloProofScenarioId,
-        sessionId,
-        type: "session.error",
-      }),
-      createVoiceTraceEvent({
-        at: now + 2,
-        payload: {
-          elapsedMs: 45,
-          kind: "tts",
-          provider: configuredTTSProviders[0] ?? "openai",
-          providerStatus: "success",
-          selectedProvider: configuredTTSProviders[0] ?? "openai",
-          status: "success",
-        },
-        scenarioId: providerSloProofScenarioId,
-        sessionId,
-        type: "session.error",
-      }),
-      createVoiceTraceEvent({
-        at: now + 3,
-        metadata: {
-          source: "browser",
-          surface: "live-latency-proof",
-        },
-        payload: {
-          completedAt: now + 3,
-          elapsedMs: 420,
-          latencyMs: 420,
-          startedAt: now - 417,
-          status: "assistant_audio_started",
-          thresholdMs: 1_800,
-        },
-        scenarioId: "production-readiness-proof",
-        sessionId,
-        traceId: `production-readiness-live-latency-${now}`,
-        type: "client.live_latency",
-      }),
-    ].map((event) => productionReadinessTraceStore.append(event)),
-  );
-};
-
-const refreshProductionReadinessProofNow = async () => {
-  await Promise.all([
-    seedProductionReadinessTraceProof(),
     cleanupDemoQualityNoise(),
     seedDemoProviderSloProof(),
     seedDemoProviderDecisionProof(),
@@ -8035,19 +7940,12 @@ const refreshProductionReadinessProofNow = async () => {
     }),
   ]);
 
-  const generatedAt = new Date().toISOString();
   const proofPack = {
-    generatedAt,
+    generatedAt: metadata.generatedAt,
     ok: true,
     outputDir: ".voice-runtime/proof-pack",
-    runId: `production-readiness-${Date.now()}`,
-    source: "production-readiness",
-  };
-  productionReadinessProofMetadata = {
-    generatedAt,
-    refreshedAt: Date.now(),
-    runId: proofPack.runId,
-    source: proofPack.source,
+    runId: metadata.runId,
+    source: metadata.source,
   };
 
   await Promise.all([
@@ -8061,7 +7959,7 @@ const refreshProductionReadinessProofNow = async () => {
       [
         "# AbsoluteJS Voice Production Readiness Proof",
         "",
-        `Generated: ${generatedAt}`,
+        `Generated: ${metadata.generatedAt}`,
         "",
         "- Provider SLO latency samples refreshed.",
         "- Provider decision traces refreshed.",
@@ -8083,7 +7981,7 @@ const refreshProductionReadinessProofNow = async () => {
               providerSlo: { eventsWithLatency: 18, status: "pass" },
             },
           ],
-          generatedAt,
+          generatedAt: metadata.generatedAt,
           ok: true,
           outputDir: ".voice-runtime/proof-trends",
           runId: proofPack.runId,
@@ -8103,7 +8001,7 @@ const refreshProductionReadinessProofNow = async () => {
       [
         "# AbsoluteJS Voice Sustained Proof Trends",
         "",
-        `Generated: ${generatedAt}`,
+        `Generated: ${metadata.generatedAt}`,
         "",
         "- Production readiness: pass",
         "- Provider SLO: pass",
@@ -8113,77 +8011,13 @@ const refreshProductionReadinessProofNow = async () => {
       ].join("\n"),
     ),
   ]);
-};
-
-const formatProofFreshnessDuration = (valueMs: number) => {
-  if (valueMs < 1_000) {
-    return `${Math.max(0, Math.round(valueMs))}ms`;
-  }
-
-  if (valueMs < 60_000) {
-    return `${Math.round(valueMs / 1_000)}s`;
-  }
-
-  return `${Math.round(valueMs / 60_000)}m`;
-};
-
-const buildProductionReadinessProofFreshnessCheck =
-  async (): Promise<VoiceProductionReadinessCheck> => {
-    await refreshProductionReadinessProof();
-
-    const metadata = productionReadinessProofMetadata;
-    const now = Date.now();
-    const cacheAgeMs = productionReadinessProofRefreshedAt
-      ? now - productionReadinessProofRefreshedAt
-      : undefined;
-    const proofAgeMs = metadata ? now - metadata.refreshedAt : undefined;
-    const maxAgeMs = 30 * 60 * 1000;
-    const status = metadata && (proofAgeMs ?? Infinity) <= maxAgeMs ? "pass" : "fail";
-
-    return {
-      detail: metadata
-        ? `Proof ${metadata.runId} refreshed ${formatProofFreshnessDuration(proofAgeMs ?? 0)} ago; route cache age is ${formatProofFreshnessDuration(cacheAgeMs ?? 0)}.`
-        : "Production readiness proof has not been refreshed yet.",
-      gateExplanation: {
-        evidenceHref: "/api/production-readiness",
-        observed: proofAgeMs ?? 0,
-        remediation:
-          "Reload production readiness to refresh provider SLO, live latency, proof-pack, trend, and observability export proof.",
-        sourceHref: "/voice/proof-trends",
-        threshold: maxAgeMs,
-        thresholdLabel: "Maximum proof age",
-        unit: "ms",
-      },
-      href: "/voice/proof-trends",
-      label: "Proof freshness",
-      proofSource: {
-        detail:
-          "Generated by the production readiness refresh path before the deploy gate evaluates cached route results.",
-        href: "/api/production-readiness",
-        source: metadata?.source ?? "production-readiness",
-        sourceLabel: "Production readiness proof refresh",
-      },
-      status,
-      value: metadata
-        ? `${formatProofFreshnessDuration(proofAgeMs ?? 0)} old`
-        : "missing",
-    };
-  };
+});
 
 const buildFreshDemoObservabilityExport = async () => {
-  if (
-    productionReadinessExportRefresh &&
-    Date.now() - productionReadinessExportRefreshedAt < 5_000
-  ) {
-    return productionReadinessExportRefresh;
-  }
-
-  productionReadinessExportRefresh = buildFreshDemoObservabilityExportNow().finally(
-    () => {
-      productionReadinessExportRefreshedAt = Date.now();
-    },
+  return productionReadinessProofRuntime.cache(
+    "observability-export",
+    buildFreshDemoObservabilityExportNow,
   );
-  return productionReadinessExportRefresh;
 };
 
 const buildFreshDemoObservabilityExportNow = async () => {
@@ -8198,64 +8032,39 @@ const buildFreshDemoObservabilityExportNow = async () => {
   return report;
 };
 
-let productionReadinessDeliveryRuntime:
-  | Promise<Awaited<ReturnType<typeof deliveryRuntimeControl.summarize>>>
-  | undefined;
-let productionReadinessDeliveryRuntimeAt = 0;
-
 const summarizeProductionReadinessDeliveryRuntime = () => {
-  if (
-    productionReadinessDeliveryRuntime &&
-    Date.now() - productionReadinessDeliveryRuntimeAt < 5_000
-  ) {
-    return productionReadinessDeliveryRuntime;
-  }
-
-  productionReadinessDeliveryRuntime = deliveryRuntimeControl
-    .summarize()
-    .finally(() => {
-      productionReadinessDeliveryRuntimeAt = Date.now();
-    });
-  return productionReadinessDeliveryRuntime;
+  return productionReadinessProofRuntime.cache(
+    "delivery-runtime",
+    () => deliveryRuntimeControl.summarize(),
+  );
 };
 
-let productionReadinessProfileSwitch:
-  | Promise<Awaited<ReturnType<typeof buildVoiceProfileSwitchReadinessReport>>>
-  | undefined;
-let productionReadinessProfileSwitchAt = 0;
-
 const buildProductionReadinessProfileSwitchReport = () => {
-  if (
-    productionReadinessProfileSwitch &&
-    Date.now() - productionReadinessProfileSwitchAt < 5_000
-  ) {
-    return productionReadinessProfileSwitch;
-  }
-
-  productionReadinessProfileSwitch = buildVoiceProfileSwitchReadinessReport({
-    audit: runtimeStorage.audit,
-    autoMode: true,
-    limit: 50,
-    maxAutoAppliedRatio: 1,
-    policyProof: {
-      allowedProfileIds: [...demoVoiceProfileIds],
-      audit: runtimeStorage.audit,
-      defaults: () => readRealCallProfileDefaultsReport(),
-      metadata: {
-        source: "absolutejs-voice-example",
-      },
-      observed: {
-        currentProfileId: "meeting-recorder",
-        fallbackUsed: true,
-        providerP95Ms: 950,
-        turnWarnings: 3,
-      },
-    },
-    trace: deliveryTraceStore,
-  }).finally(() => {
-    productionReadinessProfileSwitchAt = Date.now();
-  });
-  return productionReadinessProfileSwitch;
+  return productionReadinessProofRuntime.cache(
+    "profile-switch-readiness",
+    () =>
+      buildVoiceProfileSwitchReadinessReport({
+        audit: runtimeStorage.audit,
+        autoMode: true,
+        limit: 50,
+        maxAutoAppliedRatio: 1,
+        policyProof: {
+          allowedProfileIds: [...demoVoiceProfileIds],
+          audit: runtimeStorage.audit,
+          defaults: () => readRealCallProfileDefaultsReport(),
+          metadata: {
+            source: "absolutejs-voice-example",
+          },
+          observed: {
+            currentProfileId: "meeting-recorder",
+            fallbackUsed: true,
+            providerP95Ms: 950,
+            turnWarnings: 3,
+          },
+        },
+        trace: deliveryTraceStore,
+      }),
+  );
 };
 
 const buildDemoObservabilityExportReplay = async () => {
@@ -8320,13 +8129,13 @@ const productionReadinessOptions = () => ({
     traceDeliveries: runtimeStorage.traceDeliveries,
   }),
   additionalChecks: async () => [
-    await buildProductionReadinessProofFreshnessCheck(),
+    await productionReadinessProofRuntime.buildFreshnessCheck(),
     await buildBrowserCallProfileReadinessCheck(),
   ],
   agentSquadContracts: async () => [await runDemoAgentSquadContract()],
   auditDeliveries: false as const,
   bargeInReports: async () => [await buildDemoBargeInReport()],
-  cacheMs: 10_000,
+  cacheMs: productionReadinessProofRuntime.options.cacheMs,
   htmlPath: "/production-readiness",
   opsActionHistory: runtimeStorage.audit,
   opsRecovery: buildProductionReadinessOpsRecoveryReport,
@@ -8531,7 +8340,7 @@ const productionReadinessOptions = () => ({
   ],
   store: productionReadinessTraceStore,
   traceDeliveries: false as const,
-  traceMaxAgeMs: 30 * 60 * 1000,
+  traceMaxAgeMs: productionReadinessProofRuntime.options.traceMaxAgeMs,
 });
 
 type DemoProofSurface = {
