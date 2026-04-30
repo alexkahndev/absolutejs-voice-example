@@ -29,6 +29,15 @@ type TrendCycle = {
     kinds: Record<string, TrendMetric & { status?: string }>;
     status?: string;
   };
+  runtimeChannel?: {
+    maxBackpressureEvents?: number;
+    maxFirstAudioLatencyMs?: number;
+    maxInterruptionP95Ms?: number;
+    maxJitterMs?: number;
+    maxTimestampDriftMs?: number;
+    samples?: number;
+    status?: string;
+  };
   turnLatency?: TrendMetric & {
     status?: string;
     total?: number;
@@ -261,18 +270,45 @@ const summarizeLiveLatency = (body: JsonRecord) => ({
   samples: readMetric(body, ["total", "samples"]),
 });
 
+const summarizeRuntimeChannel = (body: JsonRecord) => {
+  const calibration = isRecord(body.calibration) ? body.calibration : {};
+  const interruption = isRecord(body.interruption) ? body.interruption : {};
+  const quality = isRecord(body.quality) ? body.quality : {};
+  const transport = isRecord(body.transport) ? body.transport : {};
+  const latencies = readArray(interruption.latenciesMs)
+    .map((value) => readNumber(value))
+    .filter((value): value is number => value !== undefined);
+
+  return {
+    maxBackpressureEvents:
+      readNumber(transport.backpressureEvents) ??
+      readNumber(quality.backpressureEvents),
+    maxFirstAudioLatencyMs: readNumber(calibration.firstAudioLatencyMs),
+    maxInterruptionP95Ms: percentile(latencies, 95),
+    maxJitterMs: readNumber(quality.jitterMs),
+    maxTimestampDriftMs: readNumber(quality.timestampDriftMs),
+    samples:
+      readNumber(body.frames) ??
+      readNumber(calibration.inputAudioFrames) ??
+      readNumber(calibration.assistantAudioFrames),
+    status: typeof body.status === "string" ? body.status : undefined,
+  };
+};
+
 const runCycle = async (cycle: number): Promise<TrendCycle> => {
   await seedCycle(cycle);
   const [
     providerSlo,
     turnLatency,
     liveLatency,
+    runtimeChannel,
     opsRecovery,
     productionReadiness,
   ] = await Promise.all([
     fetchJson("/api/voice/provider-slos"),
     fetchJson("/api/turn-latency"),
     fetchJson("/api/live-latency"),
+    fetchJson("/api/voice/media-pipeline-calibration"),
     fetchJson("/api/voice/ops-recovery"),
     fetchJson("/api/production-readiness"),
   ]);
@@ -280,6 +316,7 @@ const runCycle = async (cycle: number): Promise<TrendCycle> => {
   const summarizedProviderSlo = summarizeProviderSlo(providerSlo);
   const summarizedTurnLatency = summarizeTurnLatency(turnLatency);
   const summarizedLiveLatency = summarizeLiveLatency(liveLatency);
+  const summarizedRuntimeChannel = summarizeRuntimeChannel(runtimeChannel);
   const opsIssues = readArray(opsRecovery.issues).length;
   const readinessStatus =
     typeof productionReadiness.status === "string"
@@ -304,6 +341,7 @@ const runCycle = async (cycle: number): Promise<TrendCycle> => {
     ok:
       readinessStatus === "pass" &&
       summarizedProviderSlo.status === "pass" &&
+      summarizedRuntimeChannel.status === "pass" &&
       summarizedTurnLatency.status === "pass" &&
       opsIssues === 0 &&
       providerIssues === 0,
@@ -316,6 +354,7 @@ const runCycle = async (cycle: number): Promise<TrendCycle> => {
       status: readinessStatus,
     },
     providerSlo: summarizedProviderSlo,
+    runtimeChannel: summarizedRuntimeChannel,
     turnLatency: summarizedTurnLatency,
   };
 };
@@ -340,11 +379,23 @@ const renderMarkdown = (cycles: TrendCycle[]) => {
       (entry) => entry.kind.p95Ms,
     ),
   );
+  const maxRuntimeFirstAudio = maxOf(
+    cycles,
+    (cycle) => cycle.runtimeChannel?.maxFirstAudioLatencyMs,
+  );
+  const maxRuntimeJitter = maxOf(
+    cycles,
+    (cycle) => cycle.runtimeChannel?.maxJitterMs,
+  );
+  const maxRuntimeInterruption = maxOf(
+    cycles,
+    (cycle) => cycle.runtimeChannel?.maxInterruptionP95Ms,
+  );
 
   const rows = cycles
     .map(
       (cycle) =>
-        `| ${cycle.cycle} | ${cycle.ok ? "pass" : "fail"} | ${cycle.productionReadiness?.status ?? "n/a"} | ${cycle.providerSlo?.status ?? "n/a"} | ${renderMs(cycle.turnLatency?.p95Ms)} | ${renderMs(cycle.liveLatency?.p95Ms)} | ${cycle.opsRecovery?.issues ?? 0} |`,
+        `| ${cycle.cycle} | ${cycle.ok ? "pass" : "fail"} | ${cycle.productionReadiness?.status ?? "n/a"} | ${cycle.providerSlo?.status ?? "n/a"} | ${cycle.runtimeChannel?.status ?? "n/a"} | ${renderMs(cycle.turnLatency?.p95Ms)} | ${renderMs(cycle.liveLatency?.p95Ms)} | ${renderMs(cycle.runtimeChannel?.maxFirstAudioLatencyMs)} | ${renderMs(cycle.runtimeChannel?.maxJitterMs)} | ${cycle.opsRecovery?.issues ?? 0} |`,
     )
     .join("\n");
 
@@ -364,8 +415,14 @@ Max live p95: ${renderMs(maxLiveP95)}
 
 Max provider p95: ${renderMs(maxProviderP95)}
 
-| Cycle | Status | Readiness | Provider SLO | Turn p95 | Live p95 | Ops issues |
-| ---: | --- | --- | --- | ---: | ---: | ---: |
+Max runtime first audio: ${renderMs(maxRuntimeFirstAudio)}
+
+Max runtime jitter: ${renderMs(maxRuntimeJitter)}
+
+Max runtime interruption p95: ${renderMs(maxRuntimeInterruption)}
+
+| Cycle | Status | Readiness | Provider SLO | Runtime channel | Turn p95 | Live p95 | First audio | Jitter | Ops issues |
+| ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
 ${rows}
 `;
 };
@@ -418,6 +475,29 @@ try {
           (entry) => entry.kind.p95Ms,
         ),
       ),
+      runtimeChannel: {
+        maxBackpressureEvents: maxOf(
+          trendCycles,
+          (cycle) => cycle.runtimeChannel?.maxBackpressureEvents,
+        ),
+        maxFirstAudioLatencyMs: maxOf(
+          trendCycles,
+          (cycle) => cycle.runtimeChannel?.maxFirstAudioLatencyMs,
+        ),
+        maxInterruptionP95Ms: maxOf(
+          trendCycles,
+          (cycle) => cycle.runtimeChannel?.maxInterruptionP95Ms,
+        ),
+        maxJitterMs: maxOf(trendCycles, (cycle) => cycle.runtimeChannel?.maxJitterMs),
+        maxTimestampDriftMs: maxOf(
+          trendCycles,
+          (cycle) => cycle.runtimeChannel?.maxTimestampDriftMs,
+        ),
+        samples: maxOf(trendCycles, (cycle) => cycle.runtimeChannel?.samples),
+        status: trendCycles.every((cycle) => cycle.runtimeChannel?.status === "pass")
+          ? "pass"
+          : "warn",
+      },
       maxTurnP95Ms: maxOf(trendCycles, (cycle) => cycle.turnLatency?.p95Ms),
     },
   };

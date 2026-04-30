@@ -760,7 +760,7 @@ const proofTargets: ProofTarget[] = [
     kind: "text",
     name: "proofTrendsMarkdown",
     path: "/voice/proof-trends.md",
-    requiredText: ["AbsoluteJS Voice Sustained Proof Trends"],
+    requiredText: ["AbsoluteJS Voice Sustained Proof Trends", "Runtime channel"],
   },
   {
     kind: "json",
@@ -2618,10 +2618,16 @@ const proofTrendEvidenceReport = proofTrendReport
       maxAgeMs: 2 * 60 * 60 * 1000,
       maxLiveP95Ms: 800,
       maxProviderP95Ms: 4_500,
+      maxRuntimeBackpressureEvents: 0,
+      maxRuntimeFirstAudioLatencyMs: 600,
+      maxRuntimeInterruptionP95Ms: 300,
+      maxRuntimeJitterMs: 30,
+      maxRuntimeTimestampDriftMs: 800,
       maxTurnP95Ms: 700,
       minCycles: 6,
       minLiveLatencySamples: 50,
       minProviderSloEventsWithLatency: 6,
+      minRuntimeChannelSamples: 4,
       minTurnLatencySamples: 10,
     })
   : undefined;
