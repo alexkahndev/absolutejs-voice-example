@@ -3,6 +3,7 @@ import {
   createVoiceCampaignDialerProofStore,
   createVoicePlatformCoverageStore,
   mountVoiceProfileComparison,
+  mountVoiceProfileSwitchRecommendation,
   mountVoiceOpsStatus,
   mountVoiceProofTrends,
   mountVoiceProviderCapabilities,
@@ -108,6 +109,7 @@ const workflowStatusHost = document.querySelector("#workflow-status-card");
 const platformCoverageHost = document.querySelector("#platform-coverage-card");
 const proofTrendsHost = document.querySelector("#proof-trends-card");
 const profileComparisonHost = document.querySelector("#profile-comparison-card");
+const profileSwitchHost = document.querySelector("#profile-switch-card");
 const readinessFailuresHost = document.querySelector(
   "#readiness-failures-card",
 );
@@ -162,6 +164,7 @@ if (
   !(platformCoverageHost instanceof HTMLElement) ||
   !(proofTrendsHost instanceof HTMLElement) ||
   !(profileComparisonHost instanceof HTMLElement) ||
+  !(profileSwitchHost instanceof HTMLElement) ||
   !(readinessFailuresHost instanceof HTMLElement) ||
   !(providerCapabilitiesHost instanceof HTMLElement) ||
   !(providerContractsHost instanceof HTMLElement) ||
@@ -233,6 +236,15 @@ const profileComparison = mountVoiceProfileComparison(
     description: `${framework.toUpperCase()} renders measured profile defaults behind each selected stack.`,
     intervalMs: 10_000,
     title: "Profile Stack Comparison",
+  },
+);
+const profileSwitchRecommendation = mountVoiceProfileSwitchRecommendation(
+  profileSwitchHost,
+  "/api/voice/profile-switch-recommendation",
+  {
+    description: `${framework.toUpperCase()} compares latest session signals against measured profile evidence and recommends whether to switch stacks.`,
+    intervalMs: 10_000,
+    title: "Profile Switch Recommendation",
   },
 );
 const readinessFailures = mountVoiceReadinessFailures(
@@ -697,6 +709,7 @@ window.addEventListener("beforeunload", () => {
   guidedVoice.close();
   generalVoice.close();
   profileComparison.close();
+  profileSwitchRecommendation.close();
 });
 
 render();

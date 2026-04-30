@@ -10,6 +10,7 @@ import {
 import type { VoiceRoutingDecisionSummary } from "@absolutejs/voice";
 import {
   defineVoiceProfileComparisonElement,
+  defineVoiceProfileSwitchRecommendationElement,
   defineVoiceProviderSimulationControlsElement,
 } from "@absolutejs/voice/client";
 import { createVoiceOpsActionCenterActions } from "@absolutejs/voice/client";
@@ -324,6 +325,13 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             interval-ms="10000"
             title="Profile Stack Comparison"
           ></absolute-voice-profile-comparison>
+
+          <absolute-voice-profile-switch
+            class="voice-card voice-provider-health-card"
+            description="Angular compares latest session signals against measured profile evidence and recommends whether to switch stacks."
+            interval-ms="10000"
+            title="Profile Switch Recommendation"
+          ></absolute-voice-profile-switch>
 
           <article class="voice-card voice-provider-health-card">
             <span class="voice-framework-pill">Sustained Proof Trends</span>
@@ -1576,6 +1584,7 @@ export class AngularVoiceDemoComponent {
 
   constructor() {
     defineVoiceProfileComparisonElement();
+    defineVoiceProfileSwitchRecommendationElement();
     defineVoiceProviderSimulationControlsElement();
     effect(() => {
       const voice = this.currentVoice();

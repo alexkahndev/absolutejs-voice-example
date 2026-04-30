@@ -9,6 +9,7 @@ import {
   VoiceOpsStatus,
   VoicePlatformCoverage,
   VoiceProfileComparison,
+  VoiceProfileSwitchRecommendation,
   VoiceProofTrends,
   VoiceProviderCapabilities,
   VoiceProviderContracts,
@@ -634,6 +635,14 @@ export const ReactVoiceDemo = ({
               intervalMs={10_000}
               path="/api/voice/real-call-profile-history"
               title="Profile Stack Comparison"
+            />
+
+            <VoiceProfileSwitchRecommendation
+              className="voice-card voice-provider-health-card"
+              description="React compares the latest session signals against measured profile evidence and recommends whether to switch stacks."
+              intervalMs={10_000}
+              path="/api/voice/profile-switch-recommendation"
+              title="Profile Switch Recommendation"
             />
 
             <VoiceReadinessFailures

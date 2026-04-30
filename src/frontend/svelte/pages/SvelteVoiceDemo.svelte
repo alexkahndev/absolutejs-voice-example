@@ -20,8 +20,10 @@
     createVoiceTurnQuality,
   } from "@absolutejs/voice/svelte";
   import {
+    createVoiceProfileSwitchRecommendationStore,
     renderVoicePlatformCoverageHTML,
     renderVoiceProfileComparisonHTML,
+    renderVoiceProfileSwitchRecommendationHTML,
     renderVoiceProofTrendsHTML,
     renderVoiceReadinessFailuresHTML,
     createVoiceOpsActionCenterActions,
@@ -133,6 +135,7 @@
   let opsStatusHTML = $state("");
   let platformCoverageHTML = $state("");
   let profileComparisonHTML = $state("");
+  let profileSwitchHTML = $state("");
   let proofTrendsHTML = $state("");
   let readinessFailuresHTML = $state("");
   let providerCapabilitiesHTML = $state("");
@@ -209,6 +212,22 @@
     profileComparison.getSnapshot(),
     profileComparisonWidgetOptions,
   );
+  const profileSwitchRecommendation =
+    createVoiceProfileSwitchRecommendationStore(
+      "/api/voice/profile-switch-recommendation",
+      {
+        intervalMs: 10_000,
+      },
+    );
+  const profileSwitchWidgetOptions = {
+    description:
+      "Svelte compares latest session signals against measured profile evidence and recommends whether to switch stacks.",
+    title: "Profile Switch Recommendation",
+  };
+  profileSwitchHTML = renderVoiceProfileSwitchRecommendationHTML(
+    profileSwitchRecommendation.getSnapshot(),
+    profileSwitchWidgetOptions,
+  );
   const readinessFailures = createVoiceReadinessFailures(
     "/api/production-readiness",
     {
@@ -273,6 +292,7 @@
   let unsubscribeOpsStatus = () => {};
   let unsubscribePlatformCoverage = () => {};
   let unsubscribeProfileComparison = () => {};
+  let unsubscribeProfileSwitch = () => {};
   let unsubscribeProofTrends = () => {};
   let unsubscribeReadinessFailures = () => {};
   let unsubscribeProviderSimulation = () => {};
@@ -594,6 +614,12 @@
         profileComparisonWidgetOptions,
       );
     });
+    unsubscribeProfileSwitch = profileSwitchRecommendation.subscribe(() => {
+      profileSwitchHTML = renderVoiceProfileSwitchRecommendationHTML(
+        profileSwitchRecommendation.getSnapshot(),
+        profileSwitchWidgetOptions,
+      );
+    });
     unsubscribeReadinessFailures = readinessFailures.subscribe(() => {
       readinessFailuresHTML = renderVoiceReadinessFailuresHTML(
         readinessFailures.getSnapshot(),
@@ -651,6 +677,10 @@
       profileComparison.getSnapshot(),
       profileComparisonWidgetOptions,
     );
+    profileSwitchHTML = renderVoiceProfileSwitchRecommendationHTML(
+      profileSwitchRecommendation.getSnapshot(),
+      profileSwitchWidgetOptions,
+    );
     readinessFailuresHTML = renderVoiceReadinessFailuresHTML(
       readinessFailures.getSnapshot(),
       readinessFailuresWidgetOptions,
@@ -667,6 +697,7 @@
     void deliveryRuntime.refresh().catch(() => {});
     void platformCoverage.refresh().catch(() => {});
     void proofTrends.refresh().catch(() => {});
+    void profileSwitchRecommendation.refresh().catch(() => {});
     void readinessFailures.refresh().catch(() => {});
     void providerCapabilities.refresh().catch(() => {});
     void providerContracts.refresh().catch(() => {});
@@ -744,6 +775,7 @@
     unsubscribeOpsStatus();
     unsubscribePlatformCoverage();
     unsubscribeProfileComparison();
+    unsubscribeProfileSwitch();
     unsubscribeProofTrends();
     unsubscribeReadinessFailures();
     unsubscribeProviderSimulation();
@@ -764,6 +796,7 @@
     opsStatus.close();
     platformCoverage.close();
     profileComparison.close();
+    profileSwitchRecommendation.close();
     proofTrends.close();
     deliveryRuntime.close();
     opsActionCenter.close();
@@ -926,6 +959,10 @@
 
       <div class="voice-card voice-provider-health-card">
         {@html profileComparisonHTML}
+      </div>
+
+      <div class="voice-card voice-provider-health-card">
+        {@html profileSwitchHTML}
       </div>
 
       <div class="voice-card voice-provider-health-card">

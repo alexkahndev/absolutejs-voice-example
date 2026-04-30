@@ -4,6 +4,7 @@ import {
   defineVoiceDeliveryRuntimeElement,
   defineVoiceOpsStatusElement,
   defineVoiceProfileComparisonElement,
+  defineVoiceProfileSwitchRecommendationElement,
   defineVoiceProviderCapabilitiesElement,
   defineVoiceProviderContractsElement,
   defineVoiceProviderSimulationControlsElement,
@@ -24,6 +25,7 @@ import { mountVoiceLiveOpsPanel } from "../../shared/browser";
 defineVoiceDeliveryRuntimeElement();
 defineVoiceOpsStatusElement();
 defineVoiceProfileComparisonElement();
+defineVoiceProfileSwitchRecommendationElement();
 defineVoiceProviderCapabilitiesElement();
 defineVoiceProviderContractsElement();
 defineVoiceProviderSimulationControlsElement();

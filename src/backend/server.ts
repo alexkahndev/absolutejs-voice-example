@@ -98,6 +98,8 @@ import {
   createVoiceQualityRoutes,
   createVoiceResilienceRoutes,
   createVoiceRoutingDecisionSummary,
+  recommendVoiceProfileSwitch,
+  summarizeVoiceTurnQuality,
   createVoiceSTTProviderRouter,
   createVoiceSessionListRoutes,
   createVoiceSessionReplayRoutes,
@@ -8387,6 +8389,37 @@ const getLatestRoutingDecision = async () => {
   };
 };
 
+const getProfileSwitchRecommendation = async () => {
+  const [defaults, decision, turnQuality] = await Promise.all([
+    readRealCallProfileDefaultsReport(),
+    getLatestRoutingDecision(),
+    summarizeVoiceTurnQuality({
+      limit: 25,
+      store: runtimeStorage.session,
+    }),
+  ]);
+  const turnLatencies = turnQuality.turns
+    .map((turn) => turn.latencyMs)
+    .filter((value): value is number => typeof value === "number");
+  const turnP95Ms =
+    turnLatencies.length > 0
+      ? turnLatencies.sort((left, right) => left - right)[
+          Math.max(0, Math.ceil(turnLatencies.length * 0.95) - 1)
+        ]
+      : undefined;
+
+  return recommendVoiceProfileSwitch({
+    defaults,
+    observed: {
+      currentProfileId: decision?.profileId ?? "meeting-recorder",
+      fallbackUsed: Boolean(decision?.fallbackProvider),
+      providerP95Ms: decision?.elapsedMs,
+      turnP95Ms,
+      turnWarnings: turnQuality.warnings,
+    },
+  });
+};
+
 const sttProviderSimulationStatus = () =>
   (["deepgram", "assemblyai"] as const).map((provider) => ({
     configured: configuredSTTProviders.includes(provider),
@@ -10093,6 +10126,10 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
   )
   .get("/api/intakes", () => listIntakes())
   .get("/api/routing/latest", async () => await getLatestRoutingDecision())
+  .get(
+    "/api/voice/profile-switch-recommendation",
+    async () => await getProfileSwitchRecommendation(),
+  )
   .get("/api/assistant-config", () => assistantConfig)
   .get("/api/assistant-summary", async () => summarizeAssistantRuns())
   .get("/api/telephony-outcomes", () => ({

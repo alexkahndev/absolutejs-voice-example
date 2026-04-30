@@ -19,10 +19,12 @@ import {
   VoiceTurnQuality,
 } from "@absolutejs/voice/vue";
 import {
+  createVoiceProfileSwitchRecommendationStore,
   createVoiceOpsActionCenterActions,
   createVoiceProfileComparisonViewModel,
   createVoiceTraceTimelineViewModel,
   mountVoiceOpsActionHistory,
+  renderVoiceProfileSwitchRecommendationHTML,
 } from "@absolutejs/voice/client";
 import {
   FRAMEWORKS,
@@ -140,6 +142,23 @@ const profileComparisonModel = computed(() =>
     },
   ),
 );
+const profileSwitchRecommendation = createVoiceProfileSwitchRecommendationStore(
+  "/api/voice/profile-switch-recommendation",
+  {
+    intervalMs: 10_000,
+  },
+);
+const profileSwitchWidgetOptions = {
+  description:
+    "Vue compares latest session signals against measured profile evidence and recommends whether to switch stacks.",
+  title: "Profile Switch Recommendation",
+};
+const profileSwitchHTML = ref(
+  renderVoiceProfileSwitchRecommendationHTML(
+    profileSwitchRecommendation.getSnapshot(),
+    profileSwitchWidgetOptions,
+  ),
+);
 type CampaignDialerProofSnapshot = {
   error: string | null;
   isLoading: boolean;
@@ -221,6 +240,7 @@ let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
 let opsActionHistory: ReturnType<typeof mountVoiceOpsActionHistory> | null =
   null;
 let liveOpsPanel: ReturnType<typeof mountVoiceLiveOpsPanel> | null = null;
+let unsubscribeProfileSwitch = () => {};
 const currentVoice = computed(() =>
   activeMode.value === "general" ? generalVoice : guidedVoice,
 );
@@ -423,6 +443,13 @@ const runCallControl = (
 };
 
 onMounted(() => {
+  unsubscribeProfileSwitch = profileSwitchRecommendation.subscribe(() => {
+    profileSwitchHTML.value = renderVoiceProfileSwitchRecommendationHTML(
+      profileSwitchRecommendation.getSnapshot(),
+      profileSwitchWidgetOptions,
+    );
+  });
+  void profileSwitchRecommendation.refresh().catch(() => {});
   if (bargeInProofEl.value) {
     bargeInProof = mountDemoBargeInProof(bargeInProofEl.value);
   }
@@ -482,6 +509,8 @@ onUnmounted(() => {
   bargeInProof?.close();
   opsActionHistory?.close();
   liveOpsPanel?.close();
+  unsubscribeProfileSwitch();
+  profileSwitchRecommendation.close();
   stopMic();
 });
 </script>
@@ -716,6 +745,11 @@ onUnmounted(() => {
             }}
           </p>
         </section>
+
+        <div
+          class="voice-card voice-provider-health-card"
+          v-html="profileSwitchHTML"
+        ></div>
 
         <VoiceReadinessFailures
           class="voice-card voice-provider-health-card"
