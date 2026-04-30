@@ -39,6 +39,7 @@ import {
   createVoiceObservabilityExportRoutes,
   createVoiceObservabilityExportReplayRoutes,
   createVoiceCompetitiveCoverageRoutes,
+  buildVoiceRealtimeChannelRuntimeSamplesFromTrace,
   createVoiceRealtimeChannelRoutes,
   createVoicePlatformCoverageRoutes,
   createVoicePostCallAnalysisRoutes,
@@ -1470,6 +1471,12 @@ const openAIRealtime = openAIApiKey
       voice: process.env.OPENAI_REALTIME_VOICE ?? "marin",
     })
   : undefined;
+const realtimeChannelFormat = {
+  channels: 1,
+  container: "raw",
+  encoding: "pcm_s16le",
+  sampleRateHz: 24_000,
+} as const;
 const publicBaseUrl = process.env.VOICE_DEMO_PUBLIC_BASE_URL;
 const carrierReadinessMode =
   process.env.VOICE_DEMO_CARRIER_READINESS === "production"
@@ -5664,6 +5671,165 @@ const appendProofTrace = async (event: VoiceTraceEvent) => {
   await deliveryTraceStore.append(event);
 };
 
+const seedDemoRealtimeChannelProof = async () => {
+  const session = createProofSession({
+    assistantText:
+      "Realtime channel proof is using raw PCM browser audio with OpenAI Realtime.",
+    disposition: "completed",
+    reason: "realtime-channel-proof",
+    scenarioId: "realtime-channel-proof",
+    sessionId: "proof-realtime-channel",
+    turns: ["Prove the realtime channel is ready."],
+  });
+  const turn = session.turns[0];
+  const committedAt = turn?.committedAt ?? Date.now();
+  const turnId = turn?.id ?? "proof-realtime-channel:turn:0";
+
+  await runtimeStorage.session.set(session.id, session);
+  await appendProofTrace({
+    at: committedAt - 240,
+    metadata: { proof: "realtime-channel", realtime: true },
+    payload: { type: "start" },
+    scenarioId: "realtime-channel-proof",
+    sessionId: session.id,
+    type: "call.lifecycle",
+  });
+  await appendProofTrace({
+    at: committedAt - 120,
+    metadata: { proof: "realtime-channel", realtime: true },
+    payload: {
+      confidence: 0.98,
+      isFinal: true,
+      text: turn?.text ?? "Prove the realtime channel is ready.",
+      vendor: "openai-realtime",
+    },
+    scenarioId: "realtime-channel-proof",
+    sessionId: session.id,
+    turnId,
+    type: "turn.transcript",
+  });
+  await appendProofTrace({
+    at: committedAt,
+    metadata: { proof: "realtime-channel", realtime: true },
+    payload: {
+      fallbackUsed: false,
+      reason: "vendor",
+      source: "primary",
+      text: turn?.text ?? "Prove the realtime channel is ready.",
+      transcriptCount: 1,
+    },
+    scenarioId: "realtime-channel-proof",
+    sessionId: session.id,
+    turnId,
+    type: "turn.committed",
+  });
+  for (const [stage, offset] of [
+    ["turn_committed", 0],
+    ["assistant_text_started", 160],
+    ["tts_send_started", 190],
+    ["tts_send_completed", 360],
+    ["assistant_audio_received", 420],
+  ] as const) {
+    await appendProofTrace({
+      at: committedAt + offset,
+      metadata: { proof: "realtime-channel", realtime: true },
+      payload: { stage },
+      scenarioId: "realtime-channel-proof",
+      sessionId: session.id,
+      turnId,
+      type: "turn_latency.stage",
+    });
+  }
+  await appendProofTrace({
+    at: committedAt + 180,
+    metadata: { proof: "realtime-channel", realtime: true },
+    payload: {
+      realtimeConfigured: true,
+      text: turn?.assistantText,
+      ttsConfigured: false,
+    },
+    scenarioId: "realtime-channel-proof",
+    sessionId: session.id,
+    turnId,
+    type: "turn.assistant",
+  });
+  await appendProofTrace({
+    at: committedAt + 360,
+    metadata: { proof: "realtime-channel", realtime: true },
+    payload: {
+      elapsedMs: 170,
+      mode: "realtime",
+      status: "sent",
+    },
+    scenarioId: "realtime-channel-proof",
+    sessionId: session.id,
+    turnId,
+    type: "turn.assistant",
+  });
+  await appendProofTrace({
+    at: committedAt + 620,
+    metadata: { proof: "realtime-channel", realtime: true },
+    payload: { status: "resumed" },
+    scenarioId: "realtime-channel-proof",
+    sessionId: session.id,
+    turnId,
+    type: "client.reconnect",
+  });
+
+  return { ok: true, sessionId: session.id, turnId };
+};
+
+const buildDemoRealtimeChannelReportOptions = async () => {
+  const events = await runtimeStorage.traces.list({ limit: 500 });
+  const runtimeSamples = buildVoiceRealtimeChannelRuntimeSamplesFromTrace(
+    events.filter(
+      (event) =>
+        event.metadata?.realtime === true ||
+        event.metadata?.proof === "realtime-channel" ||
+        event.sessionId === "proof-realtime-channel",
+    ),
+    {
+      format: realtimeChannelFormat,
+      source: "persisted-trace-store",
+    },
+  );
+
+  return {
+    browserCapture: {
+      audioContextSampleRateHz: 48_000,
+      channelCount: 1 as const,
+      processorBufferSize: 4096,
+      sampleRateHz: 24_000,
+    },
+    inputFormat: realtimeChannelFormat,
+    maxFirstAudioLatencyMs: 800,
+    minAssistantAudioSamples: 1,
+    minInputAudioSamples: 1,
+    operationsRecordHref: "/voice-operations/demo-incident-bundle",
+    outputFormat: realtimeChannelFormat,
+    provider: "openai-realtime",
+    readinessHref: "/production-readiness",
+    runtimeSamples:
+      runtimeSamples.length > 0
+        ? runtimeSamples
+        : [
+            {
+              format: realtimeChannelFormat,
+              kind: "input-audio" as const,
+              ok: true,
+              source: "configured-fallback",
+            },
+            {
+              format: realtimeChannelFormat,
+              kind: "assistant-audio" as const,
+              latencyMs: 420,
+              ok: true,
+              source: "configured-fallback",
+            },
+          ],
+  };
+};
+
 type ProofCallDisposition = Exclude<
   NonNullable<VoiceSessionRecord["call"]>["disposition"],
   undefined
@@ -8380,13 +8546,9 @@ const server = new Elysia()
           phraseHints: () => VOICE_DEMO_PHRASE_HINTS,
           preset: "reliability",
           realtime: openAIRealtime,
-          realtimeInputFormat: {
-            channels: 1,
-            container: "raw",
-            encoding: "pcm_s16le",
-            sampleRateHz: 24_000,
-          },
+          realtimeInputFormat: realtimeChannelFormat,
           session: runtimeStorage.session,
+          trace: deliveryTraceStore,
           liveOps: liveOpsRuntime,
         })
       : new Elysia(),
@@ -9280,68 +9442,14 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
       source: readLatestVapiCoverageSummary,
     }),
   )
+  .post("/api/voice/realtime-channel/proof", async () =>
+    seedDemoRealtimeChannelProof(),
+  )
   .use(
     createVoiceRealtimeChannelRoutes({
-      browserCapture: {
-        audioContextSampleRateHz: 48_000,
-        channelCount: 1,
-        processorBufferSize: 4096,
-        sampleRateHz: 24_000,
-      },
-      inputFormat: {
-        channels: 1,
-        container: "raw",
-        encoding: "pcm_s16le",
-        sampleRateHz: 24_000,
-      },
-      maxFirstAudioLatencyMs: 800,
-      minAssistantAudioSamples: 1,
-      minInputAudioSamples: 1,
       name: "absolutejs-voice-example-realtime-channel",
-      operationsRecordHref: "/voice-operations/demo-incident-bundle",
-      outputFormat: {
-        channels: 1,
-        container: "raw",
-        encoding: "pcm_s16le",
-        sampleRateHz: 24_000,
-      },
       provider: "openai-realtime",
-      readinessHref: "/production-readiness",
-      runtimeSamples: [
-        {
-          format: {
-            channels: 1,
-            container: "raw",
-            encoding: "pcm_s16le",
-            sampleRateHz: 24_000,
-          },
-          kind: "input-audio",
-          ok: true,
-          source: "browser",
-        },
-        {
-          format: {
-            channels: 1,
-            container: "raw",
-            encoding: "pcm_s16le",
-            sampleRateHz: 24_000,
-          },
-          kind: "assistant-audio",
-          latencyMs: 420,
-          ok: true,
-          source: "openai-realtime",
-        },
-        {
-          kind: "turn-commit",
-          ok: true,
-          source: "absolutejs-runtime",
-        },
-        {
-          kind: "reconnect",
-          ok: true,
-          source: "absolutejs-runtime",
-        },
-      ],
+      source: buildDemoRealtimeChannelReportOptions,
       title: "AbsoluteJS Voice Realtime Channel Proof",
     }),
   )

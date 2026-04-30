@@ -178,6 +178,12 @@ const seedTargets: ProofTarget[] = [
   {
     kind: "json",
     method: "POST",
+    name: "realtimeChannelProof",
+    path: "/api/voice/realtime-channel/proof",
+  },
+  {
+    kind: "json",
+    method: "POST",
     name: "observabilityExportDeliverySeed",
     path: "/api/voice/observability-export/deliveries",
   },
@@ -506,6 +512,7 @@ const proofTargets: ProofTarget[] = [
       "AbsoluteJS Voice Realtime Channel Proof",
       "Realtime / duplex readiness",
       "openai-realtime",
+      "persisted-trace-store",
     ],
   },
   {
