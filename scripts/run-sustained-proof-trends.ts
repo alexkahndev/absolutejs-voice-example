@@ -78,6 +78,9 @@ const waitTimeoutMs = Number(process.env.VOICE_TREND_SERVER_WAIT_MS ?? 30_000);
 const pollMs = Number(process.env.VOICE_TREND_SERVER_POLL_MS ?? 500);
 const outputRoot =
   process.env.VOICE_TREND_OUTPUT_DIR ?? ".voice-runtime/proof-trends";
+const realCallProfileRoot =
+  process.env.VOICE_REAL_CALL_PROFILE_OUTPUT_DIR ??
+  ".voice-runtime/real-call-profiles";
 const runId = new Date().toISOString().replaceAll(":", "-");
 const outputDir = join(outputRoot, runId);
 const profileHistoryMaxAgeMs = 10 * 365 * 24 * 60 * 60 * 1000;
@@ -517,11 +520,18 @@ ${profileRows}
 
 const readHistoricalProofTrendReports = async (): Promise<VoiceProofTrendReport[]> => {
   const entries = await readdir(outputRoot, { withFileTypes: true }).catch(() => []);
+  const realCallProfileEntries = await readdir(realCallProfileRoot, {
+    withFileTypes: true,
+  }).catch(() => []);
   const paths = [
     join(outputRoot, "latest.json"),
     ...entries
       .filter((entry) => entry.isDirectory())
       .map((entry) => join(outputRoot, entry.name, "proof-trends.json")),
+    join(realCallProfileRoot, "latest.json"),
+    ...realCallProfileEntries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => join(realCallProfileRoot, entry.name, "real-call-profiles.json")),
   ];
   const seen = new Set<string>();
   const reports: VoiceProofTrendReport[] = [];
