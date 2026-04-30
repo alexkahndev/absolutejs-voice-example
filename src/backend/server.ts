@@ -73,6 +73,7 @@ import {
   createVoiceTelephonyMediaRoutes,
   buildVoiceTelephonyMediaReport,
   getLatestVoiceBrowserMediaReport,
+  getLatestVoiceTelephonyMediaReport,
   buildVoiceProviderOrchestrationReport,
   createVoiceProviderOrchestrationProfile,
   createVoiceProviderOrchestrationRoutes,
@@ -7696,7 +7697,10 @@ const productionReadinessOptions = () => ({
     })) ?? buildDemoBrowserMediaReport(),
   mediaPipeline: async () =>
     buildVoiceMediaPipelineReport(await buildDemoMediaPipelineReportOptions()),
-  telephonyMedia: () => buildVoiceTelephonyMediaReport(),
+  telephonyMedia: async () =>
+    (await getLatestVoiceTelephonyMediaReport({
+      store: runtimeStorage.traces,
+    })) ?? buildVoiceTelephonyMediaReport(),
   providerStack: evaluateVoiceProviderStackGaps({
     capabilities: voiceProviderStackCapabilities,
     profile: "phone-agent",
@@ -9202,6 +9206,7 @@ const server = new Elysia()
   )
   .use(
     createVoiceTelephonyMediaRoutes({
+      store: runtimeStorage.traces,
       title: "AbsoluteJS Voice Telephony Media Proof",
     }),
   )

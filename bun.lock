@@ -7,11 +7,11 @@
       "dependencies": {
         "@absolutejs/absolute": "0.19.0-beta.739",
         "@absolutejs/media": "0.0.1-beta.7",
-        "@absolutejs/voice": "0.0.22-beta.326",
-        "@absolutejs/voice-assemblyai": "0.0.19-beta.103",
-        "@absolutejs/voice-deepgram": "0.0.20-beta.73",
-        "@absolutejs/voice-gemini": "0.0.1-beta.20",
-        "@absolutejs/voice-openai": "0.0.7-beta.20",
+        "@absolutejs/voice": "0.0.22-beta.327",
+        "@absolutejs/voice-assemblyai": "0.0.19-beta.104",
+        "@absolutejs/voice-deepgram": "0.0.20-beta.74",
+        "@absolutejs/voice-gemini": "0.0.1-beta.21",
+        "@absolutejs/voice-openai": "0.0.7-beta.21",
         "@angular/common": "^21.0.0",
         "@angular/compiler": "^21.0.0",
         "@angular/compiler-cli": "^21.0.0",
@@ -67,15 +67,15 @@
 
     "@absolutejs/native-windows-x64": ["@absolutejs/native-windows-x64@0.19.0-beta.704", "", { "os": "win32", "cpu": "x64" }, "sha512-oR9EhvIFSZCjmS8kaNf1CoK7CYqiwzYIvTxjwV6Jf7B0bTsyqFDD737r2A17A8AtyJOpUiQ94EjiJl9itkq51A=="],
 
-    "@absolutejs/voice": ["@absolutejs/voice@0.0.22-beta.326", "", { "dependencies": { "@absolutejs/media": "0.0.1-beta.7" }, "peerDependencies": { "@absolutejs/absolute": ">=0.19.0-beta.646", "@angular/core": ">=21.0.0", "elysia": ">=1.4.18", "react": ">=19.0.0", "vue": ">=3.5.0" }, "optionalPeers": ["@angular/core", "react", "vue"] }, "sha512-FzOQZz+Z+3793kG7fQnmTV+wv7N0AS6UUns7EBBn58S5QOaywSZgxJAZ0xTTnGqsksBf0MENuyYaaJPx1APfGA=="],
+    "@absolutejs/voice": ["@absolutejs/voice@0.0.22-beta.327", "", { "dependencies": { "@absolutejs/media": "0.0.1-beta.7" }, "peerDependencies": { "@absolutejs/absolute": ">=0.19.0-beta.646", "@angular/core": ">=21.0.0", "elysia": ">=1.4.18", "react": ">=19.0.0", "vue": ">=3.5.0" }, "optionalPeers": ["@angular/core", "react", "vue"] }, "sha512-9DwtP4HcDakWnheJEvtcVXs6uttNd3koAE1fVgH0tRvdmqrmSTdpWscsUmmIIpgDj4xxevEtSa5tui8PuHZmwg=="],
 
-    "@absolutejs/voice-assemblyai": ["@absolutejs/voice-assemblyai@0.0.19-beta.103", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.326" } }, "sha512-xPn87bzJIXPVqzLCPNl4jPWZEX56EJMnpUkMIm24xNBJS1MFfAVajNiZxE5L0/G/xyPG+zdDMi5zChkTlHczgA=="],
+    "@absolutejs/voice-assemblyai": ["@absolutejs/voice-assemblyai@0.0.19-beta.104", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.327" } }, "sha512-jkiZEVwqshj4wI52fpMZYYO35o2Yju8pV/M8dBgmeasUx21dSJ7b0T9M3fklWR65C61VuzCSbAYOokgd2puU1g=="],
 
-    "@absolutejs/voice-deepgram": ["@absolutejs/voice-deepgram@0.0.20-beta.73", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.326" } }, "sha512-dhBub3rhlSu5j9IqhSZVYm1P6/yK8gOFrXqQ1+ENAAu24d4pASKwFAb5aLU6cjNqQLHeWxMykgwYFpHZcWLHcQ=="],
+    "@absolutejs/voice-deepgram": ["@absolutejs/voice-deepgram@0.0.20-beta.74", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.327" } }, "sha512-3WxoJWXaDVT7SpfLb+4HTlA3eN2rJmeHeDAUPteQbgn9NrKlLnXtd4YVwiBO2fxnBtFucEuDBU1sMWtVO5fkLw=="],
 
-    "@absolutejs/voice-gemini": ["@absolutejs/voice-gemini@0.0.1-beta.20", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.326" } }, "sha512-luVeYdmzeUlEIUI+GIDdeZG8+zbTzZHn/eohzOVJZ4Ux4+ZyPgLE3p7Utz1/zPGFM+i2p5Ezf/3JLpd2E9kIXQ=="],
+    "@absolutejs/voice-gemini": ["@absolutejs/voice-gemini@0.0.1-beta.21", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.327" } }, "sha512-IZbzW+nfoMw2vJT4Be51Qo1iW53tqRDJnX8Qxvf97h0YaxS86bKDa5tDjnvmYZGmEgG2epRKJA7Zs0nrkmBSfg=="],
 
-    "@absolutejs/voice-openai": ["@absolutejs/voice-openai@0.0.7-beta.20", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.326" } }, "sha512-VpBLY/k3iw2FwvLM4gVYYyOgwZZM7j0eWpZorUPOm6zsP5XmvWhuRXtQ+SjJzvMcD70AvBAZly9um+oSVStLlQ=="],
+    "@absolutejs/voice-openai": ["@absolutejs/voice-openai@0.0.7-beta.21", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.327" } }, "sha512-vFwyl4cAwTl5bKPDgWm435Dtv6t2PKN+otBe9qOVDV5xFFkjgUu/8Qn7vFLQsVtXQfnZTPCgZkF/W7vKfVv1Wg=="],
 
     "@angular/common": ["@angular/common@21.2.9", "", { "dependencies": { "tslib": "^2.3.0" }, "peerDependencies": { "@angular/core": "21.2.9", "rxjs": "^6.5.3 || ^7.4.0" } }, "sha512-7spQcF3hPN/fjTx6Pwa32KRRdO0NcixnRuPV4lo50ejtXesjiLVR+fkaX38sawAyGoq89IuuYvUDrbLwCMypmQ=="],
 
