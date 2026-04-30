@@ -71,6 +71,7 @@ import {
   createVoiceProviderHealthRoutes,
   createVoiceBrowserMediaRoutes,
   createVoiceTelephonyMediaRoutes,
+  buildVoiceTelephonyMediaReport,
   getLatestVoiceBrowserMediaReport,
   buildVoiceProviderOrchestrationReport,
   createVoiceProviderOrchestrationProfile,
@@ -7695,6 +7696,7 @@ const productionReadinessOptions = () => ({
     })) ?? buildDemoBrowserMediaReport(),
   mediaPipeline: async () =>
     buildVoiceMediaPipelineReport(await buildDemoMediaPipelineReportOptions()),
+  telephonyMedia: () => buildVoiceTelephonyMediaReport(),
   providerStack: evaluateVoiceProviderStackGaps({
     capabilities: voiceProviderStackCapabilities,
     profile: "phone-agent",
@@ -7802,6 +7804,13 @@ const productionReadinessOptions = () => ({
         href: "/voice/browser-media",
         source: "webrtc-stats",
         sourceLabel: "Browser WebRTC stats proof",
+      },
+      telephonyMedia: {
+        detail:
+          "Generated from carrier media payload serializers and checks Twilio, Telnyx, and Plivo packet parsing into MediaFrame plus outbound envelope serialization.",
+        href: "/voice/telephony-media",
+        source: "carrier-media-serializers",
+        sourceLabel: "Telephony media serializer proof",
       },
       telephonyWebhookSecurity: {
         detail:
