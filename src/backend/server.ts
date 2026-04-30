@@ -51,10 +51,12 @@ import {
   createVoiceProofTrendRoutes,
   createVoiceFileObservabilityExportDeliveryReceiptStore,
   buildVoiceCompetitiveCoverageReport,
+  buildVoiceFailureReplay,
   buildVoicePlatformCoverageSummary,
   buildVoiceOpsRecoveryReport,
   buildVoiceObservabilityExport,
   buildVoiceObservabilityExportReplayReport,
+  buildVoiceOperationsRecord,
   buildVoiceProductionReadinessGate,
   buildVoiceProductionReadinessReport,
   buildEmptyVoiceProofTrendReport,
@@ -132,6 +134,8 @@ import {
   recommendVoiceProviderStack,
   recommendVoiceReadinessProfile,
   renderVoiceProviderContractMatrixHTML,
+  renderVoiceFailureReplayMarkdown,
+  renderVoiceOperationsRecordHTML,
   resolveVoiceTelephonyOutcome,
   signVoiceTwilioWebhook,
   signVoicePlivoWebhook,
@@ -8586,6 +8590,84 @@ const liveOpsRuntime = {
   getControl: (sessionId: string) => liveOpsSessionControls.get(sessionId),
 };
 
+const buildDemoOperationsRecord = (sessionId: string) =>
+  buildVoiceOperationsRecord({
+    audit: runtimeStorage.audit,
+    redact: voiceSupportArtifactRedaction,
+    sessionId,
+    store: deliveryTraceStore,
+  });
+
+const renderFailureReplayHTML = (
+  report: ReturnType<typeof buildVoiceFailureReplay>,
+) => {
+  const providerRows =
+    report.providers.steps
+      .map(
+        (step) => `<li>
+          <strong>${escapeHtml(step.provider ?? step.selectedProvider ?? "provider")}</strong>
+          <span>${escapeHtml(step.status ?? "unknown")} ${step.fallbackProvider ? `via ${escapeHtml(step.fallbackProvider)}` : ""}</span>
+          <small>${escapeHtml(step.reason ?? "No reason recorded.")}</small>
+        </li>`,
+      )
+      .join("") || "<li>No provider recovery steps recorded.</li>";
+  const mediaRows =
+    report.media.steps
+      .map(
+        (step) => `<li>
+          <strong>${escapeHtml(step.carrier ?? "carrier")} ${escapeHtml(step.event)}</strong>
+          <span>${escapeHtml(step.direction ?? "lifecycle")} · ${String(step.audioBytes)} bytes</span>
+          ${step.issue ? `<small>${escapeHtml(step.issue)}</small>` : ""}
+        </li>`,
+      )
+      .join("") || "<li>No carrier media steps recorded.</li>";
+  const heardRows =
+    report.summary.userHeard
+      .map((text) => `<li>${escapeHtml(text)}</li>`)
+      .join("") || "<li>No assistant output recorded.</li>";
+  const issueRows =
+    report.summary.issues
+      .map((issue) => `<li>${escapeHtml(issue)}</li>`)
+      .join("") || "<li>No failure or recovery issues recorded.</li>";
+
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Voice Failure Replay</title><style>body{background:#0f1417;color:#f8f4e8;font-family:ui-sans-serif,system-ui,sans-serif;margin:0}main{margin:auto;max-width:1080px;padding:32px}.eyebrow{color:#fbbf24;font-size:.78rem;font-weight:900;letter-spacing:.14em;text-transform:uppercase}h1{font-size:clamp(2.2rem,6vw,4.4rem);letter-spacing:-.06em;line-height:.9;margin:.2rem 0 1rem}.status{border:1px solid #475569;border-radius:999px;display:inline-flex;padding:8px 12px}.healthy,.recovered{color:#86efac}.degraded{color:#fbbf24}.failed{color:#fca5a5}.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));margin:20px 0}section,.card{background:#182025;border:1px solid #2d3a43;border-radius:20px;padding:16px}.card span,small{color:#a9b4bd}.card strong{display:block;font-size:2rem}ul{display:grid;gap:10px;list-style:none;padding:0}li{background:#10171b;border:1px solid #2d3a43;border-radius:14px;padding:12px}li span,li small{display:block;margin-top:4px}.actions{display:flex;flex-wrap:wrap;gap:10px}.actions a{background:#fbbf24;border-radius:999px;color:#111827;font-weight:900;padding:10px 14px;text-decoration:none}</style></head><body><main><p class="eyebrow">Failure replay</p><h1>What failed, recovered, and reached the user</h1><p class="status ${escapeHtml(report.status)}">${escapeHtml(report.status)}</p><p>Session <code>${escapeHtml(report.sessionId)}</code></p><div class="actions"><a href="${escapeHtml(report.operationsRecordHref ?? `/voice-operations/${encodeURIComponent(report.sessionId)}`)}">Open operations record</a><a href="/voice-operations/${encodeURIComponent(report.sessionId)}/failure-replay.md">Markdown replay</a></div><div class="grid"><div class="card"><span>Provider fallbacks</span><strong>${String(report.providers.fallbacks)}</strong></div><div class="card"><span>Provider degraded</span><strong>${String(report.providers.degraded)}</strong></div><div class="card"><span>Media steps</span><strong>${String(report.media.total)}</strong></div><div class="card"><span>User heard</span><strong>${String(report.summary.userHeard.length)}</strong></div></div><section><h2>What Failed Or Recovered</h2><ul>${issueRows}</ul></section><section><h2>Provider Path</h2><ul>${providerRows}</ul></section><section><h2>Media Path</h2><ul>${mediaRows}</ul></section><section><h2>What The User Heard</h2><ul>${heardRows}</ul></section></main></body></html>`;
+};
+
+const failureReplayRoutes = new Elysia()
+  .get("/api/voice-operations/:sessionId/failure-replay", async ({ params }) => {
+    const sessionId = params.sessionId ?? demoIncidentSessionId;
+    const record = await buildDemoOperationsRecord(sessionId);
+    return buildVoiceFailureReplay(record, {
+      operationsRecordHref: `/voice-operations/${encodeURIComponent(sessionId)}`,
+    });
+  })
+  .get("/voice-operations/:sessionId/failure-replay.md", async ({ params }) => {
+    const sessionId = params.sessionId ?? demoIncidentSessionId;
+    const record = await buildDemoOperationsRecord(sessionId);
+    const replay = buildVoiceFailureReplay(record, {
+      operationsRecordHref: `/voice-operations/${encodeURIComponent(sessionId)}`,
+    });
+
+    return new Response(renderVoiceFailureReplayMarkdown(replay), {
+      headers: {
+        "content-type": "text/markdown; charset=utf-8",
+      },
+    });
+  })
+  .get("/voice-operations/:sessionId/failure-replay", async ({ params }) => {
+    const sessionId = params.sessionId ?? demoIncidentSessionId;
+    const record = await buildDemoOperationsRecord(sessionId);
+    const replay = buildVoiceFailureReplay(record, {
+      operationsRecordHref: `/voice-operations/${encodeURIComponent(sessionId)}`,
+    });
+
+    return new Response(renderFailureReplayHTML(replay), {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+      },
+    });
+  }) as unknown as Elysia;
+
 const createDemoAssistant = (
   provider: VoiceModelProvider,
   model: VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake>,
@@ -9096,12 +9178,24 @@ const server = new Elysia()
       store: deliveryTraceStore,
     }),
   )
+  .use(failureReplayRoutes)
   .use(
     createVoiceOperationsRecordRoutes({
       audit: runtimeStorage.audit,
       htmlPath: "/voice-operations/:sessionId",
       path: "/api/voice-operations/:sessionId",
       redact: voiceSupportArtifactRedaction,
+      render: (record) => {
+        const failureReplayHref = `/voice-operations/${encodeURIComponent(record.sessionId)}/failure-replay`;
+        const failureReplayLink = `<a href="${escapeHtml(failureReplayHref)}">Failure replay</a>`;
+        return renderVoiceOperationsRecordHTML(record, {
+          incidentHref: `/voice-operations/${encodeURIComponent(record.sessionId)}/incident.md`,
+          title: "AbsoluteJS Voice Operations Record",
+        }).replace(
+          '<a href="#incident-handoff">Incident handoff</a>',
+          `<a href="#incident-handoff">Incident handoff</a>${failureReplayLink}`,
+        );
+      },
       store: deliveryTraceStore,
       title: "AbsoluteJS Voice Operations Record",
     }) as unknown as Elysia,

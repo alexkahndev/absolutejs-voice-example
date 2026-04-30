@@ -30,12 +30,14 @@ import {
   evaluateVoiceMediaPipelineEvidence,
   evaluateVoiceLiveOpsControlEvidence,
   evaluateVoiceLiveOpsEvidence,
+  buildVoiceFailureReplay,
   buildVoicePlatformCoverageSummary,
   type VoiceCompetitiveCoverageReport,
   type VoiceAgentSquadContractReport,
   type VoiceCampaignDialerProofReport,
   type VoiceCampaignReadinessProofReport,
   type VoiceDataControlReport,
+  type VoiceFailureReplayReport,
   type VoiceObservabilityExportDeliveryHistory,
   type VoiceObservabilityExportReplayReport,
   type VoiceOperationsRecord,
@@ -413,6 +415,39 @@ const proofTargets: ProofTarget[] = [
     path: "/api/voice-operations/demo-incident-bundle",
   },
   {
+    allowLogicalFail: true,
+    kind: "json",
+    name: "failureReplay",
+    path: "/api/voice-operations/demo-incident-bundle/failure-replay",
+  },
+  {
+    accept: "text/html,text/plain,*/*",
+    kind: "text",
+    name: "failureReplayPage",
+    path: "/voice-operations/demo-incident-bundle/failure-replay",
+    requiredText: [
+      "Failure replay",
+      "What failed, recovered, and reached the user",
+      "Provider Path",
+      "Media Path",
+      "What The User Heard",
+    ],
+  },
+  {
+    accept: "text/markdown,text/plain,*/*",
+    kind: "text",
+    name: "failureReplayMarkdown",
+    path: "/voice-operations/demo-incident-bundle/failure-replay.md",
+    requiredText: [
+      "Voice Failure Replay: demo-incident-bundle",
+      "## What Failed Or Recovered",
+      "## Provider Path",
+      "## Media Path",
+      "## What The User Heard",
+      "degraded to deterministic",
+    ],
+  },
+  {
     accept: "text/html,text/plain,*/*",
     kind: "text",
     name: "operationsRecordPage",
@@ -424,6 +459,7 @@ const proofTargets: ProofTarget[] = [
       "assistant-output",
       "tool-input",
       "operations-record-guardrail-seed",
+      "Failure replay",
     ],
   },
   {
@@ -1588,6 +1624,7 @@ const renderMarkdown = (input: {
   proofTrendEvidenceAssertion: JsonAssertionResult;
   providerContractMatrixEvidenceAssertion: JsonAssertionResult;
   providerDecisionEvidenceAssertion: JsonAssertionResult;
+  failureReplayEvidenceAssertion: JsonAssertionResult;
   operationsRecordProviderDecisionEvidenceAssertion: JsonAssertionResult;
   providerOrchestrationEvidenceAssertion: JsonAssertionResult;
   mediaPipelineCalibrationAssertion: JsonAssertionResult;
@@ -1660,6 +1697,8 @@ Media pipeline calibration assertion: **${input.mediaPipelineCalibrationAssertio
 Realtime provider contract assertion: **${input.realtimeProviderContractEvidenceAssertion.ok ? "pass" : "fail"}**.
 
 Provider decision evidence assertion: **${input.providerDecisionEvidenceAssertion.ok ? "pass" : "fail"}**.
+
+Failure replay evidence assertion: **${input.failureReplayEvidenceAssertion.ok ? "pass" : "fail"}**.
 
 
 Operations-record provider decision assertion: **${input.operationsRecordProviderDecisionEvidenceAssertion.ok ? "pass" : "fail"}**.
@@ -1805,6 +1844,52 @@ const operationsRecordProviderDecisionEvidenceAssertion: JsonAssertionResult = {
     ],
     summary: operationRecordProviderRecoveryReport,
     total: operationRecordProviderDecisions.length,
+  },
+};
+const fetchedFailureReplay = proofResults.find(
+  (result) => result.name === "failureReplay",
+)?.body as VoiceFailureReplayReport | undefined;
+const builtFailureReplay = operationsRecord
+  ? buildVoiceFailureReplay(operationsRecord, {
+      operationsRecordHref: "/voice-operations/demo-incident-bundle",
+    })
+  : undefined;
+const failureReplay = fetchedFailureReplay ?? builtFailureReplay;
+const failureReplayIssues = [
+  !failureReplay ? "Missing failure replay proof result body." : undefined,
+  failureReplay && failureReplay.status !== "degraded"
+    ? `Expected failure replay status degraded, got ${failureReplay.status}.`
+    : undefined,
+  failureReplay && failureReplay.providers.fallbacks < 1
+    ? "Expected at least one provider fallback in failure replay."
+    : undefined,
+  failureReplay && failureReplay.providers.degraded < 1
+    ? "Expected at least one provider degradation in failure replay."
+    : undefined,
+  failureReplay &&
+  !failureReplay.providers.steps.some(
+    (step) =>
+      step.status === "degraded" &&
+      (step.fallbackProvider === "deterministic" ||
+        step.selectedProvider === "deterministic"),
+  )
+    ? "Missing deterministic degradation step in failure replay."
+    : undefined,
+  failureReplay && failureReplay.summary.userHeard.length < 1
+    ? "Missing user-heard assistant output in failure replay."
+    : undefined,
+].filter((issue): issue is string => typeof issue === "string");
+const failureReplayEvidenceAssertion: JsonAssertionResult = {
+  kind: "json-assertion",
+  name: "failureReplayEvidence",
+  ok: failureReplayIssues.length === 0,
+  summary: {
+    issues: failureReplayIssues,
+    media: failureReplay?.media,
+    ok: failureReplay?.ok,
+    providers: failureReplay?.providers,
+    status: failureReplay?.status,
+    userHeard: failureReplay?.summary.userHeard,
   },
 };
 const guardrailEvidenceReport = operationsRecord
@@ -2909,6 +2994,7 @@ const ok =
   providerSloEvidenceAssertion.ok &&
   providerOrchestrationEvidenceAssertion.ok &&
   providerDecisionEvidenceAssertion.ok &&
+  failureReplayEvidenceAssertion.ok &&
   operationsRecordProviderDecisionEvidenceAssertion.ok &&
   productionReadinessEvidenceAssertion.ok &&
   campaignReadinessEvidenceAssertion.ok &&
@@ -2946,6 +3032,7 @@ const summary = {
   competitiveCoverageAssertion,
   dataControlEvidenceAssertion,
   generatedAt,
+  failureReplayEvidenceAssertion,
   guardrailEvidenceAssertion,
   liveOpsControlEvidenceAssertion,
   liveOpsEvidenceAssertion,
@@ -2990,6 +3077,7 @@ const markdown = renderMarkdown({
   competitiveCoverageAssertion,
   dataControlEvidenceAssertion,
   generatedAt,
+  failureReplayEvidenceAssertion,
   guardrailEvidenceAssertion,
   liveOpsControlEvidenceAssertion,
   liveOpsEvidenceAssertion,
