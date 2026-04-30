@@ -8445,11 +8445,45 @@ const getProfileSwitchRecommendation = async () => {
   });
 };
 
+const demoVoiceProfileIds = [
+  "meeting-recorder",
+  "support-agent",
+  "appointment-scheduler",
+  "noisy-phone-call",
+] as const;
+
+const readQueryNumber = (
+  query: Record<PropertyKey, unknown> | undefined,
+  keys: readonly string[],
+  fallback: number,
+) => {
+  const value = Number(readQueryString(query, keys) ?? fallback);
+  return Number.isFinite(value) ? value : fallback;
+};
+
+const readQueryList = (
+  query: Record<PropertyKey, unknown> | undefined,
+  keys: readonly string[],
+) =>
+  readQueryString(query, keys)
+    ?.split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+
+const readProfileSwitchGuardMode = (
+  query: Record<PropertyKey, unknown> | undefined,
+) => {
+  const mode = readQueryString(query, ["profileSwitchMode", "mode"]);
+  return mode === "off" || mode === "recommend" || mode === "auto"
+    ? mode
+    : "auto";
+};
+
 const runProfileSwitchGuard = async (
   query: Record<string, string | undefined>,
 ) => {
   const { defaults, decision, observed } = await getProfileSwitchInputs();
-  const minConfidence = Number(query.minConfidence ?? 0.75);
+  const minConfidence = readQueryNumber(query, ["minConfidence"], 0.75);
 
   return await applyVoiceProfileSwitchGuard({
     actor: {
@@ -8457,14 +8491,26 @@ const runProfileSwitchGuard = async (
       kind: "system",
       name: "AbsoluteJS Voice Example",
     },
+    allowedProfileIds:
+      readQueryList(query, ["allowedProfiles", "allowedProfileIds"]) ??
+      [...demoVoiceProfileIds],
     audit: runtimeStorage.audit,
+    blockedProfileIds: readQueryList(query, [
+      "blockedProfiles",
+      "blockedProfileIds",
+    ]),
     defaults,
+    maxAutoSwitchesPerSession: readQueryNumber(
+      query,
+      ["maxAutoSwitchesPerSession", "maxProfileSwitches"],
+      1,
+    ),
     metadata: {
       endpoint: "/api/voice/profile-switch-guard",
       selectedBy: "demo-user",
     },
-    minConfidence: Number.isFinite(minConfidence) ? minConfidence : 0.75,
-    mode: query.mode === "auto" ? "auto" : "recommend",
+    minConfidence,
+    mode: readProfileSwitchGuardMode(query),
     observed,
     sessionId: decision?.sessionId,
   });
@@ -8476,6 +8522,12 @@ const createDemoProfileSwitchGuard = (endpoint: string) => ({
     kind: "system" as const,
     name: "AbsoluteJS Voice Example",
   },
+  allowedProfileIds: [...demoVoiceProfileIds],
+  blockedProfileIds: ({ context }: { context: unknown }) =>
+    readQueryList(queryFromContext(context), [
+      "blockedProfiles",
+      "blockedProfileIds",
+    ]),
   audit: runtimeStorage.audit,
   currentProfileId: ({ context }: { context: unknown }) =>
     resolveVoiceProfileIdFromContext(context),
@@ -8486,16 +8538,20 @@ const createDemoProfileSwitchGuard = (endpoint: string) => ({
     selectedBy: "session-start",
   }),
   minConfidence: ({ context }: { context: unknown }) => {
-    const value = Number(
-      readQueryString(queryFromContext(context), ["minProfileConfidence"]),
+    return readQueryNumber(
+      queryFromContext(context),
+      ["minProfileConfidence"],
+      0.75,
     );
-    return Number.isFinite(value) ? value : 0.75;
   },
+  maxAutoSwitchesPerSession: ({ context }: { context: unknown }) =>
+    readQueryNumber(
+      queryFromContext(context),
+      ["maxAutoSwitchesPerSession", "maxProfileSwitches"],
+      1,
+    ),
   mode: ({ context }: { context: unknown }) =>
-    readQueryString(queryFromContext(context), ["profileSwitchMode"]) ===
-    "recommend"
-      ? ("recommend" as const)
-      : ("auto" as const),
+    readProfileSwitchGuardMode(queryFromContext(context)),
   observed: async ({ context }: { context: unknown }) => {
     const quality = await getRecentTurnQualitySignals();
     return {
