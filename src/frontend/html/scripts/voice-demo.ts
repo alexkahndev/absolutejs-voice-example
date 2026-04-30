@@ -37,6 +37,7 @@ import {
   getVoiceModeLabel,
   getVoiceModePrompt,
   getVoiceProfileLabel,
+  getVoiceProfileSwitchGuardDecision,
   getVoiceProviderLabel,
   getVoiceRoutingLabel,
   getVoiceRoutePath,
@@ -45,6 +46,8 @@ import {
   getInitialVoiceProfileId,
   getInitialVoiceRoutingMode,
   getInitialVoiceSpeechEngine,
+  formatVoiceProfileSwitchGuardLabel,
+  formatVoiceProfileSwitchGuardSummary,
   rememberVoiceModelProvider,
   rememberVoiceProfileId,
   rememberVoiceRoutingMode,
@@ -101,6 +104,12 @@ const callControlRoot = document.querySelector("#call-control-actions");
 const callLifecycleStatus = document.querySelector("#status-call-lifecycle");
 const reconnectStatus = document.querySelector("#status-reconnect");
 const voiceStatus = document.querySelector("#status-voice");
+const profileSwitchGuardMetric = document.querySelector(
+  "#metric-profile-switch-guard",
+);
+const profileSwitchGuardSummary = document.querySelector(
+  "#metric-profile-switch-guard-summary",
+);
 const voiceMonitor = document.querySelector("#voice-monitor");
 const voiceMonitorCopy = document.querySelector("#voice-monitor-copy");
 const voiceWaveGlow = document.querySelector("#voice-wave-glow");
@@ -180,6 +189,8 @@ if (
   !(turnQualityHost instanceof HTMLElement) ||
   !(routingModeMetric instanceof HTMLElement) ||
   !(routingModeSelect instanceof HTMLSelectElement) ||
+  !(profileSwitchGuardMetric instanceof HTMLElement) ||
+  !(profileSwitchGuardSummary instanceof HTMLElement) ||
   !(voiceStatus instanceof HTMLElement)
 ) {
   throw new Error("Voice demo page is missing expected elements.");
@@ -573,6 +584,14 @@ const render = () => {
     : (voice.call?.events.at(-1)?.type ?? "Not started");
   modelProviderMetric.textContent = getVoiceProviderLabel(modelProvider);
   routingModeMetric.textContent = getVoiceRoutingLabel(routingMode);
+  const profileSwitchGuardDecision = getVoiceProfileSwitchGuardDecision(
+    voice.sessionMetadata,
+  );
+  profileSwitchGuardMetric.textContent = formatVoiceProfileSwitchGuardLabel(
+    profileSwitchGuardDecision,
+  );
+  profileSwitchGuardSummary.textContent =
+    formatVoiceProfileSwitchGuardSummary(profileSwitchGuardDecision);
   routingModeCopy.textContent = `${getVoiceProfileLabel(profileId)} uses ${
     VOICE_PROFILES.find((item) => item.id === profileId)?.description ??
     "the selected real-call defaults."

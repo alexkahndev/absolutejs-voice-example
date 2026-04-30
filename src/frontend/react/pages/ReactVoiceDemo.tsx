@@ -48,10 +48,13 @@ import {
   getVoiceModeLabel,
   getVoiceModePrompt,
   getVoiceProfileLabel,
+  getVoiceProfileSwitchGuardDecision,
   getVoiceProviderLabel,
   getVoiceRoutingLabel,
   getVoiceRoutePath,
   getVoiceSpeechEngineSampleRate,
+  formatVoiceProfileSwitchGuardLabel,
+  formatVoiceProfileSwitchGuardSummary,
   rememberVoiceModelProvider,
   rememberVoiceProfileId,
   rememberVoiceRoutingMode,
@@ -116,6 +119,7 @@ const EMPTY_VOICE: ReactVoiceDemoStream = {
   },
   scenarioId: null as string | null,
   sendAudio: (_audio: Uint8Array | ArrayBuffer) => {},
+  sessionMetadata: null,
   sessionId: "",
   status: "idle" as const,
   turns: [] as VoiceTurnRecord<SavedIntake>[],
@@ -191,6 +195,9 @@ export const ReactVoiceDemo = ({
     ),
   );
   const currentVoice = activeMode === "general" ? generalVoice : guidedVoice;
+  const profileSwitchGuardDecision = getVoiceProfileSwitchGuardDecision(
+    currentVoice.sessionMetadata,
+  );
   useEffect(() => {
     bargeInRef.current?.syncAssistantOutput();
     liveLatencyRef.current?.syncAssistantOutput();
@@ -508,6 +515,19 @@ export const ReactVoiceDemo = ({
                     <span className="voice-metric-label">Routing</span>
                     <span className="voice-metric-value">
                       {getVoiceRoutingLabel(routingMode)}
+                    </span>
+                  </div>
+                  <div className="voice-metric">
+                    <span className="voice-metric-label">Guarded profile</span>
+                    <span className="voice-metric-value">
+                      {formatVoiceProfileSwitchGuardLabel(
+                        profileSwitchGuardDecision,
+                      )}
+                    </span>
+                    <span className="voice-metric-label">
+                      {formatVoiceProfileSwitchGuardSummary(
+                        profileSwitchGuardDecision,
+                      )}
                     </span>
                   </div>
                 </div>

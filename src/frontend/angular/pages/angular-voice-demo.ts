@@ -37,10 +37,13 @@ import {
   getVoiceModeLabel,
   getVoiceModePrompt,
   getVoiceProfileLabel,
+  getVoiceProfileSwitchGuardDecision,
   getVoiceProviderLabel,
   getVoiceRoutingLabel,
   getVoiceRoutePath,
   getVoiceSpeechEngineSampleRate,
+  formatVoiceProfileSwitchGuardLabel,
+  formatVoiceProfileSwitchGuardSummary,
   rememberVoiceModelProvider,
   rememberVoiceProfileId,
   rememberVoiceRoutingMode,
@@ -183,6 +186,19 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
                   <span class="voice-metric-label">Routing</span>
                   <span class="voice-metric-value">{{
                     getVoiceRoutingLabel(routingMode())
+                  }}</span>
+                </div>
+                <div class="voice-metric">
+                  <span class="voice-metric-label">Guarded profile</span>
+                  <span class="voice-metric-value">{{
+                    formatVoiceProfileSwitchGuardLabel(
+                      profileSwitchGuardDecision()
+                    )
+                  }}</span>
+                  <span class="voice-metric-label">{{
+                    formatVoiceProfileSwitchGuardSummary(
+                      profileSwitchGuardDecision()
+                    )
                   }}</span>
                 </div>
               </div>
@@ -1357,6 +1373,9 @@ export class AngularVoiceDemoComponent {
   getVoiceProviderLabel = getVoiceProviderLabel;
   getVoiceProfileLabel = getVoiceProfileLabel;
   getVoiceRoutingLabel = getVoiceRoutingLabel;
+  formatVoiceProfileSwitchGuardLabel = formatVoiceProfileSwitchGuardLabel;
+  formatVoiceProfileSwitchGuardSummary =
+    formatVoiceProfileSwitchGuardSummary;
   getOpsStatusLabel = getOpsStatusLabel;
   hasStartedModes = signal<Record<VoiceDemoMode, boolean>>({
     general: false,
@@ -1520,6 +1539,11 @@ export class AngularVoiceDemoComponent {
   }
   currentVoice = computed(() =>
     this.activeMode() === "general" ? this.generalVoice : this.guidedVoice,
+  );
+  profileSwitchGuardDecision = computed(() =>
+    getVoiceProfileSwitchGuardDecision(
+      this.currentVoice().sessionMetadata(),
+    ),
   );
   waveLevels = signal(createInitialVoiceWaveLevels());
   currentPrompt = computed(() =>

@@ -37,10 +37,13 @@
     getVoiceModeLabel,
     getVoiceModePrompt,
     getVoiceProfileLabel,
+    getVoiceProfileSwitchGuardDecision,
     getVoiceProviderLabel,
     getVoiceRoutingLabel,
     getVoiceRoutePath,
     getVoiceSpeechEngineSampleRate,
+    formatVoiceProfileSwitchGuardLabel,
+    formatVoiceProfileSwitchGuardSummary,
     rememberVoiceModelProvider,
     rememberVoiceProfileId,
     rememberVoiceRoutingMode,
@@ -97,6 +100,7 @@
       status: "idle",
     },
     scenarioId: null,
+    sessionMetadata: null,
     sessionId: null,
     status: "idle",
     turns: [],
@@ -391,6 +395,9 @@
   );
   let wavePath = $derived(createVoiceWavePath(waveLevels));
   let errorMessage = $derived(error || currentVoice.error || "None");
+  let profileSwitchGuardDecision = $derived(
+    getVoiceProfileSwitchGuardDecision(currentVoice.sessionMetadata),
+  );
   let currentPrompt = $derived(
     getVoiceModePrompt({
       hasStarted:
@@ -877,6 +884,19 @@
               <span class="voice-metric-value"
                 >{getVoiceRoutingLabel(routingMode)}</span
               >
+            </div>
+            <div class="voice-metric">
+              <span class="voice-metric-label">Guarded profile</span>
+              <span class="voice-metric-value">
+                {formatVoiceProfileSwitchGuardLabel(
+                  profileSwitchGuardDecision,
+                )}
+              </span>
+              <span class="voice-metric-label">
+                {formatVoiceProfileSwitchGuardSummary(
+                  profileSwitchGuardDecision,
+                )}
+              </span>
             </div>
           </div>
         </div>

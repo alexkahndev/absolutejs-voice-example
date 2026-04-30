@@ -223,6 +223,36 @@ export const getVoiceRoutePath = (scenarioId, provider, routing, engine = "casca
 export const getVoiceProviderLabel = (provider) => VOICE_MODEL_PROVIDERS.find((item) => item.id === provider)?.label ?? provider;
 export const getVoiceRoutingLabel = (routing) => VOICE_ROUTING_MODES.find((item) => item.id === routing)?.label ?? routing ?? "Unknown";
 export const getVoiceProfileLabel = (profileId) => VOICE_PROFILES.find((item) => item.id === profileId)?.label ?? profileId ?? "Unknown";
+const isRecord = (value) => typeof value === "object" && value !== null;
+const readString = (record, key) => typeof record[key] === "string" ? record[key] : undefined;
+const readNumber = (record, key) => typeof record[key] === "number" && Number.isFinite(record[key]) ? record[key] : undefined;
+export const getVoiceProfileSwitchGuardDecision = (metadata) => {
+  if (!metadata || !isRecord(metadata.profileSwitchGuard)) {
+    return null;
+  }
+  const decision = metadata.profileSwitchGuard;
+  return {
+    action: readString(decision, "action"),
+    autoApplied: typeof decision.autoApplied === "boolean" ? decision.autoApplied : undefined,
+    confidence: readNumber(decision, "confidence"),
+    minConfidence: readNumber(decision, "minConfidence"),
+    mode: readString(decision, "mode"),
+    previousProfileId: readString(decision, "previousProfileId"),
+    recommendedProfileId: readString(decision, "recommendedProfileId"),
+    reason: readString(decision, "reason"),
+    selectedProfileId: readString(decision, "selectedProfileId")
+  };
+};
+export const formatVoiceProfileSwitchGuardLabel = (decision) => getVoiceProfileLabel(decision?.selectedProfileId);
+export const formatVoiceProfileSwitchGuardSummary = (decision) => {
+  if (!decision) {
+    return "Waiting for session guard";
+  }
+  const action = decision.action ?? "evaluated";
+  const confidence = typeof decision.confidence === "number" ? ` at ${Math.round(decision.confidence * 100)}%` : "";
+  const recommended = decision.recommendedProfileId && decision.recommendedProfileId !== decision.selectedProfileId ? `, recommended ${getVoiceProfileLabel(decision.recommendedProfileId)}` : "";
+  return `${action}${confidence}${recommended}`;
+};
 export const getVoiceSpeechEngineLabel = (engine) => VOICE_SPEECH_ENGINES.find((item) => item.id === engine)?.label ?? engine;
 export const getVoiceSpeechEngineSampleRate = (engine) => VOICE_SPEECH_ENGINES.find((item) => item.id === engine)?.sampleRateHz ?? 16000;
 export const getVoiceProviderStatusLabel = (status) => {

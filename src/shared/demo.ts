@@ -401,6 +401,84 @@ export const getVoiceProfileLabel = (profileId?: string) =>
   profileId ??
   "Unknown";
 
+export type VoiceProfileSwitchGuardClientDecision = {
+  action?: string;
+  autoApplied?: boolean;
+  confidence?: number;
+  minConfidence?: number;
+  mode?: string;
+  previousProfileId?: string;
+  recommendedProfileId?: string;
+  reason?: string;
+  selectedProfileId?: string;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const readString = (
+  record: Record<string, unknown>,
+  key: string,
+): string | undefined =>
+  typeof record[key] === "string" ? (record[key] as string) : undefined;
+
+const readNumber = (
+  record: Record<string, unknown>,
+  key: string,
+): number | undefined =>
+  typeof record[key] === "number" && Number.isFinite(record[key])
+    ? (record[key] as number)
+    : undefined;
+
+export const getVoiceProfileSwitchGuardDecision = (
+  metadata: Record<string, unknown> | null | undefined,
+): VoiceProfileSwitchGuardClientDecision | null => {
+  if (!metadata || !isRecord(metadata.profileSwitchGuard)) {
+    return null;
+  }
+
+  const decision = metadata.profileSwitchGuard;
+  return {
+    action: readString(decision, "action"),
+    autoApplied:
+      typeof decision.autoApplied === "boolean"
+        ? decision.autoApplied
+        : undefined,
+    confidence: readNumber(decision, "confidence"),
+    minConfidence: readNumber(decision, "minConfidence"),
+    mode: readString(decision, "mode"),
+    previousProfileId: readString(decision, "previousProfileId"),
+    recommendedProfileId: readString(decision, "recommendedProfileId"),
+    reason: readString(decision, "reason"),
+    selectedProfileId: readString(decision, "selectedProfileId"),
+  };
+};
+
+export const formatVoiceProfileSwitchGuardLabel = (
+  decision: VoiceProfileSwitchGuardClientDecision | null,
+) => getVoiceProfileLabel(decision?.selectedProfileId);
+
+export const formatVoiceProfileSwitchGuardSummary = (
+  decision: VoiceProfileSwitchGuardClientDecision | null,
+) => {
+  if (!decision) {
+    return "Waiting for session guard";
+  }
+
+  const action = decision.action ?? "evaluated";
+  const confidence =
+    typeof decision.confidence === "number"
+      ? ` at ${Math.round(decision.confidence * 100)}%`
+      : "";
+  const recommended =
+    decision.recommendedProfileId &&
+    decision.recommendedProfileId !== decision.selectedProfileId
+      ? `, recommended ${getVoiceProfileLabel(decision.recommendedProfileId)}`
+      : "";
+
+  return `${action}${confidence}${recommended}`;
+};
+
 export const getVoiceSpeechEngineLabel = (engine: VoiceSpeechEngine) =>
   VOICE_SPEECH_ENGINES.find((item) => item.id === engine)?.label ?? engine;
 

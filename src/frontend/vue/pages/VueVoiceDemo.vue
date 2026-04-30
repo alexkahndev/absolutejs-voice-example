@@ -33,10 +33,13 @@ import {
   getVoiceModeLabel,
   getVoiceModePrompt,
   getVoiceProfileLabel,
+  getVoiceProfileSwitchGuardDecision,
   getVoiceProviderLabel,
   getVoiceRoutingLabel,
   getVoiceRoutePath,
   getVoiceSpeechEngineSampleRate,
+  formatVoiceProfileSwitchGuardLabel,
+  formatVoiceProfileSwitchGuardSummary,
   rememberVoiceModelProvider,
   rememberVoiceProfileId,
   rememberVoiceRoutingMode,
@@ -267,6 +270,11 @@ liveLatencyHTML.value = renderDemoLiveTurnLatencyHTML(
 const wavePath = computed(() => createVoiceWavePath(waveLevels.value));
 const errorMessage = computed(
   () => micError.value || currentVoice.value.error.value || "None",
+);
+const profileSwitchGuardDecision = computed(() =>
+  getVoiceProfileSwitchGuardDecision(
+    currentVoice.value.sessionMetadata.value,
+  ),
 );
 const currentPrompt = computed(() =>
   getVoiceModePrompt({
@@ -588,6 +596,23 @@ onUnmounted(() => {
                 <span class="voice-metric-label">Routing</span>
                 <span class="voice-metric-value">
                   {{ getVoiceRoutingLabel(routingMode) }}
+                </span>
+              </div>
+              <div class="voice-metric">
+                <span class="voice-metric-label">Guarded profile</span>
+                <span class="voice-metric-value">
+                  {{
+                    formatVoiceProfileSwitchGuardLabel(
+                      profileSwitchGuardDecision,
+                    )
+                  }}
+                </span>
+                <span class="voice-metric-label">
+                  {{
+                    formatVoiceProfileSwitchGuardSummary(
+                      profileSwitchGuardDecision,
+                    )
+                  }}
                 </span>
               </div>
             </div>
