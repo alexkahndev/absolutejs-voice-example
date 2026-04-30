@@ -7438,6 +7438,9 @@ const productionReadinessLinks = {
   observabilityExportDeliveries: "/api/voice/observability-export/deliveries",
   proofTrends: "/voice/proof-trends",
   opsRecovery: "/ops-recovery",
+  profileSwitchLiveDecisions: "/voice/profile-switch-live-decisions",
+  profileSwitchPolicy: "/voice/profile-switch-policy",
+  profileSwitchReadiness: "/voice/profile-switch-readiness",
   providerContracts: "/provider-contracts",
   providerOrchestration: "/voice/provider-orchestration",
   providerRoutingContracts: "/api/provider-routing-contract",
@@ -7954,6 +7957,27 @@ const productionReadinessOptions = () => ({
   observabilityExport: buildDemoObservabilityExport,
   observabilityExportReplay: buildDemoObservabilityExportReplay,
   path: "/api/production-readiness",
+  profileSwitchReadiness: {
+    audit: runtimeStorage.audit,
+    autoMode: true,
+    limit: 50,
+    maxAutoAppliedRatio: 1,
+    policyProof: {
+      allowedProfileIds: [...demoVoiceProfileIds],
+      audit: runtimeStorage.audit,
+      defaults: () => readRealCallProfileDefaultsReport(),
+      metadata: {
+        source: "absolutejs-voice-example",
+      },
+      observed: {
+        currentProfileId: "meeting-recorder",
+        fallbackUsed: true,
+        providerP95Ms: 950,
+        turnWarnings: 3,
+      },
+    },
+    trace: deliveryTraceStore,
+  },
   browserMedia: async () =>
     (await getLatestVoiceBrowserMediaReport({
       store: runtimeStorage.traces,
