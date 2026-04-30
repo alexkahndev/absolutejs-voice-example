@@ -41,11 +41,8 @@ import {
   createVoiceCompetitiveCoverageRoutes,
   buildVoiceRealtimeChannelReport,
   buildVoiceRealtimeChannelRuntimeSamplesFromTrace,
-  buildVoiceMediaInterruptionReport,
-  buildVoiceMediaPipelineCalibrationReport,
-  buildVoiceMediaResamplingPlan,
-  buildVoiceMediaVadReport,
   createVoiceRealtimeChannelRoutes,
+  createVoiceMediaPipelineRoutes,
   createVoiceRealtimeProviderContractMatrixPreset,
   createVoiceRealtimeProviderContractRoutes,
   createVoicePlatformCoverageRoutes,
@@ -3970,6 +3967,8 @@ const competitiveCoverageSurfaces = [
       { href: "/voice/realtime-channel", kind: "proof", name: "realtimeChannelPage", status: "pass" },
       { href: "/voice/realtime-channel.md", kind: "proof", name: "realtimeChannelMarkdown", status: "pass" },
       { href: "/api/voice/media-pipeline-calibration", kind: "proof", name: "mediaPipelineCalibration", required: true, status: "pass" },
+      { href: "/voice/media-pipeline", kind: "proof", name: "mediaPipelinePage", status: "pass" },
+      { href: "/voice/media-pipeline.md", kind: "proof", name: "mediaPipelineMarkdown", status: "pass" },
       { href: "/api/voice/realtime-provider-contracts", kind: "proof", name: "realtimeProviderContracts", required: true, status: "pass" },
       { href: "/voice/realtime-provider-contracts", kind: "proof", name: "realtimeProviderContractsPage", status: "pass" },
       { href: "/provider-contracts", kind: "proof", name: "providerContracts", status: "pass" },
@@ -5881,7 +5880,7 @@ const buildDemoGeminiRealtimeChannelReport = async () =>
     provider: "gemini-live",
   });
 
-const buildDemoMediaPipelineReport = async () => {
+const buildDemoMediaPipelineReportOptions = async () => {
   const events = (
     await runtimeStorage.traces.list({ limit: 500 })
   ).filter(
@@ -5963,7 +5962,7 @@ const buildDemoMediaPipelineReport = async () => {
     })
     .filter((frame): frame is VoiceMediaFrame => frame !== undefined);
 
-  const calibration = buildVoiceMediaPipelineCalibrationReport({
+  return {
     expectedInputFormat: realtimeChannelFormat,
     expectedOutputFormat: realtimeChannelFormat,
     frames,
@@ -5975,39 +5974,9 @@ const buildDemoMediaPipelineReport = async () => {
     requireInterruptionFrame: true,
     requireTraceEvidence: true,
     surface: "direct-realtime-media-pipeline",
-  });
-  const vad = buildVoiceMediaVadReport({
-    frames,
     maxSilenceFrames: 1,
     minSpeechFrames: 1,
-  });
-  const interruption = buildVoiceMediaInterruptionReport({
-    frames,
     maxInterruptionLatencyMs: 250,
-  });
-  const resampling = buildVoiceMediaResamplingPlan({
-    inputFormat: realtimeChannelFormat,
-    outputFormat: realtimeChannelFormat,
-  });
-  const status =
-    calibration.status === "fail" || interruption.status === "fail"
-      ? "fail"
-      : calibration.status === "warn" ||
-          vad.status === "warn" ||
-          interruption.status === "warn" ||
-          resampling.status === "warn"
-        ? "warn"
-        : "pass";
-
-  return {
-    calibration,
-    checkedAt: Date.now(),
-    frames: frames.length,
-    interruption,
-    ok: status === "pass",
-    resampling,
-    status,
-    vad,
   };
 };
 
@@ -9659,8 +9628,15 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
   .post("/api/voice/realtime-channel/proof", async () =>
     seedDemoRealtimeChannelProof(),
   )
-  .get("/api/voice/media-pipeline-calibration", async () =>
-    buildDemoMediaPipelineReport(),
+  .use(
+    createVoiceMediaPipelineRoutes({
+      htmlPath: "/voice/media-pipeline",
+      markdownPath: "/voice/media-pipeline.md",
+      name: "absolutejs-voice-example-media-pipeline",
+      path: "/api/voice/media-pipeline-calibration",
+      source: buildDemoMediaPipelineReportOptions,
+      title: "AbsoluteJS Voice Media Pipeline Proof",
+    }),
   )
   .use(
     createVoiceRealtimeChannelRoutes({

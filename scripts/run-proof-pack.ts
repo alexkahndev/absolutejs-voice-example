@@ -27,6 +27,7 @@ import {
   evaluateVoiceSimulationSuiteEvidence,
   evaluateVoiceTelephonyWebhookNormalizationEvidence,
   evaluateVoiceToolContractEvidence,
+  evaluateVoiceMediaPipelineEvidence,
   evaluateVoiceLiveOpsControlEvidence,
   evaluateVoiceLiveOpsEvidence,
   buildVoicePlatformCoverageSummary,
@@ -43,10 +44,7 @@ import {
   type VoiceOpsStatusReport,
   type VoiceLiveOpsActionResult,
   type VoiceLiveOpsControlState,
-  type VoiceMediaInterruptionReport,
-  type VoiceMediaPipelineCalibrationReport,
-  type VoiceMediaResamplingPlan,
-  type VoiceMediaVadReport,
+  type VoiceMediaPipelineReport,
   type VoiceOutcomeContractSuiteReport,
   type VoicePhoneAgentSetupReport,
   type VoicePhoneAgentProductionSmokeReport,
@@ -65,16 +63,6 @@ import {
   type VoiceTelephonyWebhookVerificationEvidenceAttempt,
   type VoiceToolContractSuiteReport,
 } from "@absolutejs/voice";
-
-type DemoMediaPipelineReport = {
-  calibration: VoiceMediaPipelineCalibrationReport;
-  frames: number;
-  interruption: VoiceMediaInterruptionReport;
-  ok: boolean;
-  resampling: VoiceMediaResamplingPlan;
-  status: "fail" | "pass" | "warn";
-  vad: VoiceMediaVadReport;
-};
 
 type ProofMethod = "GET" | "POST";
 
@@ -523,6 +511,30 @@ const proofTargets: ProofTarget[] = [
     kind: "json",
     name: "mediaPipelineCalibration",
     path: "/api/voice/media-pipeline-calibration",
+  },
+  {
+    accept: "text/html,text/plain,*/*",
+    kind: "text",
+    name: "mediaPipelinePage",
+    path: "/voice/media-pipeline",
+    requiredText: [
+      "AbsoluteJS Voice Media Pipeline Proof",
+      "Native media pipeline",
+      "VAD segments",
+      "Interruptions",
+    ],
+  },
+  {
+    accept: "text/markdown,text/plain,*/*",
+    kind: "text",
+    name: "mediaPipelineMarkdown",
+    path: "/voice/media-pipeline.md",
+    requiredText: [
+      "Voice Media Pipeline Proof",
+      "Status: pass",
+      "VAD segments",
+      "Interruption frames",
+    ],
   },
   {
     kind: "json",
@@ -2696,61 +2708,31 @@ const realtimeChannelEvidenceAssertion: JsonAssertionResult = realtimeChannel
     };
 const mediaPipelineCalibration = proofResults.find(
   (result) => result.name === "mediaPipelineCalibration",
-)?.body as DemoMediaPipelineReport | undefined;
-const mediaPipelineCalibrationIssues = mediaPipelineCalibration
-  ? [
-      ...(mediaPipelineCalibration.status === "pass"
-        ? []
-        : [`Expected pass status, found ${mediaPipelineCalibration.status}.`]),
-      ...(mediaPipelineCalibration.calibration.inputAudioFrames >= 1
-        ? []
-        : ["Expected at least one input audio frame."]),
-      ...(mediaPipelineCalibration.calibration.assistantAudioFrames >= 1
-        ? []
-        : ["Expected at least one assistant audio frame."]),
-      ...(mediaPipelineCalibration.calibration.turnCommitFrames >= 1
-        ? []
-        : ["Expected at least one turn commit frame."]),
-      ...(mediaPipelineCalibration.calibration.traceLinkedFrames >= 4
-        ? []
-        : ["Expected at least four trace-linked media frames."]),
-      ...(mediaPipelineCalibration.calibration.interruptionFrames >= 1
-        ? []
-        : ["Expected at least one interruption frame."]),
-      ...(mediaPipelineCalibration.vad.segments.length >= 1
-        ? []
-        : ["Expected at least one VAD speech segment."]),
-      ...(mediaPipelineCalibration.interruption.status === "pass"
-        ? []
-        : ["Expected interruption report to pass."]),
-      ...(mediaPipelineCalibration.resampling.required
-        ? ["Expected no required resampling for calibrated realtime format."]
-        : []),
-      ...(mediaPipelineCalibration.calibration.firstAudioLatencyMs !==
-        undefined &&
-      mediaPipelineCalibration.calibration.firstAudioLatencyMs <= 800
-        ? []
-        : ["Expected first assistant audio latency at or below 800ms."]),
-      ...mediaPipelineCalibration.calibration.issues
-        .filter((issue) => issue.severity === "error")
-        .map((issue) => issue.message),
-      ...mediaPipelineCalibration.interruption.issues
-        .filter((issue) => issue.severity === "error")
-        .map((issue) => issue.message),
-    ]
-  : ["Missing mediaPipelineCalibration proof result body."];
+)?.body as VoiceMediaPipelineReport | undefined;
+const mediaPipelineCalibrationEvidence = mediaPipelineCalibration
+  ? evaluateVoiceMediaPipelineEvidence(mediaPipelineCalibration, {
+      maxFirstAudioLatencyMs: 800,
+      maxInterruptionLatencyMs: 250,
+      minAssistantAudioFrames: 1,
+      minInputAudioFrames: 1,
+      minTraceLinkedFrames: 4,
+      minVadSegments: 1,
+      requireInterruptionFrame: true,
+      requirePass: true,
+      requireResamplingReady: true,
+    })
+  : undefined;
 const mediaPipelineCalibrationAssertion: JsonAssertionResult = {
   kind: "json-assertion",
   name: "mediaPipelineCalibration",
-  ok: mediaPipelineCalibrationIssues.length === 0,
+  ok: mediaPipelineCalibrationEvidence?.ok === true,
   summary: mediaPipelineCalibration
     ? {
         ...mediaPipelineCalibration,
-        ok: mediaPipelineCalibrationIssues.length === 0,
-        proofIssues: mediaPipelineCalibrationIssues,
+        proofIssues: mediaPipelineCalibrationEvidence?.issues ?? [],
       }
     : {
-        issues: mediaPipelineCalibrationIssues,
+        issues: ["Missing mediaPipelineCalibration proof result body."],
       },
 };
 const realtimeProviderContracts = proofResults.find(
