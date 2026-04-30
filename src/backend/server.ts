@@ -57,7 +57,7 @@ import {
   createVoiceProofTrendRoutes,
   createVoiceRealCallProfileHistoryRoutes,
   createVoiceRealCallProfileRecoveryActionRoutes,
-  createVoiceInMemoryRealCallProfileRecoveryJobStore,
+  createVoiceSQLiteRealCallProfileRecoveryJobStore,
   buildVoiceRealCallProfileHistoryReport,
   buildVoiceRealCallProfileReadinessCheck,
   loadVoiceRealCallProfileEvidenceFromTraceStore,
@@ -246,7 +246,7 @@ import { deepgram } from "@absolutejs/voice-deepgram";
 import { gemini } from "@absolutejs/voice-gemini";
 import { openai } from "@absolutejs/voice-openai";
 import { Elysia } from "elysia";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, statSync } from "node:fs";
 import { mkdir, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import {
@@ -3828,9 +3828,13 @@ const longProofWindowRoot = ".voice-runtime/long-proof-window";
 const latestBrowserCallProfilesJsonPath =
   ".voice-runtime/browser-call-profiles/latest.json";
 const realCallProfilesRoot = ".voice-runtime/real-call-profiles";
+const realCallProfileRecoveryJobsPath =
+  ".voice-runtime/real-call-recovery/jobs.sqlite";
+mkdirSync(dirname(realCallProfileRecoveryJobsPath), { recursive: true });
 const realCallProfileRecoveryJobStore =
-  createVoiceInMemoryRealCallProfileRecoveryJobStore({
+  createVoiceSQLiteRealCallProfileRecoveryJobStore({
     idPrefix: "voice-profile-recovery",
+    path: realCallProfileRecoveryJobsPath,
   });
 const latestProofTrendsJsonPath = ".voice-runtime/proof-trends/latest.json";
 const latestProofTrendsMarkdownPath = ".voice-runtime/proof-trends/latest.md";
