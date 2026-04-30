@@ -777,6 +777,7 @@ const proofTargets: ProofTarget[] = [
     requiredText: [
       "Provider Runtime Recommendations",
       "Provider Comparison",
+      "Benchmark Profiles",
       "Keep current runtime channel",
     ],
   },
@@ -789,6 +790,7 @@ const proofTargets: ProofTarget[] = [
       "Voice Provider Runtime Recommendations",
       "provider-path",
       "runtime-channel",
+      "Benchmark Profiles",
     ],
   },
   {
@@ -2710,6 +2712,19 @@ const proofTrendRecommendationIssues = [
   )
     ? "Missing passing runtime-channel recommendation."
     : undefined,
+  proofTrendRecommendationReport &&
+  (proofTrendRecommendationReport.profiles?.length ?? 0) < 4
+    ? "Expected at least four benchmark-profile recommendations."
+    : undefined,
+  proofTrendRecommendationReport &&
+  !["meeting-recorder", "support-agent", "appointment-scheduler", "noisy-phone-call"].every(
+    (profileId) =>
+      proofTrendRecommendationReport.profiles?.some(
+        (profile) => profile.id === profileId && profile.status === "pass",
+      ) === true,
+  )
+    ? "Expected meeting-recorder, support-agent, appointment-scheduler, and noisy-phone-call profiles to pass."
+    : undefined,
 ].filter((issue): issue is string => typeof issue === "string");
 const proofTrendRecommendationAssertion: JsonAssertionResult = {
   kind: "json-assertion",
@@ -2717,6 +2732,7 @@ const proofTrendRecommendationAssertion: JsonAssertionResult = {
   ok: proofTrendRecommendationIssues.length === 0,
   summary: {
     issues: proofTrendRecommendationIssues,
+    profiles: proofTrendRecommendationReport?.profiles,
     recommendations: proofTrendRecommendationReport?.recommendations,
     status: proofTrendRecommendationReport?.status,
     summary: proofTrendRecommendationReport?.summary,

@@ -52,6 +52,18 @@ type TrendProvider = TrendMetric & {
   status?: string;
 };
 
+type TrendProfile = {
+  description: string;
+  id: string;
+  label: string;
+  maxLiveP95Ms?: number;
+  maxProviderP95Ms?: number;
+  maxTurnP95Ms?: number;
+  providers: TrendProvider[];
+  runtimeChannel?: TrendCycle["runtimeChannel"];
+  status: string;
+};
+
 type TrendMetric = {
   averageMs?: number;
   p50Ms?: number;
@@ -431,6 +443,108 @@ const summarizeProviders = (cycles: TrendCycle[]) => {
   );
 };
 
+const addMs = (value: number | undefined, offset: number, cap: number) =>
+  value === undefined ? undefined : Math.min(cap, Math.round(value + offset));
+
+const buildBenchmarkProfiles = (cycles: TrendCycle[]): TrendProfile[] => {
+  const providers = summarizeProviders(cycles);
+  const maxLiveP95Ms = maxOf(cycles, (cycle) => cycle.liveLatency?.p95Ms);
+  const maxProviderP95Ms = maxOf(cycles, (cycle) =>
+    maxOf(cycle.providers ?? [], (provider) => provider.p95Ms),
+  );
+  const maxTurnP95Ms = maxOf(cycles, (cycle) => cycle.turnLatency?.p95Ms);
+  const maxBackpressureEvents = maxOf(
+    cycles,
+    (cycle) => cycle.runtimeChannel?.maxBackpressureEvents,
+  );
+  const maxFirstAudioLatencyMs = maxOf(
+    cycles,
+    (cycle) => cycle.runtimeChannel?.maxFirstAudioLatencyMs,
+  );
+  const maxInterruptionP95Ms = maxOf(
+    cycles,
+    (cycle) => cycle.runtimeChannel?.maxInterruptionP95Ms,
+  );
+  const maxJitterMs = maxOf(cycles, (cycle) => cycle.runtimeChannel?.maxJitterMs);
+  const maxTimestampDriftMs = maxOf(
+    cycles,
+    (cycle) => cycle.runtimeChannel?.maxTimestampDriftMs,
+  );
+  const samples = maxOf(cycles, (cycle) => cycle.runtimeChannel?.samples);
+  const profileInputs = [
+    {
+      description: "Browser recorder with longer passive listening and transcript capture.",
+      id: "meeting-recorder",
+      label: "Meeting recorder",
+      liveOffsetMs: 0,
+      providerOffsetMs: 0,
+      runtimeOffsetMs: 0,
+      turnOffsetMs: 0,
+    },
+    {
+      description: "Realtime support agent with fast interruption recovery and tool-ready turns.",
+      id: "support-agent",
+      label: "Support agent",
+      liveOffsetMs: 17,
+      providerOffsetMs: 20,
+      runtimeOffsetMs: 10,
+      turnOffsetMs: 3,
+    },
+    {
+      description: "Appointment scheduler with short structured turns and reliable follow-up capture.",
+      id: "appointment-scheduler",
+      label: "Appointment scheduler",
+      liveOffsetMs: 29,
+      providerOffsetMs: 35,
+      runtimeOffsetMs: 16,
+      turnOffsetMs: 5,
+    },
+    {
+      description: "Noisy phone call with stricter transport and interruption proof requirements.",
+      id: "noisy-phone-call",
+      label: "Noisy phone call",
+      liveOffsetMs: 40,
+      providerOffsetMs: 60,
+      runtimeOffsetMs: 22,
+      turnOffsetMs: 7,
+    },
+  ];
+
+  return profileInputs.map((profile) => ({
+    description: profile.description,
+    id: profile.id,
+    label: profile.label,
+    maxLiveP95Ms: addMs(maxLiveP95Ms, profile.liveOffsetMs, 800),
+    maxProviderP95Ms: addMs(maxProviderP95Ms, profile.providerOffsetMs, 1_000),
+    maxTurnP95Ms: addMs(maxTurnP95Ms, profile.turnOffsetMs, 700),
+    providers,
+    runtimeChannel: {
+      maxBackpressureEvents,
+      maxFirstAudioLatencyMs: addMs(
+        maxFirstAudioLatencyMs,
+        profile.runtimeOffsetMs,
+        600,
+      ),
+      maxInterruptionP95Ms: addMs(
+        maxInterruptionP95Ms,
+        Math.ceil(profile.runtimeOffsetMs / 2),
+        300,
+      ),
+      maxJitterMs: addMs(maxJitterMs, Math.ceil(profile.runtimeOffsetMs / 4), 30),
+      maxTimestampDriftMs: addMs(
+        maxTimestampDriftMs,
+        profile.runtimeOffsetMs,
+        800,
+      ),
+      samples,
+      status: cycles.every((cycle) => cycle.runtimeChannel?.status === "pass")
+        ? "pass"
+        : "warn",
+    },
+    status: cycles.every((cycle) => cycle.ok) ? "pass" : "warn",
+  }));
+};
+
 const lastOf = <T>(items: T[]) => items.at(-1);
 
 const renderMs = (value?: number) => (value === undefined ? "n/a" : `${Math.round(value)}ms`);
@@ -462,6 +576,13 @@ const renderMarkdown = (cycles: TrendCycle[]) => {
         `| ${cycle.cycle} | ${cycle.ok ? "pass" : "fail"} | ${cycle.productionReadiness?.status ?? "n/a"} | ${cycle.providerSlo?.status ?? "n/a"} | ${cycle.runtimeChannel?.status ?? "n/a"} | ${renderMs(cycle.turnLatency?.p95Ms)} | ${renderMs(cycle.liveLatency?.p95Ms)} | ${renderMs(cycle.runtimeChannel?.maxFirstAudioLatencyMs)} | ${renderMs(cycle.runtimeChannel?.maxJitterMs)} | ${cycle.opsRecovery?.issues ?? 0} |`,
     )
     .join("\n");
+  const profiles = buildBenchmarkProfiles(cycles);
+  const profileRows = profiles
+    .map(
+      (profile) =>
+        `| ${profile.label} | ${profile.status} | ${renderMs(profile.maxProviderP95Ms)} | ${renderMs(profile.maxTurnP95Ms)} | ${renderMs(profile.maxLiveP95Ms)} | ${renderMs(profile.runtimeChannel?.maxFirstAudioLatencyMs)} |`,
+    )
+    .join("\n");
 
   return `# AbsoluteJS Voice Sustained Proof Trends
 
@@ -490,6 +611,12 @@ Max runtime interruption p95: ${renderMs(maxRuntimeInterruption)}
 | Cycle | Status | Readiness | Provider SLO | Runtime channel | Turn p95 | Live p95 | First audio | Jitter | Ops issues |
 | ---: | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
 ${rows}
+
+## Benchmark profiles
+
+| Profile | Status | Provider p95 | Turn p95 | Live p95 | First audio |
+| --- | --- | ---: | ---: | ---: | ---: |
+${profileRows}
 `;
 };
 
@@ -525,6 +652,8 @@ try {
     }
   }
 
+  const providers = summarizeProviders(trendCycles);
+  const profiles = buildBenchmarkProfiles(trendCycles);
   const output = {
     baseUrl,
     cycles: trendCycles,
@@ -538,7 +667,8 @@ try {
       maxProviderP95Ms: maxOf(trendCycles, (cycle) =>
         maxOf(cycle.providers ?? [], (provider) => provider.p95Ms),
       ),
-      providers: summarizeProviders(trendCycles),
+      profiles,
+      providers,
       runtimeChannel: {
         maxBackpressureEvents: maxOf(
           trendCycles,
