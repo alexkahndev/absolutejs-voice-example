@@ -98,6 +98,7 @@ import {
   createVoiceQualityRoutes,
   createVoiceResilienceRoutes,
   createVoiceRoutingDecisionSummary,
+  applyVoiceProfileSwitchGuard,
   recommendVoiceProfileSwitch,
   summarizeVoiceTurnQuality,
   createVoiceSTTProviderRouter,
@@ -8389,7 +8390,7 @@ const getLatestRoutingDecision = async () => {
   };
 };
 
-const getProfileSwitchRecommendation = async () => {
+const getProfileSwitchInputs = async () => {
   const [defaults, decision, turnQuality] = await Promise.all([
     readRealCallProfileDefaultsReport(),
     getLatestRoutingDecision(),
@@ -8408,8 +8409,9 @@ const getProfileSwitchRecommendation = async () => {
         ]
       : undefined;
 
-  return recommendVoiceProfileSwitch({
+  return {
     defaults,
+    decision,
     observed: {
       currentProfileId: decision?.profileId ?? "meeting-recorder",
       fallbackUsed: Boolean(decision?.fallbackProvider),
@@ -8417,6 +8419,40 @@ const getProfileSwitchRecommendation = async () => {
       turnP95Ms,
       turnWarnings: turnQuality.warnings,
     },
+  };
+};
+
+const getProfileSwitchRecommendation = async () => {
+  const { defaults, observed } = await getProfileSwitchInputs();
+
+  return recommendVoiceProfileSwitch({
+    defaults,
+    observed,
+  });
+};
+
+const runProfileSwitchGuard = async (
+  query: Record<string, string | undefined>,
+) => {
+  const { defaults, decision, observed } = await getProfileSwitchInputs();
+  const minConfidence = Number(query.minConfidence ?? 0.75);
+
+  return await applyVoiceProfileSwitchGuard({
+    actor: {
+      id: "absolutejs-voice-example",
+      kind: "system",
+      name: "AbsoluteJS Voice Example",
+    },
+    audit: runtimeStorage.audit,
+    defaults,
+    metadata: {
+      endpoint: "/api/voice/profile-switch-guard",
+      selectedBy: "demo-user",
+    },
+    minConfidence: Number.isFinite(minConfidence) ? minConfidence : 0.75,
+    mode: query.mode === "auto" ? "auto" : "recommend",
+    observed,
+    sessionId: decision?.sessionId,
   });
 };
 
@@ -10129,6 +10165,9 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
   .get(
     "/api/voice/profile-switch-recommendation",
     async () => await getProfileSwitchRecommendation(),
+  )
+  .post("/api/voice/profile-switch-guard", async ({ query }) =>
+    await runProfileSwitchGuard(query),
   )
   .get("/api/assistant-config", () => assistantConfig)
   .get("/api/assistant-summary", async () => summarizeAssistantRuns())
