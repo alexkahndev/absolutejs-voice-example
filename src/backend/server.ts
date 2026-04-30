@@ -72,9 +72,6 @@ import {
   createVoiceProviderOrchestrationProfile,
   createVoiceProviderOrchestrationRoutes,
   createVoiceProviderDecisionTraceEvent,
-  createVoiceMediaFrame,
-  createVoiceMediaProcessorGraph,
-  createVoiceMediaTransport,
   createVoiceProviderDecisionTraceRoutes,
   createVoiceProviderSloRoutes,
   createVoiceSloCalibrationRoutes,
@@ -195,7 +192,6 @@ import {
   type VoiceCompetitiveSurface,
   type VoicePostCallAnalysisOptions,
   type VoiceGuardrailDecision,
-  type VoiceMediaFrame,
   type VoiceProofTrendCycle,
   type VoiceProofTrendReport,
   type VoiceSloCalibrationSample,
@@ -205,6 +201,12 @@ import {
   voiceGuardrailPolicyPresets,
   voiceTelephonyOutcomeToRouteResult,
 } from "@absolutejs/voice";
+import {
+  createMediaFrame,
+  createMediaProcessorGraph,
+  createMediaTransport,
+  type MediaFrame,
+} from "@absolutejs/media";
 import { assemblyai } from "@absolutejs/voice-assemblyai";
 import { deepgram } from "@absolutejs/voice-deepgram";
 import { gemini } from "@absolutejs/voice-gemini";
@@ -5892,7 +5894,7 @@ const buildDemoMediaPipelineReportOptions = async () => {
       event.sessionId === "proof-realtime-channel",
   );
   const frames = events
-    .map((event): VoiceMediaFrame | undefined => {
+    .map((event): MediaFrame | undefined => {
       const traceEventId = `${event.type}:${String(event.at)}:${event.turnId ?? event.sessionId ?? "session"}`;
       const base = {
         at: event.at,
@@ -5902,15 +5904,15 @@ const buildDemoMediaPipelineReportOptions = async () => {
         sessionId: event.sessionId,
         traceEventId,
         turnId: event.turnId,
-      } satisfies Partial<VoiceMediaFrame>;
+      } satisfies Partial<MediaFrame>;
 
       if (event.type === "turn.transcript") {
-        return createVoiceMediaFrame({
+        return createMediaFrame({
           ...base,
           kind: "input-audio",
           metadata: { ...base.metadata, speechProbability: 0.92 },
           source: "browser",
-        } as VoiceMediaFrame);
+        } as MediaFrame);
       }
 
       if (
@@ -5920,33 +5922,33 @@ const buildDemoMediaPipelineReportOptions = async () => {
         "stage" in event.payload &&
         event.payload.stage === "assistant_audio_received"
       ) {
-        return createVoiceMediaFrame({
+        return createMediaFrame({
           ...base,
           kind: "assistant-audio",
           latencyMs: 420,
           metadata: { ...base.metadata, jitterMs: 12 },
           source: "provider",
-        } as VoiceMediaFrame);
+        } as MediaFrame);
       }
 
       if (event.type === "turn.committed") {
-        return createVoiceMediaFrame({
+        return createMediaFrame({
           ...base,
           kind: "turn-commit",
           source: "voice-runtime",
-        } as VoiceMediaFrame);
+        } as MediaFrame);
       }
 
       if (event.type === "client.reconnect") {
-        return createVoiceMediaFrame({
+        return createMediaFrame({
           ...base,
           kind: "metadata",
           source: "voice-runtime",
-        } as VoiceMediaFrame);
+        } as MediaFrame);
       }
 
       if (event.type === "client.barge_in") {
-        return createVoiceMediaFrame({
+        return createMediaFrame({
           ...base,
           kind: "interruption",
           latencyMs:
@@ -5957,13 +5959,13 @@ const buildDemoMediaPipelineReportOptions = async () => {
               ? event.payload.latencyMs
               : undefined,
           source: "voice-runtime",
-        } as VoiceMediaFrame);
+        } as MediaFrame);
       }
 
       return undefined;
     })
-    .filter((frame): frame is VoiceMediaFrame => frame !== undefined);
-  const transport = createVoiceMediaTransport({
+    .filter((frame): frame is MediaFrame => frame !== undefined);
+  const transport = createMediaTransport({
     inputFormat: realtimeChannelFormat,
     maxBufferedFrames: Math.max(frames.length + 1, 1),
     name: "absolutejs-browser-realtime-transport",
@@ -5979,7 +5981,7 @@ const buildDemoMediaPipelineReportOptions = async () => {
       await transport.send(frame);
     }
   }
-  const processorGraph = createVoiceMediaProcessorGraph({
+  const processorGraph = createMediaProcessorGraph({
     name: "absolutejs-realtime-media-graph",
     nodes: [
       {
@@ -5998,7 +6000,7 @@ const buildDemoMediaPipelineReportOptions = async () => {
           frame.kind === "input-audio"
             ? [
                 frame,
-                createVoiceMediaFrame({
+                createMediaFrame({
                   ...frame,
                   id: `${frame.id}:transcript-alignment`,
                   kind: "transcript",
