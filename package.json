@@ -20,6 +20,7 @@
     "smoke:live-guardrails": "bun run ./scripts/run-live-guardrails-proof.ts",
     "smoke:live-ops-runtime": "bun run ./scripts/run-live-ops-runtime-proof.ts",
     "smoke:reconnect-ui": "bun run ./scripts/run-reconnect-ui-smoke.ts",
+    "smoke:telephony:media-ops": "bun run ./scripts/run-telephony-media-operations-smoke.ts",
     "smoke:telephony:tts": "bun run ./scripts/run-telephony-tts-smoke.ts",
     "simulate:provider-failure": "bun run ./scripts/run-provider-failure-simulation.ts",
     "start": "absolute start",

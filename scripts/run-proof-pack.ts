@@ -935,6 +935,11 @@ const commandProofTargets: CommandProofTarget[] = [
     kind: "command",
     name: "liveGuardrailsRuntime",
   },
+  {
+    command: ["bun", "run", "smoke:telephony:media-ops"],
+    kind: "command",
+    name: "telephonyMediaOperationsSmoke",
+  },
 ];
 
 const summarizeValue = (value: unknown): unknown => {
@@ -963,6 +968,9 @@ const summarizeValue = (value: unknown): unknown => {
     "campaigns",
     "recipients",
     "attempts",
+    "telephonyMedia",
+    "operationsRecordHref",
+    "sentEvents",
     "tasks",
     "reviews",
     "events",
