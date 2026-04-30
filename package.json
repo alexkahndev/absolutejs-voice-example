@@ -30,6 +30,7 @@
     "@absolutejs/voice": "0.0.22-beta.305",
     "@absolutejs/voice-assemblyai": "0.0.19-beta.84",
     "@absolutejs/voice-deepgram": "0.0.20-beta.54",
+    "@absolutejs/voice-gemini": "0.0.1-beta.1",
     "@angular/common": "^21.0.0",
     "@angular/compiler": "^21.0.0",
     "@angular/compiler-cli": "^21.0.0",

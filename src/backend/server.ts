@@ -204,6 +204,7 @@ import {
 } from "@absolutejs/voice";
 import { assemblyai } from "@absolutejs/voice-assemblyai";
 import { deepgram } from "@absolutejs/voice-deepgram";
+import { gemini } from "@absolutejs/voice-gemini";
 import { Elysia } from "elysia";
 import { existsSync, statSync } from "node:fs";
 import { mkdir, readdir } from "node:fs/promises";
@@ -1466,6 +1467,17 @@ const assemblyAIApiKey = process.env.ASSEMBLYAI_API_KEY;
 const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
 const geminiApiKey = process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
 const openAIApiKey = process.env.OPENAI_API_KEY;
+const geminiRealtime = geminiApiKey
+  ? gemini({
+      apiKey: geminiApiKey,
+      instructions:
+        "Speak like a concise product demo assistant for AbsoluteJS Voice. Keep replies short, natural, and useful.",
+      model:
+        process.env.GEMINI_REALTIME_MODEL ??
+        "gemini-2.5-flash-native-audio-preview-12-2025",
+      voiceName: process.env.GEMINI_REALTIME_VOICE ?? "Puck",
+    })
+  : undefined;
 const openAIRealtime = openAIApiKey
   ? createOpenAIRealtimeAdapter({
       apiKey: openAIApiKey,
@@ -5839,6 +5851,13 @@ const buildDemoRealtimeChannelReportOptions = async () => {
 const buildDemoRealtimeChannelReport = async () =>
   buildVoiceRealtimeChannelReport(await buildDemoRealtimeChannelReportOptions());
 
+const buildDemoGeminiRealtimeChannelReport = async () =>
+  buildVoiceRealtimeChannelReport({
+    ...(await buildDemoRealtimeChannelReportOptions()),
+    maxFirstAudioLatencyMs: 900,
+    provider: "gemini-live",
+  });
+
 const buildDemoRealtimeProviderContractMatrixInput =
   async (): Promise<VoiceRealtimeProviderContractMatrixInput> => ({
   contracts: [
@@ -5872,16 +5891,21 @@ const buildDemoRealtimeProviderContractMatrixInput =
         "turn-commit",
         "first-audio-latency",
         "trace-evidence",
+        "reconnect",
+        "barge-in",
       ],
-      configured: false,
+      configured: Boolean(geminiRealtime),
       env: {
         GEMINI_API_KEY: geminiApiKey,
       },
       fallbackProviders: ["openai-realtime", "cascaded-stt-llm-tts"],
-      implementationStatus: "planned",
+      implementationStatus: geminiRealtime ? undefined : "planned",
       latencyBudgetMs: 900,
       provider: "gemini-live",
       readinessHref: "/production-readiness",
+      realtimeChannel: geminiRealtime
+        ? await buildDemoGeminiRealtimeChannelReport()
+        : undefined,
       requiredEnv: ["GEMINI_API_KEY"],
       selected: false,
       traceHref: "/traces?sessionId=proof-realtime-channel",

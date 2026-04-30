@@ -9,6 +9,7 @@
         "@absolutejs/voice": "0.0.22-beta.305",
         "@absolutejs/voice-assemblyai": "0.0.19-beta.84",
         "@absolutejs/voice-deepgram": "0.0.20-beta.54",
+        "@absolutejs/voice-gemini": "0.0.1-beta.1",
         "@angular/common": "^21.0.0",
         "@angular/compiler": "^21.0.0",
         "@angular/compiler-cli": "^21.0.0",
@@ -67,6 +68,8 @@
     "@absolutejs/voice-assemblyai": ["@absolutejs/voice-assemblyai@0.0.19-beta.84", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.119" } }, "sha512-1Yy39evod61jknKT449rpREecyVuvANsK+UcEE9YJLnWeCqchKUkwYCFbmWFW7hJaitGAt2zjBVFUNL+IrQmxw=="],
 
     "@absolutejs/voice-deepgram": ["@absolutejs/voice-deepgram@0.0.20-beta.54", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.119" } }, "sha512-pmcNQpRBhIlerBMSx0vp42+xc7OZt1LuyAwruXaGf8UCh4qJws1JHZIHcZ85di1tOgc47KMkb/p5KnSq+QY8pw=="],
+
+    "@absolutejs/voice-gemini": ["@absolutejs/voice-gemini@0.0.1-beta.1", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.305" } }, "sha512-Dq456G34+EDq7UcVoY95eCmOPWNeGcDWaWfmsg67noaZiVI0ZG48UHJJSWATKPM/WTijQdsgGGgQo9hSDy4yCQ=="],
 
     "@angular/common": ["@angular/common@21.2.9", "", { "dependencies": { "tslib": "^2.3.0" }, "peerDependencies": { "@angular/core": "21.2.9", "rxjs": "^6.5.3 || ^7.4.0" } }, "sha512-7spQcF3hPN/fjTx6Pwa32KRRdO0NcixnRuPV4lo50ejtXesjiLVR+fkaX38sawAyGoq89IuuYvUDrbLwCMypmQ=="],
 
