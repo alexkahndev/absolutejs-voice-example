@@ -1842,6 +1842,7 @@ const productionReadinessEvidenceReport = productionReadinessReport
       requireStatus: "pass",
       requiredChecks: [
         "Campaign readiness proof",
+        "Media pipeline quality",
         "Ops recovery",
         "Provider orchestration profiles",
         "Provider SLO gates",

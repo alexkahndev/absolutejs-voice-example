@@ -41,6 +41,7 @@ import {
   createVoiceCompetitiveCoverageRoutes,
   buildVoiceRealtimeChannelReport,
   buildVoiceRealtimeChannelRuntimeSamplesFromTrace,
+  buildVoiceMediaPipelineReport,
   createVoiceRealtimeChannelRoutes,
   createVoiceMediaPipelineRoutes,
   createVoiceRealtimeProviderContractMatrixPreset,
@@ -5893,7 +5894,7 @@ const buildDemoMediaPipelineReportOptions = async () => {
       event.metadata?.proof === "realtime-channel" ||
       event.sessionId === "proof-realtime-channel",
   );
-  const frames = events
+  const traceFrames = events
     .map((event): MediaFrame | undefined => {
       const traceEventId = `${event.type}:${String(event.at)}:${event.turnId ?? event.sessionId ?? "session"}`;
       const base = {
@@ -5967,6 +5968,71 @@ const buildDemoMediaPipelineReportOptions = async () => {
       return undefined;
     })
     .filter((frame): frame is MediaFrame => frame !== undefined);
+  const hasInputAudio = traceFrames.some((frame) => frame.kind === "input-audio");
+  const hasAssistantAudio = traceFrames.some(
+    (frame) => frame.kind === "assistant-audio",
+  );
+  const frames =
+    hasInputAudio && hasAssistantAudio
+      ? traceFrames
+      : [
+          createMediaFrame({
+            at: 1_000,
+            durationMs: 20,
+            format: realtimeChannelFormat,
+            id: "demo-media-input",
+            kind: "input-audio",
+            metadata: {
+              level: 0.52,
+              proof: "media-pipeline-fallback",
+              speechProbability: 0.92,
+            },
+            sessionId: "proof-realtime-channel",
+            source: "browser",
+            traceEventId: "demo-media-input",
+            turnId: "demo-media-turn",
+          }),
+          createMediaFrame({
+            at: 1_520,
+            durationMs: 20,
+            format: realtimeChannelFormat,
+            id: "demo-media-assistant",
+            kind: "assistant-audio",
+            latencyMs: 420,
+            metadata: {
+              jitterMs: 12,
+              level: 0.45,
+              proof: "media-pipeline-fallback",
+            },
+            sessionId: "proof-realtime-channel",
+            source: "provider",
+            traceEventId: "demo-media-assistant",
+            turnId: "demo-media-turn",
+          }),
+          createMediaFrame({
+            at: 1_570,
+            format: realtimeChannelFormat,
+            id: "demo-media-interruption",
+            kind: "interruption",
+            latencyMs: 190,
+            metadata: { proof: "media-pipeline-fallback" },
+            sessionId: "proof-realtime-channel",
+            source: "voice-runtime",
+            traceEventId: "demo-media-interruption",
+            turnId: "demo-media-turn",
+          }),
+          createMediaFrame({
+            at: 1_600,
+            format: realtimeChannelFormat,
+            id: "demo-media-turn-commit",
+            kind: "turn-commit",
+            metadata: { proof: "media-pipeline-fallback" },
+            sessionId: "proof-realtime-channel",
+            source: "voice-runtime",
+            traceEventId: "demo-media-turn-commit",
+            turnId: "demo-media-turn",
+          }),
+        ];
   const transport = createMediaTransport({
     inputFormat: realtimeChannelFormat,
     maxBufferedFrames: Math.max(frames.length + 1, 1),
@@ -7054,6 +7120,7 @@ const productionReadinessLinks = {
   carriers: "/carriers",
   deliveryRuntime: "/delivery-runtime",
   handoffs: "/handoffs",
+  mediaPipeline: "/voice/media-pipeline",
   opsActions: "/voice/ops-actions",
   operationsRecords: "/voice-operations/:sessionId",
   observabilityExport: "/voice/observability-export",
@@ -7575,6 +7642,8 @@ const productionReadinessOptions = () => ({
   observabilityExport: buildDemoObservabilityExport,
   observabilityExportReplay: buildDemoObservabilityExportReplay,
   path: "/api/production-readiness",
+  mediaPipeline: async () =>
+    buildVoiceMediaPipelineReport(await buildDemoMediaPipelineReportOptions()),
   providerStack: evaluateVoiceProviderStackGaps({
     capabilities: voiceProviderStackCapabilities,
     profile: "phone-agent",
@@ -7668,6 +7737,13 @@ const productionReadinessOptions = () => ({
         href: "/voice/provider-slos",
         source: "trace",
         sourceLabel: "Provider SLO trace evidence",
+      },
+      mediaPipeline: {
+        detail:
+          "Generated from realtime media frames and checks calibration, VAD, interruption, transport, processor-graph, gap, jitter, drift, speech-ratio, and backpressure evidence.",
+        href: "/voice/media-pipeline",
+        source: "media-report",
+        sourceLabel: "Media pipeline quality proof",
       },
       telephonyWebhookSecurity: {
         detail:
