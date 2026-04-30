@@ -3827,9 +3827,13 @@ const buildRealCallProfileReadinessCheck =
     buildVoiceRealCallProfileReadinessCheck(
       await readRealCallProfileDefaultsReport(),
       {
+        browserProofHref: "/voice/browser-call-profiles",
         href: "/voice/real-call-profile-history",
         minActionableProfiles: 2,
         minCycles: 10,
+        operationsRecordsHref: "/voice-operations",
+        phoneProofHref: "/api/voice/phone/smoke",
+        productionReadinessHref: "/production-readiness",
         requiredProfileIds: ["meeting-recorder", "support-agent"],
         requiredProviderRoles: ["llm", "stt", "tts"],
         sourceHref: "/api/voice/real-call-profile-history",
