@@ -20,6 +20,7 @@ import {
   evaluateVoiceProofTrendEvidence,
   evaluateVoiceProviderContractMatrixEvidence,
   evaluateVoiceProviderRoutingContractEvidence,
+  evaluateVoiceRealtimeChannelEvidence,
   evaluateVoiceProviderSloEvidence,
   evaluateVoiceProviderStackEvidence,
   evaluateVoiceSimulationSuiteEvidence,
@@ -48,6 +49,7 @@ import {
   type VoiceProviderDecisionTraceReport,
   type VoiceProviderOrchestrationReport,
   type VoiceProviderRoutingContractReport,
+  type VoiceRealtimeChannelReport,
   type VoiceProviderStackCapabilityGapReport,
   type VoiceProductionReadinessReport,
   type VoiceProofTrendReport,
@@ -489,6 +491,33 @@ const proofTargets: ProofTarget[] = [
     kind: "json",
     name: "providerDecisions",
     path: "/api/voice/provider-decisions",
+  },
+  {
+    kind: "json",
+    name: "realtimeChannel",
+    path: "/api/voice/realtime-channel",
+  },
+  {
+    accept: "text/html,text/plain,*/*",
+    kind: "text",
+    name: "realtimeChannelPage",
+    path: "/voice/realtime-channel",
+    requiredText: [
+      "AbsoluteJS Voice Realtime Channel Proof",
+      "Realtime / duplex readiness",
+      "openai-realtime",
+    ],
+  },
+  {
+    accept: "text/markdown,text/plain,*/*",
+    kind: "text",
+    name: "realtimeChannelMarkdown",
+    path: "/voice/realtime-channel.md",
+    requiredText: [
+      "Voice Realtime Channel Proof",
+      "Provider: openai-realtime",
+      "Status: pass",
+    ],
   },
   {
     kind: "json",
@@ -1020,6 +1049,9 @@ const vapiCoverageSurfaces: VapiCoverageSurface[] = [
       "providerOrchestrationMarkdown",
       "providerDecisions",
       "providerDecisionsMarkdown",
+      "realtimeChannel",
+      "realtimeChannelPage",
+      "realtimeChannelMarkdown",
       "providerSlo",
       "providerSloMarkdown",
       "competitiveCoverage",
@@ -1390,6 +1422,7 @@ const renderMarkdown = (input: {
   providerDecisionEvidenceAssertion: JsonAssertionResult;
   operationsRecordProviderDecisionEvidenceAssertion: JsonAssertionResult;
   providerOrchestrationEvidenceAssertion: JsonAssertionResult;
+  realtimeChannelEvidenceAssertion: JsonAssertionResult;
   providerRoutingContractEvidenceAssertion: JsonAssertionResult;
   providerSloEvidenceAssertion: JsonAssertionResult;
   providerStackEvidenceAssertion: JsonAssertionResult;
@@ -1450,7 +1483,10 @@ Provider SLO evidence assertion: **${input.providerSloEvidenceAssertion.ok ? "pa
 
 Provider orchestration evidence assertion: **${input.providerOrchestrationEvidenceAssertion.ok ? "pass" : "fail"}**.
 
+Realtime channel evidence assertion: **${input.realtimeChannelEvidenceAssertion.ok ? "pass" : "fail"}**.
+
 Provider decision evidence assertion: **${input.providerDecisionEvidenceAssertion.ok ? "pass" : "fail"}**.
+
 
 Operations-record provider decision assertion: **${input.operationsRecordProviderDecisionEvidenceAssertion.ok ? "pass" : "fail"}**.
 
@@ -2574,6 +2610,36 @@ const competitiveCoverageAssertion: JsonAssertionResult = competitiveCoverage
         issues: ["Missing competitiveCoverage proof result body."],
       },
     };
+const realtimeChannel = proofResults.find(
+  (result) => result.name === "realtimeChannel",
+)?.body as VoiceRealtimeChannelReport | undefined;
+const realtimeChannelEvidenceReport = realtimeChannel
+  ? evaluateVoiceRealtimeChannelEvidence(realtimeChannel, {
+      maxFirstAudioLatencyMs: 800,
+      minAssistantAudioSamples: 1,
+      minInputAudioSamples: 1,
+      requireBrowserCapture: true,
+      requireOperationsRecordHref: true,
+      requirePass: true,
+      requireReadinessHref: true,
+    })
+  : undefined;
+const realtimeChannelEvidenceAssertion: JsonAssertionResult = realtimeChannel
+  ? {
+      kind: "json-assertion",
+      name: "realtimeChannelEvidence",
+      ok: realtimeChannelEvidenceReport?.ok === true,
+      summary:
+        realtimeChannelEvidenceReport as unknown as Record<string, unknown>,
+    }
+  : {
+      kind: "json-assertion",
+      name: "realtimeChannelEvidence",
+      ok: false,
+      summary: {
+        issues: ["Missing realtimeChannel proof result body."],
+      },
+    };
 const ok =
   seedResults.every((result) => result.ok) &&
   proofResults.every((result) => result.ok) &&
@@ -2602,6 +2668,7 @@ const ok =
   proofTrendEvidenceAssertion.ok &&
   providerContractMatrixEvidenceAssertion.ok &&
   providerRoutingContractEvidenceAssertion.ok &&
+  realtimeChannelEvidenceAssertion.ok &&
   providerStackEvidenceAssertion.ok &&
   productionReadinessGateExplanationAssertion.ok &&
   agentSquadContractEvidenceAssertion.ok &&
@@ -2636,6 +2703,7 @@ const summary = {
   providerContractMatrixEvidenceAssertion,
   providerDecisionEvidenceAssertion,
   providerOrchestrationEvidenceAssertion,
+  realtimeChannelEvidenceAssertion,
   providerRoutingContractEvidenceAssertion,
   providerSloEvidenceAssertion,
   providerStackEvidenceAssertion,
@@ -2677,6 +2745,7 @@ const markdown = renderMarkdown({
   providerContractMatrixEvidenceAssertion,
   providerDecisionEvidenceAssertion,
   providerOrchestrationEvidenceAssertion,
+  realtimeChannelEvidenceAssertion,
   providerRoutingContractEvidenceAssertion,
   providerSloEvidenceAssertion,
   providerStackEvidenceAssertion,

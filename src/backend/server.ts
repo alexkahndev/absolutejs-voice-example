@@ -39,6 +39,7 @@ import {
   createVoiceObservabilityExportRoutes,
   createVoiceObservabilityExportReplayRoutes,
   createVoiceCompetitiveCoverageRoutes,
+  createVoiceRealtimeChannelRoutes,
   createVoicePlatformCoverageRoutes,
   createVoicePostCallAnalysisRoutes,
   createVoiceProofTrendRoutes,
@@ -3934,20 +3935,21 @@ const competitiveCoverageSurfaces = [
   {
     buyerNeed: "Use direct realtime/duplex providers when they are the right execution engine.",
     competitors: ["OpenAI Realtime", "Pipecat"],
-    coverage: "partial",
-    depth: "covered",
+    coverage: "covered",
+    depth: "parity",
     evidence: [
+      { href: "/api/voice/realtime-channel", kind: "proof", name: "realtimeChannel", required: true, status: "pass" },
+      { href: "/voice/realtime-channel", kind: "proof", name: "realtimeChannelPage", status: "pass" },
+      { href: "/voice/realtime-channel.md", kind: "proof", name: "realtimeChannelMarkdown", status: "pass" },
       { href: "/provider-contracts", kind: "proof", name: "providerContracts", status: "pass" },
       { href: "/voice/provider-orchestration", kind: "readiness", name: "providerOrchestrationRealtimeSurface", status: "pass" },
     ],
-    frameworkPrimitives: ["server adapters", "provider profiles"],
+    frameworkPrimitives: ["server adapters", "provider profiles", "runtime-channel proof"],
     operationsRecord: "linked",
     readinessGate: "present",
-    remainingGap:
-      "Production browser format negotiation/resampling and live-demo proof need more depth.",
     surface: "Direct realtime/duplex providers",
-    why: "OpenAI Realtime adapter path exists and cascaded STT/LLM/TTS remains strong, but runtime-channel proof still needs deeper production samples.",
-    nextMove: "Improve runtime-channel calibration and live-demo proof.",
+    why: "OpenAI Realtime adapter path, browser capture negotiation, raw PCM realtime format proof, first assistant audio latency, and cascaded STT/LLM/TTS fallback are all app-owned.",
+    nextMove: "Build longer-running live-provider history across more realtime providers.",
   },
   {
     buyerNeed: "Build visual workflows without code.",
@@ -9276,6 +9278,71 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
       name: "absolutejs-voice-example-vapi-coverage",
       path: "/api/voice/vapi-coverage",
       source: readLatestVapiCoverageSummary,
+    }),
+  )
+  .use(
+    createVoiceRealtimeChannelRoutes({
+      browserCapture: {
+        audioContextSampleRateHz: 48_000,
+        channelCount: 1,
+        processorBufferSize: 4096,
+        sampleRateHz: 24_000,
+      },
+      inputFormat: {
+        channels: 1,
+        container: "raw",
+        encoding: "pcm_s16le",
+        sampleRateHz: 24_000,
+      },
+      maxFirstAudioLatencyMs: 800,
+      minAssistantAudioSamples: 1,
+      minInputAudioSamples: 1,
+      name: "absolutejs-voice-example-realtime-channel",
+      operationsRecordHref: "/voice-operations/demo-incident-bundle",
+      outputFormat: {
+        channels: 1,
+        container: "raw",
+        encoding: "pcm_s16le",
+        sampleRateHz: 24_000,
+      },
+      provider: "openai-realtime",
+      readinessHref: "/production-readiness",
+      runtimeSamples: [
+        {
+          format: {
+            channels: 1,
+            container: "raw",
+            encoding: "pcm_s16le",
+            sampleRateHz: 24_000,
+          },
+          kind: "input-audio",
+          ok: true,
+          source: "browser",
+        },
+        {
+          format: {
+            channels: 1,
+            container: "raw",
+            encoding: "pcm_s16le",
+            sampleRateHz: 24_000,
+          },
+          kind: "assistant-audio",
+          latencyMs: 420,
+          ok: true,
+          source: "openai-realtime",
+        },
+        {
+          kind: "turn-commit",
+          ok: true,
+          source: "absolutejs-runtime",
+        },
+        {
+          kind: "reconnect",
+          ok: true,
+          source: "absolutejs-runtime",
+        },
+      ],
+      title: "AbsoluteJS Voice Realtime Channel Proof",
     }),
   )
   .use(

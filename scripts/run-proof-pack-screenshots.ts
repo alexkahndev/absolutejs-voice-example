@@ -100,6 +100,16 @@ const screenshotTargets: ScreenshotTarget[] = [
     ],
   },
   {
+    file: "realtime-channel.png",
+    name: "Realtime Channel",
+    path: "/voice/realtime-channel",
+    requiredText: [
+      "AbsoluteJS Voice Realtime Channel Proof",
+      "Realtime / duplex readiness",
+      "openai-realtime",
+    ],
+  },
+  {
     file: "proof-trends.png",
     name: "Sustained Proof Trends",
     path: "/voice/proof-trends",
