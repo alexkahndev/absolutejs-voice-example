@@ -513,6 +513,23 @@ const proofTargets: ProofTarget[] = [
     path: "/api/voice/media-pipeline-calibration",
   },
   {
+    kind: "json",
+    name: "browserMedia",
+    path: "/api/voice/browser-media",
+  },
+  {
+    accept: "text/html,text/plain,*/*",
+    kind: "text",
+    name: "browserMediaPage",
+    path: "/voice/browser-media",
+    requiredText: [
+      "AbsoluteJS Voice Browser Media Proof",
+      "WebRTC stats",
+      "Active candidate pairs",
+      "Packet loss ratio",
+    ],
+  },
+  {
     accept: "text/html,text/plain,*/*",
     kind: "text",
     name: "mediaPipelinePage",
@@ -1841,6 +1858,7 @@ const productionReadinessEvidenceReport = productionReadinessReport
   ? evaluateVoiceProductionReadinessEvidence(productionReadinessReport, {
       requireStatus: "pass",
       requiredChecks: [
+        "Browser media transport",
         "Campaign readiness proof",
         "Media pipeline quality",
         "Ops recovery",

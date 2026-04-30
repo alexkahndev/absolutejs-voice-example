@@ -203,6 +203,7 @@ import {
   voiceTelephonyOutcomeToRouteResult,
 } from "@absolutejs/voice";
 import {
+  buildMediaWebRTCStatsReport,
   createMediaFrame,
   createMediaProcessorGraph,
   createMediaTransport,
@@ -6122,6 +6123,48 @@ const buildDemoMediaPipelineReportOptions = async () => {
   };
 };
 
+const buildDemoBrowserMediaReport = () =>
+  buildMediaWebRTCStatsReport({
+    maxJitterMs: 30,
+    maxPacketLossRatio: 0.02,
+    maxRoundTripTimeMs: 250,
+    requireConnectedCandidatePair: true,
+    requireLiveAudioTrack: true,
+    stats: [
+      {
+        bytesReceived: 240_000,
+        id: "demo-browser-inbound-audio",
+        jitter: 0.008,
+        kind: "audio",
+        packetsLost: 1,
+        packetsReceived: 999,
+        type: "inbound-rtp",
+      },
+      {
+        bytesSent: 210_000,
+        id: "demo-browser-outbound-audio",
+        kind: "audio",
+        packetsSent: 1_000,
+        type: "outbound-rtp",
+      },
+      {
+        currentRoundTripTime: 0.08,
+        id: "demo-browser-candidate-pair",
+        nominated: true,
+        selected: true,
+        state: "succeeded",
+        type: "candidate-pair",
+      },
+      {
+        audioLevel: 0.42,
+        id: "demo-browser-audio-track",
+        kind: "audio",
+        readyState: "live",
+        type: "media-source",
+      },
+    ],
+  });
+
 const buildDemoRealtimeProviderContractMatrixInput = async () =>
   createVoiceRealtimeProviderContractMatrixPreset({
     configured: {
@@ -7120,6 +7163,7 @@ const productionReadinessLinks = {
   carriers: "/carriers",
   deliveryRuntime: "/delivery-runtime",
   handoffs: "/handoffs",
+  browserMedia: "/voice/browser-media",
   mediaPipeline: "/voice/media-pipeline",
   opsActions: "/voice/ops-actions",
   operationsRecords: "/voice-operations/:sessionId",
@@ -7642,6 +7686,7 @@ const productionReadinessOptions = () => ({
   observabilityExport: buildDemoObservabilityExport,
   observabilityExportReplay: buildDemoObservabilityExportReplay,
   path: "/api/production-readiness",
+  browserMedia: buildDemoBrowserMediaReport,
   mediaPipeline: async () =>
     buildVoiceMediaPipelineReport(await buildDemoMediaPipelineReportOptions()),
   providerStack: evaluateVoiceProviderStackGaps({
@@ -7744,6 +7789,13 @@ const productionReadinessOptions = () => ({
         href: "/voice/media-pipeline",
         source: "media-report",
         sourceLabel: "Media pipeline quality proof",
+      },
+      browserMedia: {
+        detail:
+          "Generated from browser WebRTC-style stats and checks live audio tracks, selected candidate pairs, packet loss, RTT, jitter, and byte flow.",
+        href: "/voice/browser-media",
+        source: "webrtc-stats",
+        sourceLabel: "Browser WebRTC stats proof",
       },
       telephonyWebhookSecurity: {
         detail:
@@ -9127,6 +9179,61 @@ const server = new Elysia()
       options: telephonyWebhookSecurityOptions(),
     }),
   )
+  .get("/api/voice/browser-media", () =>
+    Response.json(buildDemoBrowserMediaReport()),
+  )
+  .get("/voice/browser-media", () => {
+    const report = buildDemoBrowserMediaReport();
+    const summaryRows: [string, string][] = [
+      ["Status", report.status],
+      ["Active candidate pairs", String(report.activeCandidatePairs)],
+      ["Live audio tracks", String(report.liveAudioTracks)],
+      ["Packet loss ratio", report.packetLossRatio.toFixed(4)],
+      ["Round trip time", `${(report.roundTripTimeMs ?? 0).toFixed(1)} ms`],
+      ["Jitter", `${(report.jitterMs ?? 0).toFixed(1)} ms`],
+      ["Bytes received", String(report.bytesReceived)],
+      ["Bytes sent", String(report.bytesSent)],
+    ];
+    const rows = summaryRows
+      .map(
+        ([label, value]) =>
+          `<tr><th>${escapeHtml(label)}</th><td>${escapeHtml(value)}</td></tr>`,
+      )
+      .join("");
+
+    return new Response(
+      `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>AbsoluteJS Voice Browser Media Proof</title>
+    <style>
+      body { background: #0f172a; color: #e2e8f0; font-family: ui-sans-serif, system-ui, sans-serif; margin: 0; padding: 40px; }
+      main { max-width: 860px; margin: 0 auto; }
+      a { color: #93c5fd; }
+      table { border-collapse: collapse; margin-top: 24px; width: 100%; }
+      th, td { border-bottom: 1px solid #334155; padding: 12px; text-align: left; }
+      th { color: #bfdbfe; width: 38%; }
+      .badge { background: #14532d; border: 1px solid #22c55e; border-radius: 999px; color: #bbf7d0; display: inline-block; padding: 6px 12px; text-transform: uppercase; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p><a href="/production-readiness">Back to production readiness</a></p>
+      <h1>AbsoluteJS Voice Browser Media Proof</h1>
+      <p class="badge">${escapeHtml(report.status)}</p>
+      <p>This deterministic proof exercises the same WebRTC stats shape browsers expose for live calls, so readiness can gate on candidate pairs, audio tracks, packet loss, RTT, jitter, and media byte flow.</p>
+      <table>${rows}</table>
+    </main>
+  </body>
+</html>`,
+      {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
+        },
+      },
+    );
+  })
   .use(createVoiceProductionReadinessRoutes(productionReadinessOptions()))
   .use(
     createVoiceOpsRecoveryRoutes({
