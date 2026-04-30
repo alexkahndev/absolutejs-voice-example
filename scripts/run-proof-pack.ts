@@ -727,6 +727,8 @@ const proofTargets: ProofTarget[] = [
       "AbsoluteJS Voice Competitive Coverage",
       "Self-hosted market proof",
       "Provider choice and fallback",
+      "failureReplay",
+      "failure-replay",
     ],
   },
   {
@@ -738,6 +740,7 @@ const proofTargets: ProofTarget[] = [
       "Voice Competitive Coverage",
       "Vapi-style coverage: 99.8%",
       "Provider choice and fallback",
+      "Unified call log / operations record",
     ],
   },
   {
@@ -2842,6 +2845,7 @@ const competitiveCoverageReport = competitiveCoverage
       requireOperationsRecordLinks: true,
       requireReadinessGates: true,
       requiredEvidence: [
+        "failureReplay",
         "operationsRecord",
         "providerDecisions",
         "providerOrchestration",
