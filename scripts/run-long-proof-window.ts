@@ -5,9 +5,11 @@ import { join } from "node:path";
 
 type JsonRecord = Record<string, unknown>;
 
-const baseUrl = (
-  process.env.VOICE_DEMO_URL ?? `http://127.0.0.1:${process.env.PORT ?? "3004"}`
-).replace(/\/$/, "");
+const port = process.env.PORT ?? process.env.VOICE_LONG_PROOF_PORT ?? "3004";
+const baseUrl = (process.env.VOICE_DEMO_URL ?? `http://127.0.0.1:${port}`).replace(
+  /\/$/,
+  "",
+);
 const waitTimeoutMs = Number(
   process.env.VOICE_LONG_PROOF_SERVER_WAIT_MS ??
     process.env.VOICE_PROOF_PACK_SERVER_WAIT_MS ??
@@ -28,14 +30,19 @@ const intervalMs = Math.max(
 );
 const samplesPerCycle = Math.max(
   1,
-  Number(process.env.VOICE_LONG_PROOF_LIVE_SAMPLES_PER_CYCLE ?? 5),
+  Number(process.env.VOICE_LONG_PROOF_LIVE_SAMPLES_PER_CYCLE ?? 50),
 );
 const outputRoot =
   process.env.VOICE_LONG_PROOF_OUTPUT_DIR ?? ".voice-runtime/long-proof-window";
 const runId = new Date().toISOString().replaceAll(":", "-");
 const outputDir = join(outputRoot, runId);
+const runtimeDir =
+  process.env.VOICE_DEMO_RUNTIME_DIR ?? join(outputDir, "runtime");
 const startedAtMs = Date.now();
 const startedAt = new Date(startedAtMs).toISOString();
+const reuseExistingServer =
+  process.env.VOICE_LONG_PROOF_REUSE_SERVER === "true" ||
+  process.env.VOICE_DEMO_URL !== undefined;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -131,6 +138,7 @@ const runScript = async (
       ...process.env,
       PORT: process.env.PORT ?? "3004",
       VOICE_DEMO_URL: baseUrl,
+      VOICE_DEMO_RUNTIME_DIR: runtimeDir,
       ...env,
     },
     stderr: "inherit",
@@ -267,12 +275,18 @@ let exitCode = 0;
 
 try {
   if (await isServerRunning()) {
+    if (!reuseExistingServer) {
+      throw new Error(
+        `${baseUrl} is already serving. Long proof windows default to a fresh isolated runtime; stop the existing server or set VOICE_LONG_PROOF_REUSE_SERVER=true intentionally.`,
+      );
+    }
     console.log(`Reusing running demo server at ${baseUrl}.`);
   } else {
     server = Bun.spawn(["bun", "run", "dev"], {
       env: {
         ...process.env,
-        PORT: process.env.PORT ?? "3004",
+        PORT: port,
+        VOICE_DEMO_RUNTIME_DIR: runtimeDir,
       },
       stderr: "inherit",
       stdout: "inherit",

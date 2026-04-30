@@ -29,6 +29,7 @@ type TrendCycle = {
     kinds: Record<string, TrendMetric & { status?: string }>;
     status?: string;
   };
+  providers?: TrendProvider[];
   runtimeChannel?: {
     maxBackpressureEvents?: number;
     maxFirstAudioLatencyMs?: number;
@@ -42,6 +43,13 @@ type TrendCycle = {
     status?: string;
     total?: number;
   };
+};
+
+type TrendProvider = TrendMetric & {
+  id: string;
+  label?: string;
+  role?: string;
+  status?: string;
 };
 
 type TrendMetric = {
@@ -216,6 +224,11 @@ const seedCycle = async (cycle: number) => {
 
 const summarizeProviderSlo = (body: JsonRecord) => {
   const kinds = isRecord(body.kinds) ? body.kinds : {};
+  const providerRows = ["llm", "stt", "tts"].map((kind) => {
+    const row = isRecord(kinds[kind]) ? rowToProvider(kind, kinds[kind]) : undefined;
+    return row;
+  }).filter((row): row is TrendProvider => row !== undefined);
+
   return {
     events: readNumber(body.events),
     eventsWithLatency: readNumber(body.eventsWithLatency),
@@ -240,7 +253,31 @@ const summarizeProviderSlo = (body: JsonRecord) => {
         ];
       }),
     ),
+    providers: providerRows,
     status: typeof body.status === "string" ? body.status : undefined,
+  };
+};
+
+const rowToProvider = (kind: string, value: unknown): TrendProvider | undefined => {
+  const row = isRecord(value) ? value : {};
+  const metrics = isRecord(row.metrics) ? row.metrics : row;
+  const providers = readArray(row.providers)
+    .map((provider) => (typeof provider === "string" ? provider : undefined))
+    .filter((provider): provider is string => provider !== undefined);
+  const id = providers.length > 0 ? `${kind}:${providers.join("+")}` : kind;
+  return {
+    averageMs:
+      readMetric(row, ["averageMs"]) ??
+      readMetricActual(metrics, "averageElapsedMs"),
+    id,
+    label: providers.length > 0 ? `${kind.toUpperCase()} ${providers.join(" + ")}` : `${kind.toUpperCase()} provider path`,
+    p50Ms:
+      readMetric(row, ["p50Ms"]) ?? readMetricActual(metrics, "p50ElapsedMs"),
+    p95Ms:
+      readMetric(row, ["p95Ms"]) ?? readMetricActual(metrics, "p95ElapsedMs"),
+    role: kind,
+    samples: readMetric(row, ["eventsWithLatency", "samples"]),
+    status: typeof row.status === "string" ? row.status : undefined,
   };
 };
 
@@ -354,6 +391,7 @@ const runCycle = async (cycle: number): Promise<TrendCycle> => {
       status: readinessStatus,
     },
     providerSlo: summarizedProviderSlo,
+    providers: summarizedProviderSlo.providers,
     runtimeChannel: summarizedRuntimeChannel,
     turnLatency: summarizedTurnLatency,
   };
@@ -362,6 +400,35 @@ const runCycle = async (cycle: number): Promise<TrendCycle> => {
 const maxOf = <T>(items: T[], read: (item: T) => number | undefined) => {
   const values = items.map(read).filter((value): value is number => value !== undefined);
   return values.length ? Math.max(...values) : undefined;
+};
+
+const summarizeProviders = (cycles: TrendCycle[]) => {
+  const providersById = new Map<string, TrendProvider>();
+  for (const cycle of cycles) {
+    for (const provider of cycle.providers ?? []) {
+      const existing = providersById.get(provider.id);
+      providersById.set(provider.id, {
+        averageMs: maxOf([existing, provider], (item) => item?.averageMs),
+        id: provider.id,
+        label: existing?.label ?? provider.label,
+        p50Ms: maxOf([existing, provider], (item) => item?.p50Ms),
+        p95Ms: maxOf([existing, provider], (item) => item?.p95Ms),
+        role: existing?.role ?? provider.role,
+        samples: (existing?.samples ?? 0) + (provider.samples ?? 0),
+        status:
+          existing?.status === "fail" || provider.status === "fail"
+            ? "fail"
+            : existing?.status === "warn" || provider.status === "warn"
+              ? "warn"
+              : provider.status ?? existing?.status,
+      });
+    }
+  }
+  return [...providersById.values()].sort(
+    (left, right) =>
+      (left.p95Ms ?? Number.POSITIVE_INFINITY) -
+      (right.p95Ms ?? Number.POSITIVE_INFINITY),
+  );
 };
 
 const lastOf = <T>(items: T[]) => items.at(-1);
@@ -374,10 +441,7 @@ const renderMarkdown = (cycles: TrendCycle[]) => {
   const maxTurnP95 = maxOf(cycles, (cycle) => cycle.turnLatency?.p95Ms);
   const maxLiveP95 = maxOf(cycles, (cycle) => cycle.liveLatency?.p95Ms);
   const maxProviderP95 = maxOf(cycles, (cycle) =>
-    maxOf(
-      Object.values(cycle.providerSlo?.kinds ?? {}).map((kind) => ({ kind })),
-      (entry) => entry.kind.p95Ms,
-    ),
+    maxOf(cycle.providers ?? [], (provider) => provider.p95Ms),
   );
   const maxRuntimeFirstAudio = maxOf(
     cycles,
@@ -414,6 +478,8 @@ Max turn p95: ${renderMs(maxTurnP95)}
 Max live p95: ${renderMs(maxLiveP95)}
 
 Max provider p95: ${renderMs(maxProviderP95)}
+
+Best provider path: ${latest?.providers?.sort((left, right) => (left.p95Ms ?? Number.POSITIVE_INFINITY) - (right.p95Ms ?? Number.POSITIVE_INFINITY))[0]?.label ?? "n/a"}
 
 Max runtime first audio: ${renderMs(maxRuntimeFirstAudio)}
 
@@ -470,11 +536,9 @@ try {
       cycles: trendCycles.length,
       maxLiveP95Ms: maxOf(trendCycles, (cycle) => cycle.liveLatency?.p95Ms),
       maxProviderP95Ms: maxOf(trendCycles, (cycle) =>
-        maxOf(
-          Object.values(cycle.providerSlo?.kinds ?? {}).map((kind) => ({ kind })),
-          (entry) => entry.kind.p95Ms,
-        ),
+        maxOf(cycle.providers ?? [], (provider) => provider.p95Ms),
       ),
+      providers: summarizeProviders(trendCycles),
       runtimeChannel: {
         maxBackpressureEvents: maxOf(
           trendCycles,

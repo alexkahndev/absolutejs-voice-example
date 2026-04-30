@@ -776,7 +776,7 @@ const proofTargets: ProofTarget[] = [
     path: "/voice/proof-trend-recommendations",
     requiredText: [
       "Provider Runtime Recommendations",
-      "Keep current provider path",
+      "Provider Comparison",
       "Keep current runtime channel",
     ],
   },
