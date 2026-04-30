@@ -1553,7 +1553,6 @@ const sttLatencyBudgets = {
 type VoiceSTTProvider = "deepgram" | "assemblyai";
 const sessionRoutingModes = new Map<string, VoiceRoutingMode>();
 const sessionVoiceProfileIds = new Map<string, string>();
-const sessionVoiceProfileGuarded = new Set<string>();
 const configuredModelProviders: VoiceModelProvider[] = [
   "deterministic",
   openAIApiKey ? "openai" : undefined,
@@ -2109,87 +2108,18 @@ const findVoiceProfileDefault = async (profileId?: string) => {
     report.defaults.profiles[0]
   );
 };
-const rememberSessionVoiceProfileId = async (input: {
+const rememberSessionVoiceProfileId = (input: {
   context: unknown;
   sessionId: string;
 }) => {
-  if (sessionVoiceProfileGuarded.has(input.sessionId)) {
-    return (
-      sessionVoiceProfileIds.get(input.sessionId) ??
-      resolveVoiceProfileIdFromContext(input.context)
-    );
+  const existing = sessionVoiceProfileIds.get(input.sessionId);
+  if (existing) {
+    return existing;
   }
 
-  const requestedProfileId = resolveVoiceProfileIdFromContext(input.context);
-  sessionVoiceProfileIds.set(input.sessionId, requestedProfileId);
-  sessionVoiceProfileGuarded.add(input.sessionId);
-
-  const [defaults, turnQuality] = await Promise.all([
-    readRealCallProfileDefaultsReport(),
-    summarizeVoiceTurnQuality({
-      limit: 25,
-      store: runtimeStorage.session,
-    }),
-  ]);
-  const turnLatencies = turnQuality.turns
-    .map((turn) => turn.latencyMs)
-    .filter((value): value is number => typeof value === "number");
-  const turnP95Ms =
-    turnLatencies.length > 0
-      ? turnLatencies.sort((left, right) => left - right)[
-          Math.max(0, Math.ceil(turnLatencies.length * 0.95) - 1)
-        ]
-      : undefined;
-  const query = queryFromContext(input.context);
-  const minConfidence = Number(readQueryString(query, ["minProfileConfidence"]));
-  const guard = await applyVoiceProfileSwitchGuard({
-    actor: {
-      id: "absolutejs-voice-example",
-      kind: "system",
-      name: "AbsoluteJS Voice Example",
-    },
-    audit: runtimeStorage.audit,
-    defaults,
-    metadata: {
-      endpoint: "/voice/intake",
-      requestedProfileId,
-      selectedBy: "session-start",
-    },
-    minConfidence: Number.isFinite(minConfidence) ? minConfidence : 0.75,
-    mode: readQueryString(query, ["profileSwitchMode"]) === "recommend"
-      ? "recommend"
-      : "auto",
-    observed: {
-      currentProfileId: requestedProfileId,
-      turnP95Ms,
-      turnWarnings: turnQuality.warnings,
-    },
-    sessionId: input.sessionId,
-  });
-  const selectedProfileId = guard.selectedProfileId ?? requestedProfileId;
-  sessionVoiceProfileIds.set(input.sessionId, selectedProfileId);
-  await deliveryTraceStore.append({
-    at: Date.now(),
-    metadata: {
-      requestedProfileId,
-      selectedProfileId,
-      source: "profile-switch-guard",
-    },
-    payload: {
-      action: guard.action,
-      autoApplied: guard.autoApplied,
-      confidence: guard.confidence,
-      minConfidence: guard.minConfidence,
-      mode: guard.mode,
-      reason: guard.reason,
-      recommendedProfileId: guard.recommendedProfileId,
-      selectedProfileId,
-      status: guard.recommendation.status,
-    },
-    sessionId: input.sessionId,
-    type: "provider.decision",
-  });
-  return selectedProfileId;
+  const profileId = resolveVoiceProfileIdFromContext(input.context);
+  sessionVoiceProfileIds.set(input.sessionId, profileId);
+  return profileId;
 };
 const intakeModel: VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake> = {
   generate: ({ context, session, turn, system }) => {
@@ -2449,7 +2379,7 @@ const rememberSessionRoutingMode = async (input: {
       : "balanced";
 
   sessionRoutingModes.set(input.sessionId, routing);
-  await rememberSessionVoiceProfileId(input);
+  rememberSessionVoiceProfileId(input);
   return routing;
 };
 const providerFailureSimulator = createVoiceProviderFailureSimulator({
@@ -8465,15 +8395,11 @@ const getLatestRoutingDecision = async () => {
   };
 };
 
-const getProfileSwitchInputs = async () => {
-  const [defaults, decision, turnQuality] = await Promise.all([
-    readRealCallProfileDefaultsReport(),
-    getLatestRoutingDecision(),
-    summarizeVoiceTurnQuality({
-      limit: 25,
-      store: runtimeStorage.session,
-    }),
-  ]);
+const getRecentTurnQualitySignals = async () => {
+  const turnQuality = await summarizeVoiceTurnQuality({
+    limit: 25,
+    store: runtimeStorage.session,
+  });
   const turnLatencies = turnQuality.turns
     .map((turn) => turn.latencyMs)
     .filter((value): value is number => typeof value === "number");
@@ -8485,14 +8411,27 @@ const getProfileSwitchInputs = async () => {
       : undefined;
 
   return {
+    turnP95Ms,
+    turnWarnings: turnQuality.warnings,
+  };
+};
+
+const getProfileSwitchInputs = async () => {
+  const [defaults, decision, turnQuality] = await Promise.all([
+    readRealCallProfileDefaultsReport(),
+    getLatestRoutingDecision(),
+    getRecentTurnQualitySignals(),
+  ]);
+
+  return {
     defaults,
     decision,
     observed: {
       currentProfileId: decision?.profileId ?? "meeting-recorder",
       fallbackUsed: Boolean(decision?.fallbackProvider),
       providerP95Ms: decision?.elapsedMs,
-      turnP95Ms,
-      turnWarnings: turnQuality.warnings,
+      turnP95Ms: turnQuality.turnP95Ms,
+      turnWarnings: turnQuality.turnWarnings,
     },
   };
 };
@@ -8530,6 +8469,57 @@ const runProfileSwitchGuard = async (
     sessionId: decision?.sessionId,
   });
 };
+
+const createDemoProfileSwitchGuard = (endpoint: string) => ({
+  actor: {
+    id: "absolutejs-voice-example",
+    kind: "system" as const,
+    name: "AbsoluteJS Voice Example",
+  },
+  audit: runtimeStorage.audit,
+  currentProfileId: ({ context }: { context: unknown }) =>
+    resolveVoiceProfileIdFromContext(context),
+  defaults: () => readRealCallProfileDefaultsReport(),
+  metadata: ({ context }: { context: unknown }) => ({
+    endpoint,
+    requestedProfileId: resolveVoiceProfileIdFromContext(context),
+    selectedBy: "session-start",
+  }),
+  minConfidence: ({ context }: { context: unknown }) => {
+    const value = Number(
+      readQueryString(queryFromContext(context), ["minProfileConfidence"]),
+    );
+    return Number.isFinite(value) ? value : 0.75;
+  },
+  mode: ({ context }: { context: unknown }) =>
+    readQueryString(queryFromContext(context), ["profileSwitchMode"]) ===
+    "recommend"
+      ? ("recommend" as const)
+      : ("auto" as const),
+  observed: async ({ context }: { context: unknown }) => {
+    const quality = await getRecentTurnQualitySignals();
+    return {
+      currentProfileId: resolveVoiceProfileIdFromContext(context),
+      turnP95Ms: quality.turnP95Ms,
+      turnWarnings: quality.turnWarnings,
+    };
+  },
+  onDecision: ({
+    context,
+    decision,
+    sessionId,
+  }: {
+    context: unknown;
+    decision: Awaited<ReturnType<typeof applyVoiceProfileSwitchGuard>>;
+    sessionId: string;
+  }) => {
+    sessionVoiceProfileIds.set(
+      sessionId,
+      decision.selectedProfileId ?? resolveVoiceProfileIdFromContext(context),
+    );
+  },
+  trace: deliveryTraceStore,
+});
 
 const sttProviderSimulationStatus = () =>
   (["deepgram", "assemblyai"] as const).map((provider) => ({
@@ -9336,6 +9326,7 @@ const createTelephonyBridgeConfig = () => ({
     await rememberSessionRoutingMode(input);
     return VOICE_DEMO_PHRASE_HINTS;
   },
+  profileSwitchGuard: createDemoProfileSwitchGuard("/voice/telephony"),
   preset: "reliability" as const,
   session: runtimeStorage.session,
   stt: sttAdapter,
@@ -9406,6 +9397,7 @@ const server = new Elysia()
         await rememberSessionRoutingMode(input);
         return VOICE_DEMO_PHRASE_HINTS;
       },
+      profileSwitchGuard: createDemoProfileSwitchGuard("/voice/intake"),
       onTurn: contractAwareOnTurn,
       path: "/voice/intake",
       preset: "reliability",
@@ -9441,6 +9433,7 @@ const server = new Elysia()
             await rememberSessionRoutingMode(input);
             return VOICE_DEMO_PHRASE_HINTS;
           },
+          profileSwitchGuard: createDemoProfileSwitchGuard("/voice/realtime"),
           preset: "reliability",
           realtime: openAIRealtime,
           realtimeInputFormat: realtimeChannelFormat,
