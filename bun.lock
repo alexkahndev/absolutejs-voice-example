@@ -6,12 +6,12 @@
       "name": "absolutejs-voice-example",
       "dependencies": {
         "@absolutejs/absolute": "0.19.0-beta.739",
-        "@absolutejs/media": "0.0.1-beta.6",
-        "@absolutejs/voice": "0.0.22-beta.324",
-        "@absolutejs/voice-assemblyai": "0.0.19-beta.101",
-        "@absolutejs/voice-deepgram": "0.0.20-beta.71",
-        "@absolutejs/voice-gemini": "0.0.1-beta.18",
-        "@absolutejs/voice-openai": "0.0.7-beta.18",
+        "@absolutejs/media": "0.0.1-beta.7",
+        "@absolutejs/voice": "0.0.22-beta.325",
+        "@absolutejs/voice-assemblyai": "0.0.19-beta.102",
+        "@absolutejs/voice-deepgram": "0.0.20-beta.72",
+        "@absolutejs/voice-gemini": "0.0.1-beta.19",
+        "@absolutejs/voice-openai": "0.0.7-beta.19",
         "@angular/common": "^21.0.0",
         "@angular/compiler": "^21.0.0",
         "@angular/compiler-cli": "^21.0.0",
@@ -53,7 +53,7 @@
   "packages": {
     "@absolutejs/absolute": ["@absolutejs/absolute@0.19.0-beta.739", "", { "dependencies": { "@angular/compiler": "^21.0.0", "zustand": "^5.0.12" }, "optionalDependencies": { "@absolutejs/native-darwin-arm64": "0.19.0-beta.704", "@absolutejs/native-darwin-x64": "0.19.0-beta.704", "@absolutejs/native-linux-arm64": "0.19.0-beta.704", "@absolutejs/native-linux-x64": "0.19.0-beta.704", "@absolutejs/native-windows-arm64": "0.19.0-beta.704", "@absolutejs/native-windows-x64": "0.19.0-beta.704" }, "peerDependencies": { "@angular/common": "^21.0.0", "@angular/compiler-cli": "^21.0.0", "@angular/core": "^21.0.0", "@angular/platform-browser": "^21.0.0", "@angular/platform-server": "^21.0.0", "@angular/ssr": "^21.0.0", "bun-plugin-tailwind": "^0.1.2", "elysia": "^1.4.0", "less": "^4.6.0", "postcss": "^8.5.0", "react": "^19.2.0", "react-dom": "^19.2.0", "react-refresh": "^0.18.0", "sass": "^1.99.0", "sharp": ">=0.33.0", "stylus": "^0.64.0", "svelte": "^5.35.2", "tailwindcss": "^4.1.0", "typescript": "^5.9.3", "vue": "^3.5.27", "zone.js": "^0.15.0" }, "optionalPeers": ["@angular/common", "@angular/compiler-cli", "@angular/core", "@angular/platform-browser", "@angular/platform-server", "@angular/ssr", "bun-plugin-tailwind", "less", "postcss", "react", "react-dom", "react-refresh", "sass", "sharp", "stylus", "svelte", "tailwindcss", "typescript", "vue", "zone.js"], "bin": { "absolute": "dist/cli/index.js" } }, "sha512-Dgt5Mzwdw/kX/PqGSyF6ha/AHAQH65PI5B9e5e8GXY5z0rnIFLzuu0n7XSehmQo0zr4hlC7ic04ergkwvxk6qA=="],
 
-    "@absolutejs/media": ["@absolutejs/media@0.0.1-beta.6", "", {}, "sha512-EvcaUZL71Ax3IEq2BsxzDUB8Co12R6tQ9hpHQ30uuP0kEYuyK2wQPwm36+wlwbzceMmHbwWmuZtlOzNEYR8yWw=="],
+    "@absolutejs/media": ["@absolutejs/media@0.0.1-beta.7", "", {}, "sha512-rYL2+ztAlm8EwN9Y7wCzp6ApXRcd3mQYWmkUQriSI3FXj68MxMa+mnkDRR998gOVu3VO/hL7DFero32wbv14fw=="],
 
     "@absolutejs/native-darwin-arm64": ["@absolutejs/native-darwin-arm64@0.19.0-beta.704", "", { "os": "darwin", "cpu": "arm64" }, "sha512-jd+jimSY7xvCXv1r93250bns8GdIUfcpl8zkOgsCXYuWkZN+o0VMeFsNbvWD+CLp05y4dxT8yWje0m1FGS5Xpg=="],
 
@@ -67,15 +67,15 @@
 
     "@absolutejs/native-windows-x64": ["@absolutejs/native-windows-x64@0.19.0-beta.704", "", { "os": "win32", "cpu": "x64" }, "sha512-oR9EhvIFSZCjmS8kaNf1CoK7CYqiwzYIvTxjwV6Jf7B0bTsyqFDD737r2A17A8AtyJOpUiQ94EjiJl9itkq51A=="],
 
-    "@absolutejs/voice": ["@absolutejs/voice@0.0.22-beta.324", "", { "dependencies": { "@absolutejs/media": "0.0.1-beta.6" }, "peerDependencies": { "@absolutejs/absolute": ">=0.19.0-beta.646", "@angular/core": ">=21.0.0", "elysia": ">=1.4.18", "react": ">=19.0.0", "vue": ">=3.5.0" }, "optionalPeers": ["@angular/core", "react", "vue"] }, "sha512-jDCLU1TgbxzH4+a5cT4FK/gyYK2945sobzeU6gyu24alKkjbcwx/BmPG0nMlr+Jxzfh4DmHjlGCpnQU6dShAXg=="],
+    "@absolutejs/voice": ["@absolutejs/voice@0.0.22-beta.325", "", { "dependencies": { "@absolutejs/media": "0.0.1-beta.7" }, "peerDependencies": { "@absolutejs/absolute": ">=0.19.0-beta.646", "@angular/core": ">=21.0.0", "elysia": ">=1.4.18", "react": ">=19.0.0", "vue": ">=3.5.0" }, "optionalPeers": ["@angular/core", "react", "vue"] }, "sha512-QOr4QQOeDzPQckL2RdJAyoP0mxvjxDdLig/ifvypwPlQUpdotNpcxBv1ivLysdsLqmjgcNOXp6O3LbMicY4kEw=="],
 
-    "@absolutejs/voice-assemblyai": ["@absolutejs/voice-assemblyai@0.0.19-beta.101", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.324" } }, "sha512-8ClyZ1ZfG++pvIMv4reBqCDzUuZNYmTouerUGCf6f9d9b+rgJIAhoKnsB3kpbeDkJdjIkdYEzTyhPpUD3QJcQA=="],
+    "@absolutejs/voice-assemblyai": ["@absolutejs/voice-assemblyai@0.0.19-beta.102", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.325" } }, "sha512-QozfFr9iOOcP4wrhXnzAekhlFnzxVLdZcspliI7OIkRDwgPGCtFpYrjLgWjY3p65wHYZdUju8Zdn5IqfzkHMIg=="],
 
-    "@absolutejs/voice-deepgram": ["@absolutejs/voice-deepgram@0.0.20-beta.71", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.324" } }, "sha512-1P4dE/Xb3A3fg97mxIJTib+0bq0C6fRTXip7AZqUPNUzgYZRhwZYQ097J7lYS5TUfW4nmiW1QuN3W4zGjF4qMA=="],
+    "@absolutejs/voice-deepgram": ["@absolutejs/voice-deepgram@0.0.20-beta.72", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.325" } }, "sha512-BUo92UtSDYcrgN6C+3NVifwXnx8c8dppYxNuqLWjk9q47lDrsM+lAnayvwr88u/ZC54+BPnSMz8tsqAKqFrW3w=="],
 
-    "@absolutejs/voice-gemini": ["@absolutejs/voice-gemini@0.0.1-beta.18", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.324" } }, "sha512-SXSaMSv/yETWE0WcJ8s9ik9cZ9zRumVq3ue+LfysXKDGR4sDQKqKn1nEiuJZ7bq/4VAHXOKRuDwFW0SDq3GKgw=="],
+    "@absolutejs/voice-gemini": ["@absolutejs/voice-gemini@0.0.1-beta.19", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.325" } }, "sha512-4cp6pC/Tnj2/Krbt7fYh8Uph2ilxlKe0ziEM9iuM8Po+G/ZGY4Ge3mDPOoJqdae1pG+Nk+QAhnPLdqvmomhX2Q=="],
 
-    "@absolutejs/voice-openai": ["@absolutejs/voice-openai@0.0.7-beta.18", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.324" } }, "sha512-GcDNQadE+f8AzpcQzzbqZEl/bgq3KdhJqvX3zMYbpCRN6PP0Metssn/ql4Xl9VdEfrlgPDxmtMBibfmYY8U9tg=="],
+    "@absolutejs/voice-openai": ["@absolutejs/voice-openai@0.0.7-beta.19", "", { "dependencies": { "@absolutejs/voice": "0.0.22-beta.325" } }, "sha512-6+93fUfkVVqCPOQlG4fzQ+j+g6eeWZw/7nXQwuVI0pHoRtZ/9dXJvIM0xUdUCs8M5hYtzzzcf9xFa2a3YFcq2Q=="],
 
     "@angular/common": ["@angular/common@21.2.9", "", { "dependencies": { "tslib": "^2.3.0" }, "peerDependencies": { "@angular/core": "21.2.9", "rxjs": "^6.5.3 || ^7.4.0" } }, "sha512-7spQcF3hPN/fjTx6Pwa32KRRdO0NcixnRuPV4lo50ejtXesjiLVR+fkaX38sawAyGoq89IuuYvUDrbLwCMypmQ=="],
 
