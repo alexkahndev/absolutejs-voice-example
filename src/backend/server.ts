@@ -3413,6 +3413,12 @@ const demoChecklistItems = [
   },
   {
     description:
+      "Queue browser or phone recovery proof jobs and watch readiness repair status live.",
+    href: "/voice/real-call-profile-recovery",
+    label: "Run real-call recovery jobs",
+  },
+  {
+    description:
       "Show the compact gate JSON your own deploy script can check before release.",
     href: "/deploy-gate",
     label: "Explain deploy gate",
@@ -3523,6 +3529,186 @@ const renderDemoChecklistHTML = () => {
     </body>
   </html>`;
 };
+
+const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>AbsoluteJS Voice Real-Call Recovery Jobs</title>
+      <style>
+        :root{color-scheme:dark;--bg:#0c1116;--panel:#141d24;--panel-2:#17252f;--line:#2d4050;--text:#f7fbff;--muted:#9eb2c2;--accent:#7dd3fc;--good:#86efac;--bad:#fca5a5;--warn:#facc15}
+        *{box-sizing:border-box}
+        body{background:radial-gradient(circle at top left,rgba(125,211,252,.16),transparent 34rem),linear-gradient(135deg,#0c1116,#111827 58%,#11140c);color:var(--text);font-family:ui-sans-serif,system-ui,sans-serif;margin:0}
+        main{max-width:1120px;margin:auto;padding:32px}
+        a{color:var(--accent)}
+        button{background:var(--accent);border:0;border-radius:999px;color:#062235;cursor:pointer;font-weight:800;padding:10px 14px}
+        button:disabled{cursor:not-allowed;filter:grayscale(.8);opacity:.6}
+        code{background:#0a0f14;border:1px solid var(--line);border-radius:8px;padding:2px 6px}
+        h1{font-size:clamp(2.2rem,6vw,4.8rem);line-height:.9;margin:.2rem 0 1rem;max-width:900px}
+        h2{margin:.2rem 0 .7rem}
+        p{line-height:1.6}
+        .hero,.panel{background:linear-gradient(135deg,rgba(20,29,36,.94),rgba(23,37,47,.86));border:1px solid var(--line);border-radius:28px;box-shadow:0 24px 80px rgba(0,0,0,.28);padding:24px}
+        .hero{margin-bottom:16px}
+        .muted{color:var(--muted)}
+        .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+        .actions,.jobs{display:grid;gap:12px}
+        .card{background:#0d151c;border:1px solid var(--line);border-radius:20px;padding:16px}
+        .card header{align-items:flex-start;display:flex;gap:12px;justify-content:space-between}
+        .pill{border:1px solid var(--line);border-radius:999px;color:var(--muted);font-size:.8rem;font-weight:800;padding:5px 9px;text-transform:uppercase}
+        .pass{color:var(--good)}.fail{color:var(--bad)}.running,.queued{color:var(--warn)}
+        pre{background:#080d12;border:1px solid var(--line);border-radius:16px;max-height:340px;overflow:auto;padding:14px;white-space:pre-wrap}
+      </style>
+    </head>
+    <body>
+      <main>
+        <p><a href="/ops-console">Back to Ops Console</a> · <a href="/production-readiness">Production Readiness</a> · <a href="/voice/real-call-profile-history">Profile History</a> · <a href="/api/voice/real-call-profile-history/actions">Actions JSON</a></p>
+        <section class="hero">
+          <p class="muted">Executable proof repair</p>
+          <h1>Run recovery jobs instead of reading stale instructions</h1>
+          <p class="muted">This page uses the same primitive routes a self-hosted app can mount: list recovery actions, POST an action, receive a <code>jobId</code>, and poll <code>/actions/:jobId</code>.</p>
+        </section>
+        <section class="grid">
+          <article class="panel">
+            <h2>Recommended Actions</h2>
+            <p class="muted">Loaded from <code>/api/voice/real-call-profile-history/actions</code>. Green systems may only recommend refresh.</p>
+            <div id="recommended" class="actions"></div>
+          </article>
+          <article class="panel">
+            <h2>Proof Jobs</h2>
+            <p class="muted">These are safe demo controls for rerunning the proof surfaces even when readiness is already passing.</p>
+            <div id="proof-jobs" class="actions"></div>
+          </article>
+        </section>
+        <section class="panel" style="margin-top:14px">
+          <h2>Job Status</h2>
+          <div id="jobs" class="jobs"></div>
+        </section>
+        <section class="panel" style="margin-top:14px">
+          <h2>Latest Payload</h2>
+          <pre id="payload">Loading...</pre>
+        </section>
+      </main>
+      <script>
+        const base = "/api/voice/real-call-profile-history";
+        const payload = document.querySelector("#payload");
+        const recommended = document.querySelector("#recommended");
+        const proofJobs = document.querySelector("#proof-jobs");
+        const jobs = document.querySelector("#jobs");
+        const pollers = new Map();
+        const staticJobs = [
+          {
+            description: "Run real browser microphone/WebSocket profile proof against this demo server.",
+            href: base + "/collect-browser-proof",
+            id: "collect-browser-proof",
+            label: "Run browser profile proof",
+            method: "POST"
+          },
+          {
+            description: "Run Twilio, Telnyx, and Plivo phone smoke-contract proof.",
+            href: base + "/collect-phone-proof",
+            id: "collect-phone-proof",
+            label: "Run phone smoke proof",
+            method: "POST"
+          }
+        ];
+
+        const showPayload = (value) => {
+          payload.textContent = JSON.stringify(value, null, 2);
+        };
+
+        const actionCard = (action) => {
+          const card = document.createElement("div");
+          card.className = "card";
+          const canPost = action.method === "POST";
+          card.innerHTML = \`
+            <header>
+              <div>
+                <strong>\${action.label ?? action.id}</strong>
+                <p class="muted">\${action.description ?? action.href}</p>
+              </div>
+              <span class="pill">\${action.method ?? "GET"}</span>
+            </header>
+          \`;
+          const button = document.createElement("button");
+          button.textContent = canPost ? "Run action" : "Open";
+          button.addEventListener("click", async () => {
+            if (!canPost) {
+              window.location.href = action.href;
+              return;
+            }
+            button.disabled = true;
+            button.textContent = "Queued...";
+            try {
+              const response = await fetch(action.href, { method: "POST" });
+              const result = await response.json();
+              showPayload(result);
+              if (result.jobId) {
+                renderJob({ id: result.jobId, actionId: result.actionId, status: result.jobStatus ?? "queued", message: result.message });
+                pollJob(result.jobId);
+              }
+              button.textContent = "Run again";
+            } catch (error) {
+              showPayload({ error: error instanceof Error ? error.message : String(error) });
+              button.textContent = "Failed";
+            } finally {
+              button.disabled = false;
+            }
+          });
+          card.append(button);
+          return card;
+        };
+
+        const renderJob = (job) => {
+          let card = document.querySelector(\`[data-job-id="\${job.id}"]\`);
+          if (!card) {
+            card = document.createElement("div");
+            card.className = "card";
+            card.dataset.jobId = job.id;
+            jobs.prepend(card);
+          }
+          card.innerHTML = \`
+            <header>
+              <div>
+                <strong>\${job.actionId ?? "Recovery job"}</strong>
+                <p class="muted"><code>\${job.id}</code></p>
+                <p>\${job.message ?? "Waiting for update..."}</p>
+              </div>
+              <span class="pill \${job.status}">\${job.status}</span>
+            </header>
+          \`;
+        };
+
+        const pollJob = (jobId) => {
+          if (pollers.has(jobId)) return;
+          const tick = async () => {
+            const response = await fetch(base + "/actions/" + encodeURIComponent(jobId));
+            const result = await response.json();
+            showPayload(result);
+            if (result.job) {
+              renderJob(result.job);
+              if (result.job.status === "pass" || result.job.status === "fail") {
+                clearInterval(pollers.get(jobId));
+                pollers.delete(jobId);
+              }
+            }
+          };
+          tick();
+          pollers.set(jobId, setInterval(tick, 1200));
+        };
+
+        const load = async () => {
+          const response = await fetch(base + "/actions");
+          const result = await response.json();
+          showPayload(result);
+          recommended.replaceChildren(...(result.actions ?? []).map(actionCard));
+          proofJobs.replaceChildren(...staticJobs.map(actionCard));
+        };
+
+        load().catch((error) => showPayload({ error: error instanceof Error ? error.message : String(error) }));
+      </script>
+    </body>
+  </html>`;
 
 const vapiMigrationItems = [
   {
@@ -5390,6 +5576,13 @@ const opsSurfaceLinks = [
     href: "/deploy-gate",
     label: "Deploy Gate",
     statusHref: "/api/production-readiness/gate",
+  },
+  {
+    description:
+      "Queue real-call profile recovery proof jobs and poll their status.",
+    href: "/voice/real-call-profile-recovery",
+    label: "Real-Call Recovery Jobs",
+    statusHref: "/api/voice/real-call-profile-history/actions",
   },
   {
     description:
@@ -10737,6 +10930,13 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
     "/demo-checklist",
     () =>
       new Response(renderDemoChecklistHTML(), {
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+  )
+  .get(
+    "/voice/real-call-profile-recovery",
+    () =>
+      new Response(renderRealCallProfileRecoveryHTML(), {
         headers: { "content-type": "text/html; charset=utf-8" },
       }),
   )
