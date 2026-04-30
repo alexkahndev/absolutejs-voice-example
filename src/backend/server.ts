@@ -56,6 +56,7 @@ import {
   createVoiceProofTrendRecommendationRoutes,
   createVoiceProofTrendRoutes,
   createVoiceRealCallProfileHistoryRoutes,
+  createVoiceRealCallProfileRecoveryActionRoutes,
   buildVoiceRealCallProfileHistoryReport,
   buildVoiceRealCallProfileReadinessCheck,
   loadVoiceRealCallProfileEvidenceFromTraceStore,
@@ -10678,6 +10679,59 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
       name: "absolutejs-voice-example-real-call-profile-history",
       source: readRealCallProfileHistory,
       title: "AbsoluteJS Voice Real-Call Profile History",
+    }),
+  )
+  .use(
+    createVoiceRealCallProfileRecoveryActionRoutes({
+      handlers: {
+        "collect-browser-proof": async () => {
+          const report = await readLatestBrowserCallProfiles();
+          const passing = report.status === "pass";
+
+          return {
+            ok: passing,
+            status: passing ? "pass" : "fail",
+            message: passing
+              ? "Latest browser profile proof is passing."
+              : "Browser profile proof is not passing; refresh browser profile proof and re-check readiness.",
+          };
+        },
+        "collect-phone-proof": async () => ({
+          message:
+            "Run the configured carrier smoke proof, then refresh production readiness.",
+        }),
+        "collect-provider-role-evidence": async () => {
+          realCallProfileDefaultsCache = undefined;
+          const report = await readRealCallProfileDefaultsReport();
+          const actionableProfiles = report.defaults.summary.actionableProfiles;
+          const passing = actionableProfiles >= 2;
+
+          return {
+            ok: passing,
+            report,
+            status: passing ? "pass" : "fail",
+            message: `${actionableProfiles}/${report.defaults.summary.profileCount} real-call profiles have actionable provider defaults.`,
+          };
+        },
+        refresh: async () => {
+          realCallProfileDefaultsCache = undefined;
+          await readRealCallProfileDefaultsReport();
+          await refreshProductionReadinessProof();
+
+          return {
+            message:
+              "Real-call profile history and production readiness proof refreshed.",
+          };
+        },
+      },
+      maxAgeMs: proofTrendsMaxAgeMs,
+      minActionableProfiles: 2,
+      minCycles: 10,
+      name: "absolutejs-voice-example-real-call-profile-recovery-actions",
+      path: "/api/voice/real-call-profile-history",
+      requiredProfileIds: ["meeting-recorder", "support-agent"],
+      requiredProviderRoles: ["llm", "stt", "tts"],
+      source: readRealCallProfileHistory,
     }),
   )
   .use(
