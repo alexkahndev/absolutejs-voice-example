@@ -4029,8 +4029,11 @@ const runRecoveryProofScript = async (
   }
 };
 
-const runBrowserCallProfileRecoveryProof = async () => {
+const runBrowserCallProfileRecoveryProof = async (input?: { profileId?: string }) => {
   await runRecoveryProofScript("proof:profiles:browser-call", {
+    ...(input?.profileId
+      ? { VOICE_BROWSER_CALL_PROFILE_ID: input.profileId }
+      : {}),
     VOICE_BROWSER_CALL_USE_EXISTING_SERVER: "1",
   });
   realCallProfileDefaultsCache = undefined;
@@ -4046,12 +4049,15 @@ const runBrowserCallProfileRecoveryProof = async () => {
   } as const;
 };
 
-const runPhoneSmokeRecoveryProof = async () => {
+const runPhoneSmokeRecoveryProof = async (input?: { profileId?: string }) => {
   const baseUrl = resolveRecoveryProofBaseUrl();
   const providers = ["twilio", "telnyx", "plivo"] as const;
   const results = await Promise.all(
     providers.map(async (provider) => {
       const sessionId = `profile-recovery-${provider}-${Date.now()}`;
+      if (input?.profileId) {
+        sessionVoiceProfileIds.set(sessionId, input.profileId);
+      }
       const response = await fetch(
         `${baseUrl}/api/voice/phone/smoke-contract?provider=${provider}&sessionId=${sessionId}`,
         { headers: { accept: "application/json" } },
@@ -4208,14 +4214,16 @@ const buildRealCallProfileReadinessCheck =
     buildVoiceRealCallProfileReadinessCheck(
       await readRealCallProfileDefaultsReport(),
       {
-        browserProofHref: "/voice/browser-call-profiles",
+        browserProofHref:
+          "/api/voice/real-call-profile-history/collect-browser-proof",
         href: "/voice/real-call-profile-history",
         minActionableProfiles: 2,
         minCycles: 10,
         minProfileCycles: 1,
         minProfileSessions: 1,
         operationsRecordsHref: "/voice-operations",
-        phoneProofHref: "/api/voice/phone/smoke",
+        phoneProofHref:
+          "/api/voice/real-call-profile-history/collect-phone-proof",
         productionReadinessHref: "/production-readiness",
         requiredProfileIds: ["meeting-recorder", "support-agent"],
         requiredProfileSurfaces: {
@@ -11160,8 +11168,10 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
     createVoiceRealCallProfileRecoveryActionRoutes({
       asyncActionIds: ["collect-browser-proof", "collect-phone-proof"],
       handlers: {
-        "collect-browser-proof": runBrowserCallProfileRecoveryProof,
-        "collect-phone-proof": runPhoneSmokeRecoveryProof,
+        "collect-browser-proof": ({ profileId }) =>
+          runBrowserCallProfileRecoveryProof({ profileId }),
+        "collect-phone-proof": ({ profileId }) =>
+          runPhoneSmokeRecoveryProof({ profileId }),
         "collect-provider-role-evidence": async () => {
           realCallProfileDefaultsCache = undefined;
           const report = await readRealCallProfileDefaultsReport();
