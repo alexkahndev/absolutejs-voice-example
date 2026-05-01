@@ -1,6 +1,5 @@
 import { getEnv, networking, prepare } from "@absolutejs/absolute";
 import {
-  applyVoiceCampaignTelephonyOutcome,
   applyPhraseHintCorrections,
   appendVoiceIOProviderRouterTraceEvent,
   appendVoiceProviderRouterTraceEvent,
@@ -25,6 +24,7 @@ import {
   createVoiceAuditEvent,
   createVoiceAuditSinkDeliveryRecord,
   createVoiceCampaignRoutes,
+  createVoiceCampaignTelephonyOutcomeRecorder,
   createVoiceDeliverySinkPair,
   createVoiceDeliverySinkRoutes,
   createVoiceDeliveryRuntime,
@@ -1191,40 +1191,14 @@ const renderVoiceSessionsWithSupportActions = (
 
   return html;
 };
-type TelephonyWebhookDecisionSnapshot = {
-  action: string;
-  at: number;
-  campaignOutcome: unknown;
-  disposition?: string;
-  duplicate?: boolean;
-  idempotencyKey?: string;
-  provider: VoiceTelephonyProvider;
-  routeResult: unknown;
-  source?: string;
-  sessionId?: string;
-};
-const telephonyWebhookDecisionSnapshots: TelephonyWebhookDecisionSnapshot[] =
-  [];
 const recordTelephonyWebhookDecision = async (
   provider: VoiceTelephonyProvider,
-  input: Parameters<typeof recordCampaignTelephonyOutcome>[0] &
-    Pick<VoiceTelephonyWebhookDecision, "duplicate" | "idempotencyKey">,
+  input: VoiceTelephonyWebhookDecision,
 ) => {
-  const { decision } = input;
-  const campaignOutcome = await recordCampaignTelephonyOutcome(input);
-  telephonyWebhookDecisionSnapshots.unshift({
-    action: decision.action,
-    at: Date.now(),
-    campaignOutcome,
-    disposition: decision.disposition,
-    duplicate: input.duplicate,
-    idempotencyKey: input.idempotencyKey,
+  await telephonyOutcomeRecorder.record({
+    ...input,
     provider,
-    routeResult: input.routeResult,
-    source: decision.source,
-    sessionId: input.sessionId,
   });
-  telephonyWebhookDecisionSnapshots.splice(20);
 };
 
 const base64FromBytes = (bytes: ArrayBuffer | Uint8Array) =>
@@ -3198,25 +3172,10 @@ const telephonyWebhookIdempotencyStore =
 const campaignStore = createVoiceSQLiteCampaignStore({
   path: resolve(runtimeDirectory, "campaigns.sqlite"),
 });
-const recordCampaignTelephonyOutcome = (input: {
-  decision: Parameters<
-    typeof applyVoiceCampaignTelephonyOutcome
-  >[0]["decision"];
-  event: Parameters<typeof applyVoiceCampaignTelephonyOutcome>[0]["event"];
-  routeResult?: unknown;
-  sessionId?: string;
-}) =>
-  applyVoiceCampaignTelephonyOutcome(
-    {
-      decision: input.decision,
-      event: input.event,
-      routeResult: input.routeResult,
-      sessionId: input.sessionId,
-    },
-    {
-      store: campaignStore,
-    },
-  );
+const telephonyOutcomeRecorder = createVoiceCampaignTelephonyOutcomeRecorder({
+  maxSnapshots: 20,
+  store: campaignStore,
+});
 
 const renderCampaignDialerProofHTML = () => `<!doctype html>
   <html lang="en">
@@ -3363,11 +3322,12 @@ const renderTelephonyOutcomePreviewHTML = () => {
 };
 
 const renderTelephonyWebhookDecisionsHTML = () => {
-  const rows = telephonyWebhookDecisionSnapshots.length
-    ? telephonyWebhookDecisionSnapshots
+  const decisions = telephonyOutcomeRecorder.list();
+  const rows = decisions.length
+    ? decisions
         .map(
           (decision) => `<tr>
-            <td><strong>${escapeHtml(decision.provider)}</strong><br /><span class="muted">${escapeHtml(
+            <td><strong>${escapeHtml(decision.provider ?? "unknown")}</strong><br /><span class="muted">${escapeHtml(
               new Date(decision.at).toLocaleString("en-US", {
                 dateStyle: "medium",
                 timeStyle: "medium",
@@ -11492,11 +11452,14 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
     policy: telephonyOutcomePolicy,
     previews: listTelephonyOutcomePreviews(),
   }))
-  .get("/api/telephony-webhook-decisions", () => ({
-    decisions: telephonyWebhookDecisionSnapshots,
-    generatedAt: Date.now(),
-    total: telephonyWebhookDecisionSnapshots.length,
-  }))
+  .get("/api/telephony-webhook-decisions", () => {
+    const decisions = telephonyOutcomeRecorder.list();
+    return {
+      decisions,
+      generatedAt: Date.now(),
+      total: decisions.length,
+    };
+  })
   .get(
     "/api/telephony-webhook/verification-proof",
     async () => await runTelephonyWebhookVerificationProof(),
