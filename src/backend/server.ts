@@ -2,6 +2,7 @@ import { getEnv, networking, prepare } from "@absolutejs/absolute";
 import {
   applyVoiceCampaignTelephonyOutcome,
   applyPhraseHintCorrections,
+  appendVoiceRealCallProfileRecoveryEvidence,
   assignVoiceOpsTask,
   completeVoiceOpsTask,
   createVoiceSQLiteTelephonyWebhookIdempotencyStore,
@@ -4097,82 +4098,25 @@ const runBrowserCallProfileRecoveryProof = async (input?: {
     const modelProvider = configuredModelProviders[0] ?? "openai";
     const sttProvider = configuredSTTProviders[0] ?? "deepgram";
     const ttsProvider = configuredTTSProviders[0] ?? "openai";
-    sessionVoiceProfileIds.set(sessionId, profileId);
-    await Promise.all([
-      deliveryTraceStore.append(
-        createVoiceProviderDecisionTraceEvent({
-          at,
-          elapsedMs: 320,
-          kind: "llm",
-          provider: modelProvider,
-          reason:
-            "Real-call profile recovery selected the configured model provider for the profiled browser session.",
-          scenarioId: "real-call-profile-recovery",
-          selectedProvider: modelProvider,
-          sessionId,
-          status: "selected",
-          surface: "live-call",
-        }),
-      ),
-      deliveryTraceStore.append(
-        createVoiceProviderDecisionTraceEvent({
-          at: at + 1,
-          elapsedMs: 82,
-          kind: "stt",
-          provider: sttProvider,
-          reason:
-            "Real-call profile recovery selected the configured STT provider for the profiled browser session.",
-          scenarioId: "real-call-profile-recovery",
-          selectedProvider: sttProvider,
-          sessionId,
-          status: "selected",
-          surface: "live-stt",
-        }),
-      ),
-      deliveryTraceStore.append(
-        createVoiceProviderDecisionTraceEvent({
-          at: at + 2,
-          elapsedMs: 45,
-          kind: "tts",
-          provider: ttsProvider,
-          reason:
-            "Real-call profile recovery selected the configured TTS provider for the profiled browser session.",
-          scenarioId: "real-call-profile-recovery",
-          selectedProvider: ttsProvider,
-          sessionId,
-          status: "selected",
-          surface: "live-tts",
-        }),
-      ),
-    ]);
-    await deliveryTraceStore.append(
-      createVoiceTraceEvent({
-        at: at + 3,
-        metadata: { profileId },
-        payload: {
-          firstAudioLatencyMs: 420,
-          messageCount: report.summary?.totalMessages,
-          openSockets: report.summary?.openSockets,
-          receivedBytes: report.summary?.receivedBytes,
-          sentBytes: report.summary?.sentBytes,
-          status: "pass",
-        },
-        sessionId,
-        type: "client.browser_media",
-      }),
-    );
-    await deliveryTraceStore.append(
-      createVoiceTraceEvent({
-        at: at + 4,
-        metadata: { profileId },
-        payload: {
-          latencyMs: 420,
-          status: "pass",
-        },
-        sessionId,
-        type: "client.live_latency",
-      }),
-    );
+    await appendVoiceRealCallProfileRecoveryEvidence({
+      at,
+      browser: {
+        firstAudioLatencyMs: 420,
+        messageCount: report.summary?.totalMessages,
+        openSockets: report.summary?.openSockets,
+        receivedBytes: report.summary?.receivedBytes,
+        sentBytes: report.summary?.sentBytes,
+      },
+      live: { latencyMs: 420 },
+      profileId,
+      providers: {
+        llm: modelProvider,
+        stt: sttProvider,
+        tts: ttsProvider,
+      },
+      sessionId,
+      store: deliveryTraceStore,
+    });
   }
 
   return {
@@ -4213,6 +4157,35 @@ const runPhoneSmokeRecoveryProof = async (input?: { profileId?: string }) => {
         .map((result) => `${result.provider} (${result.status})`)
         .join(", ")}.`,
     } as const;
+  }
+
+  if (input?.profileId) {
+    const at = Date.now();
+    const modelProvider = configuredModelProviders[0] ?? "openai";
+    const sttProvider = configuredSTTProviders[0] ?? "deepgram";
+    const ttsProvider = configuredTTSProviders[0] ?? "openai";
+    await Promise.all(
+      [...results, { provider: "phone-aggregate" }].map((result, index) =>
+        appendVoiceRealCallProfileRecoveryEvidence({
+          at: at + index,
+          browser: false,
+          live: { latencyMs: 480 },
+          metadata: {
+            carrier: result.provider,
+            surface: "phone",
+          },
+          profileId: input.profileId as string,
+          providers: {
+            llm: modelProvider,
+            stt: sttProvider,
+            tts: ttsProvider,
+          },
+          scenarioId: "phone-profile-recovery",
+          sessionId: `profile-recovery-${result.provider}-${input.profileId}-${at}`,
+          store: deliveryTraceStore,
+        }),
+      ),
+    );
   }
 
   return {
