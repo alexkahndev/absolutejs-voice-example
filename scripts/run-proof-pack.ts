@@ -33,7 +33,7 @@ import {
   evaluateVoiceLiveOpsControlEvidence,
   evaluateVoiceLiveOpsEvidence,
   createVoiceEvidenceAssertion,
-  getVoiceProofTargetLogicalFailure,
+  runVoiceCommandProofTargets,
   runVoiceProofTargets,
   buildVoiceFailureReplay,
   buildVoicePlatformCoverageSummary,
@@ -72,29 +72,12 @@ import {
   type VoiceTelephonyWebhookVerificationEvidenceAttempt,
   type VoiceToolContractSuiteReport,
   type VoiceProofAssertionResult as JsonAssertionResult,
+  type VoiceCommandProofTarget as CommandProofTarget,
+  type VoiceCommandProofTargetResult as CommandProofResult,
   type VoiceProofTarget as ProofTarget,
   type VoiceProofTargetMethod as ProofMethod,
   type VoiceProofTargetResult as ProofResult,
 } from "@absolutejs/voice";
-
-type CommandProofTarget = {
-  command: string[];
-  kind: "command";
-  name: string;
-};
-
-type CommandProofResult = {
-  body?: unknown;
-  bytes: number;
-  command: string[];
-  elapsedMs: number;
-  error?: string;
-  kind: "command";
-  name: string;
-  ok: boolean;
-  status?: number;
-  summary?: Record<string, unknown>;
-};
 
 const baseUrl = (
   process.env.VOICE_DEMO_URL ?? `http://127.0.0.1:${process.env.PORT ?? "3004"}`
@@ -109,7 +92,6 @@ const outputRoot =
 
 const runId = new Date().toISOString().replaceAll(":", "-");
 const outputDir = join(outputRoot, runId);
-const encoder = new TextEncoder();
 const webhookProofIds = {
   plivoTransfer: `proof-plivo-transfer-${runId}`,
   telnyxVoicemail: `proof-telnyx-voicemail-${runId}`,
@@ -1046,67 +1028,6 @@ const commandProofTargets: CommandProofTarget[] = [
   },
 ];
 
-const summarizeValue = (value: unknown): unknown => {
-  if (Array.isArray(value)) {
-    return { count: value.length };
-  }
-  if (!value || typeof value !== "object") {
-    return value;
-  }
-
-  const record = value as Record<string, unknown>;
-  const preferredKeys = [
-    "status",
-    "ok",
-    "pass",
-    "ready",
-    "proof",
-    "total",
-    "passed",
-    "failed",
-    "issues",
-    "summary",
-    "links",
-    "actions",
-    "checks",
-    "campaigns",
-    "recipients",
-    "attempts",
-    "telephonyMedia",
-    "operationsRecordHref",
-    "sentEvents",
-    "tasks",
-    "reviews",
-    "events",
-    "eventsWithLatency",
-    "observabilityExportReplay",
-    "validationIssues",
-    "deliveryDestinations",
-    "failedDeliveryDestinations",
-    "failedArtifacts",
-    "artifacts",
-    "kinds",
-    "redaction",
-    "retentionPlan",
-    "zeroRetentionAvailable",
-  ];
-  const summary: Record<string, unknown> = {};
-
-  for (const key of preferredKeys) {
-    if (key in record) {
-      summary[key] = summarizeValue(record[key]);
-    }
-  }
-
-  if (Object.keys(summary).length > 0) {
-    return summary;
-  }
-
-  return {
-    keys: Object.keys(record).slice(0, 12),
-  };
-};
-
 const writeArtifact = async (name: string, content: string | Uint8Array) => {
   await Bun.write(join(outputDir, name), content);
 };
@@ -1450,79 +1371,6 @@ const renderVapiCoverage = (coverage: VapiCoverageResult[]) => {
 ${rows}`;
 };
 
-const runCommandProofTarget = async (
-  target: CommandProofTarget,
-): Promise<CommandProofResult> => {
-  const startedAt = performance.now();
-  const safeName = target.name.replace(/[^a-z0-9_.-]/gi, "-");
-  const proc = Bun.spawn(target.command, {
-    env: {
-      ...process.env,
-      PORT: process.env.PORT ?? "3004",
-      VOICE_DEMO_URL: baseUrl,
-    },
-    stderr: "pipe",
-    stdout: "pipe",
-  });
-  const [stdout, stderr, status] = await Promise.all([
-    new Response(proc.stdout).text(),
-    new Response(proc.stderr).text(),
-    proc.exited,
-  ]);
-  const text = stdout.trim();
-  const bytes = encoder.encode(`${stdout}${stderr}`).byteLength;
-  let body: unknown = text;
-  let parseError: string | undefined;
-
-  if (text) {
-    const jsonStart = text.indexOf("{");
-    const jsonText = jsonStart >= 0 ? text.slice(jsonStart) : text;
-    try {
-      body = JSON.parse(jsonText) as unknown;
-    } catch (error) {
-      parseError = error instanceof Error ? error.message : String(error);
-    }
-  }
-
-  await writeArtifact(
-    `${safeName}.json`,
-    `${JSON.stringify(
-      {
-        command: target.command,
-        parseError,
-        stderr,
-        stdout,
-        status,
-        summary: parseError ? undefined : body,
-      },
-      null,
-      2,
-    )}\n`,
-  );
-
-  const logicalFailure = !parseError
-    ? getVoiceProofTargetLogicalFailure(body)
-    : undefined;
-
-  return {
-    body,
-    bytes,
-    command: target.command,
-    elapsedMs: Math.round(performance.now() - startedAt),
-    error:
-      parseError ??
-      logicalFailure ??
-      (status === 0 ? undefined : stderr.trim() || `Command exited ${status}`),
-    kind: "command",
-    name: target.name,
-    ok: status === 0 && !parseError && !logicalFailure,
-    status,
-    summary: parseError
-      ? { bytes, parseError }
-      : (summarizeValue(body) as Record<string, unknown>),
-  };
-};
-
 const renderMarkdown = (input: {
   baseUrl: string;
   campaignDialerProofEvidenceAssertion: JsonAssertionResult;
@@ -1737,9 +1585,31 @@ seedResults.push(
   ...(await runTargets(orderedSeedTargets, 1)),
 );
 const proofResults = await runTargets(proofTargets);
-const commandResults = await Promise.all(
-  commandProofTargets.map(runCommandProofTarget),
-);
+const commandResults = await runVoiceCommandProofTargets(commandProofTargets, {
+  execute: async (target) => {
+    const proc = Bun.spawn(target.command, {
+      env: {
+        ...process.env,
+        PORT: process.env.PORT ?? "3004",
+        VOICE_DEMO_URL: baseUrl,
+      },
+      stderr: "pipe",
+      stdout: "pipe",
+    });
+    const [stdout, stderr, status] = await Promise.all([
+      new Response(proc.stdout).text(),
+      new Response(proc.stderr).text(),
+      proc.exited,
+    ]);
+
+    return {
+      status,
+      stderr,
+      stdout,
+    };
+  },
+  writeArtifact: ({ content, name }) => writeArtifact(name, content),
+});
 const operationsRecord = proofResults.find(
   (result) => result.name === "operationsRecord",
 )?.body as VoiceOperationsRecord | undefined;
