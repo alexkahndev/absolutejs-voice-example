@@ -2,6 +2,7 @@
   import { onDestroy, onMount } from "svelte";
   import Head from "@absolutejs/absolute/svelte/components/Head.js";
   import {
+    createVoiceCallDebugger,
     createVoiceDeliveryRuntime,
     createVoiceOpsActionCenter,
     createVoiceOpsStatus,
@@ -28,7 +29,6 @@
     renderVoiceProofTrendsHTML,
     renderVoiceReadinessFailuresHTML,
     createVoiceOpsActionCenterActions,
-    mountVoiceCallDebuggerLaunch,
     mountVoiceOpsActionHistory,
   } from "@absolutejs/voice/client";
   import type { VoiceStream, VoiceStreamState } from "@absolutejs/voice";
@@ -145,6 +145,7 @@
   let proofTrendsHTML = $state("");
   let readinessFailuresHTML = $state("");
   let sessionSnapshotHTML = $state("");
+  let callDebuggerHTML = $state("");
   let providerCapabilitiesHTML = $state("");
   let providerContractsHTML = $state("");
   let providerSimulationHTML = $state("");
@@ -173,13 +174,10 @@
   let bargeInProofElement: HTMLElement | null = null;
   let opsActionHistoryElement: HTMLElement | null = null;
   let liveOpsPanelElement: HTMLElement | null = null;
-  let callDebuggerLaunchElement: HTMLElement | null = null;
   let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
   let opsActionHistory: ReturnType<typeof mountVoiceOpsActionHistory> | null =
     null;
   let liveOpsPanel: ReturnType<typeof mountVoiceLiveOpsPanel> | null = null;
-  let callDebuggerLaunch: ReturnType<typeof mountVoiceCallDebuggerLaunch> | null =
-    null;
   let providerSimulationElement: HTMLElement | null = null;
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
   let guidedVoice: VoiceStream<SavedIntake> | null = null;
@@ -263,6 +261,16 @@
     },
   );
   sessionSnapshotHTML = sessionSnapshot.getHTML();
+  const callDebugger = createVoiceCallDebugger(
+    "/api/voice-call-debugger/latest",
+    {
+      description:
+        "Svelte opens the latest full call debugger with snapshot, replay, provider path, transcript, and incident markdown.",
+      intervalMs: 5_000,
+      title: "Debug Latest Call",
+    },
+  );
+  callDebuggerHTML = callDebugger.getHTML();
   const providerStatus = createVoiceProviderStatus("/api/provider-status", {
     intervalMs: 5_000,
   });
@@ -316,6 +324,7 @@
   let unsubscribeProofTrends = () => {};
   let unsubscribeReadinessFailures = () => {};
   let unsubscribeSessionSnapshot = () => {};
+  let unsubscribeCallDebugger = () => {};
   let unsubscribeProviderSimulation = () => {};
   let unbindProviderSimulation = () => {};
   let unsubscribeProviderCapabilities = () => {};
@@ -653,6 +662,9 @@
     unsubscribeSessionSnapshot = sessionSnapshot.subscribe(() => {
       sessionSnapshotHTML = sessionSnapshot.getHTML();
     });
+    unsubscribeCallDebugger = callDebugger.subscribe(() => {
+      callDebuggerHTML = callDebugger.getHTML();
+    });
     unsubscribeDeliveryRuntime = deliveryRuntime.subscribe(() => {
       deliveryRuntimeHTML = deliveryRuntime.getHTML();
     });
@@ -713,6 +725,7 @@
       readinessFailuresWidgetOptions,
     );
     sessionSnapshotHTML = sessionSnapshot.getHTML();
+    callDebuggerHTML = callDebugger.getHTML();
     providerCapabilitiesHTML = providerCapabilities.getHTML();
     providerContractsHTML = providerContracts.getHTML();
     providerSimulationHTML = providerSimulation.getHTML();
@@ -728,6 +741,7 @@
     void profileSwitchRecommendation.refresh().catch(() => {});
     void readinessFailures.refresh().catch(() => {});
     void sessionSnapshot.refresh().catch(() => {});
+    void callDebugger.refresh().catch(() => {});
     void providerCapabilities.refresh().catch(() => {});
     void providerContracts.refresh().catch(() => {});
     void providerStatus.refresh().catch(() => {});
@@ -749,18 +763,6 @@
         opsActionHistoryElement,
         "/api/voice/ops-actions/history",
         { intervalMs: 5_000 },
-      );
-    }
-    if (callDebuggerLaunchElement) {
-      callDebuggerLaunch = mountVoiceCallDebuggerLaunch(
-        callDebuggerLaunchElement,
-        "/api/voice-call-debugger/latest",
-        {
-          description:
-            "Svelte opens the latest full call debugger with snapshot, replay, provider path, transcript, and incident markdown.",
-          intervalMs: 5_000,
-          title: "Debug Latest Call",
-        },
       );
     }
     if (liveOpsPanelElement) {
@@ -820,9 +822,11 @@
     unsubscribeProofTrends();
     unsubscribeReadinessFailures();
     unsubscribeSessionSnapshot();
+    unsubscribeCallDebugger();
     unsubscribeProviderSimulation();
     readinessFailures.close();
     sessionSnapshot.close();
+    callDebugger.close();
     unbindProviderSimulation();
     unsubscribeProviderCapabilities();
     unsubscribeProviderContracts();
@@ -834,7 +838,6 @@
     bargeInProof?.close();
     opsActionHistory?.close();
     liveOpsPanel?.close();
-    callDebuggerLaunch?.close();
     guidedVoice?.close();
     generalVoice?.close();
     opsStatus.close();
@@ -1030,10 +1033,9 @@
         {@html sessionSnapshotHTML}
       </div>
 
-      <div
-        bind:this={callDebuggerLaunchElement}
-        class="voice-card voice-provider-health-card"
-      ></div>
+      <div class="voice-card voice-provider-health-card">
+        {@html callDebuggerHTML}
+      </div>
 
       <div class="voice-card voice-routing-card voice-routing-status-host">
         {@html routingStatusHTML}

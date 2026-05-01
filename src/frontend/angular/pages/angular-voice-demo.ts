@@ -9,7 +9,7 @@ import {
 } from "@angular/core";
 import type { VoiceRoutingDecisionSummary } from "@absolutejs/voice";
 import {
-  defineVoiceCallDebuggerLaunchElement,
+  createVoiceCallDebuggerLaunchViewModel,
   defineVoiceProfileComparisonElement,
   defineVoiceProfileSwitchRecommendationElement,
   defineVoiceProviderSimulationControlsElement,
@@ -19,6 +19,7 @@ import { createVoiceOpsActionCenterActions } from "@absolutejs/voice/client";
 import {
   VoiceOpsStatusService,
   VoiceOpsActionCenterService,
+  VoiceCallDebuggerService,
   VoiceCampaignDialerProofService,
   VoiceDeliveryRuntimeService,
   VoiceProviderCapabilitiesService,
@@ -507,13 +508,52 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             }
           </article>
 
-          <absolute-voice-call-debugger-launch
-            class="voice-card voice-provider-health-card"
-            description="Angular opens the latest full call debugger with snapshot, replay, provider path, transcript, and incident markdown."
-            interval-ms="5000"
-            path="/api/voice-call-debugger/latest"
-            title="Debug Latest Call"
-          ></absolute-voice-call-debugger-launch>
+          <article
+            class="voice-card voice-provider-health-card absolute-voice-call-debugger-launch"
+            [class.absolute-voice-call-debugger-launch--ready]="
+              callDebuggerModel().status === 'ready'
+            "
+            [class.absolute-voice-call-debugger-launch--warning]="
+              callDebuggerModel().status === 'warning'
+            "
+          >
+            <header class="absolute-voice-call-debugger-launch__header">
+              <span class="absolute-voice-call-debugger-launch__eyebrow">
+                {{ callDebuggerModel().title }}
+              </span>
+              <strong class="absolute-voice-call-debugger-launch__label">
+                {{ callDebuggerModel().label }}
+              </strong>
+            </header>
+            <p class="absolute-voice-call-debugger-launch__description">
+              {{ callDebuggerModel().description }}
+            </p>
+            <a
+              class="absolute-voice-call-debugger-launch__link"
+              [href]="callDebuggerModel().href"
+            >
+              Open debugger
+            </a>
+            @if (callDebuggerModel().rows.length > 0) {
+              <dl>
+                @for (row of callDebuggerModel().rows; track row.label) {
+                  <div>
+                    <dt>{{ row.label }}</dt>
+                    <dd>{{ row.value }}</dd>
+                  </div>
+                }
+              </dl>
+            } @else {
+              <p class="absolute-voice-call-debugger-launch__empty">
+                Load a call debugger report to see the latest support artifact.
+              </p>
+            }
+            @if (callDebuggerModel().error) {
+              <p class="absolute-voice-call-debugger-launch__error">
+                {{ callDebuggerModel().error }}
+              </p>
+            }
+          </article>
 
           <article class="voice-card voice-routing-card">
             <span class="voice-framework-pill">Routing Trace</span>
@@ -1533,6 +1573,28 @@ export class AngularVoiceDemoComponent {
       },
     ),
   );
+  callDebugger = inject(VoiceCallDebuggerService).connect(
+    "/api/voice-call-debugger/latest",
+    {
+      intervalMs: 5_000,
+    },
+  );
+  callDebuggerModel = computed(() =>
+    createVoiceCallDebuggerLaunchViewModel(
+      "/api/voice-call-debugger/latest",
+      {
+        error: this.callDebugger.error(),
+        isLoading: this.callDebugger.isLoading(),
+        report: this.callDebugger.report(),
+        updatedAt: this.callDebugger.updatedAt(),
+      },
+      {
+        description:
+          "Angular opens the latest full call debugger with snapshot, replay, provider path, transcript, and incident markdown.",
+        title: "Debug Latest Call",
+      },
+    ),
+  );
   providerStatus = inject(VoiceProviderStatusService).connect(
     "/api/provider-status",
     {
@@ -1689,7 +1751,6 @@ export class AngularVoiceDemoComponent {
   private bargeInProofTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
-    defineVoiceCallDebuggerLaunchElement();
     defineVoiceProfileComparisonElement();
     defineVoiceProfileSwitchRecommendationElement();
     defineVoiceProviderSimulationControlsElement();
@@ -1951,6 +2012,7 @@ export class AngularVoiceDemoComponent {
     this.platformCoverage.close();
     this.proofTrends.close();
     this.sessionSnapshot.close();
+    this.callDebugger.close();
     this.providerCapabilities.close();
     this.providerContracts.close();
     this.providerStatus.close();

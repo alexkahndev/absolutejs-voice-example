@@ -4,6 +4,7 @@ import type { VoiceTurnRecord } from "@absolutejs/voice";
 import {
   useVoiceStream,
   useVoiceCampaignDialerProof,
+  VoiceCallDebuggerLaunch,
   VoiceDeliveryRuntime,
   VoiceOpsActionCenter,
   VoiceOpsStatus,
@@ -24,7 +25,6 @@ import {
 } from "@absolutejs/voice/react";
 import {
   createVoiceOpsActionCenterActions,
-  mountVoiceCallDebuggerLaunch,
   mountVoiceOpsActionHistory,
 } from "@absolutejs/voice/client";
 import {
@@ -139,7 +139,6 @@ export const ReactVoiceDemo = ({
   );
   const opsActionHistoryRef = useRef<HTMLDivElement | null>(null);
   const liveOpsPanelRef = useRef<HTMLDivElement | null>(null);
-  const callDebuggerLaunchRef = useRef<HTMLDivElement | null>(null);
   const bargeInProofRef = useRef<HTMLDivElement | null>(null);
   const bargeInRef = useRef<ReturnType<
     typeof createDemoBargeInEvidence
@@ -267,23 +266,6 @@ export const ReactVoiceDemo = ({
       { intervalMs: 5_000 },
     );
     return () => history.close();
-  }, []);
-  useEffect(() => {
-    if (!callDebuggerLaunchRef.current) {
-      return;
-    }
-
-    const launch = mountVoiceCallDebuggerLaunch(
-      callDebuggerLaunchRef.current,
-      "/api/voice-call-debugger/latest",
-      {
-        description:
-          "React opens the latest full call debugger with snapshot, replay, provider path, transcript, and incident markdown.",
-        intervalMs: 5_000,
-        title: "Debug Latest Call",
-      },
-    );
-    return () => launch.close();
   }, []);
   useEffect(() => {
     if (!liveOpsPanelRef.current) {
@@ -701,9 +683,12 @@ export const ReactVoiceDemo = ({
               title="Session Debug Snapshot"
             />
 
-            <div
+            <VoiceCallDebuggerLaunch
               className="voice-card voice-provider-health-card"
-              ref={callDebuggerLaunchRef}
+              description="React opens the latest full call debugger with snapshot, replay, provider path, transcript, and incident markdown."
+              intervalMs={5_000}
+              path="/api/voice-call-debugger/latest"
+              title="Debug Latest Call"
             />
 
             <VoiceRoutingStatus
