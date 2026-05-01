@@ -78,6 +78,7 @@ import {
   buildVoiceOpsRecoveryReport,
   buildVoiceObservabilityExport,
   buildVoiceObservabilityExportReplayReport,
+  createVoiceOperationalStatusRoutes,
   createVoiceObservabilityExportSchema,
   buildVoiceProofPackInput,
   writeVoiceProofPack,
@@ -12323,6 +12324,26 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
     createVoiceDeliveryRuntimeRoutes({
       runtime: deliveryRuntimeControl,
       title: "AbsoluteJS Voice Demo Delivery Runtime",
+    }),
+  )
+  .use(
+    createVoiceOperationalStatusRoutes({
+      deliveryRuntime: deliveryRuntimeControl,
+      links: {
+        deliveryRuntime: "/delivery-runtime",
+        productionReadiness: "/production-readiness",
+        proofPack: "/voice/proof-pack",
+      },
+      productionReadiness: () =>
+        buildVoiceProductionReadinessReport(
+          productionReadinessOptions({
+            fast: true,
+            includeObservabilityExport: false,
+            refresh: false,
+          }),
+        ),
+      proofPack: () => readLatestDemoVoiceProofPack.getStatus(),
+      title: "AbsoluteJS Voice Demo Operational Status",
     }),
   )
   .use(
