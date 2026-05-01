@@ -214,6 +214,7 @@ import {
   type VoiceCallReviewStore,
   type VoiceAssistantMemoryRecord,
   type VoiceAgentModel,
+  type VoiceAuditEventStore,
   type VoiceHandoffDeliveryStore,
   type VoiceIOProviderRouterEvent,
   type VoiceLiveOpsAction,
@@ -4521,13 +4522,53 @@ const readLongProofWindowCalibrationSamples = async (): Promise<
   ];
 };
 
-const loadDemoSloThresholdProfile = async () =>
-  createVoiceSloThresholdProfile(
-    await readLongProofWindowCalibrationSamples(),
-    {
-      minPassingRuns: sloCalibrationMinRuns,
-    },
-  );
+const demoSloThresholdProfileCacheMs = 60_000;
+let demoSloThresholdProfileCache:
+  | {
+      expiresAt: number;
+      promise: Promise<ReturnType<typeof createVoiceSloThresholdProfile>>;
+    }
+  | undefined;
+
+const loadDemoSloThresholdProfile = () => {
+  const now = Date.now();
+  if (
+    demoSloThresholdProfileCache &&
+    demoSloThresholdProfileCache.expiresAt > now
+  ) {
+    return demoSloThresholdProfileCache.promise;
+  }
+
+  const promise = readLongProofWindowCalibrationSamples()
+    .then((samples) =>
+      createVoiceSloThresholdProfile(samples, {
+        minPassingRuns: sloCalibrationMinRuns,
+      }),
+    )
+    .catch((error) => {
+      demoSloThresholdProfileCache = undefined;
+      throw error;
+    });
+  demoSloThresholdProfileCache = {
+    expiresAt: now + demoSloThresholdProfileCacheMs,
+    promise,
+  };
+
+  return promise;
+};
+
+const loadProofPackSloThresholdProfile = (
+  context?: ReturnType<typeof createVoiceProofPackBuildContext>,
+) =>
+  context
+    ? context.cache("sloThresholdProfile", () =>
+        context.time("sloThresholdProfile", loadDemoSloThresholdProfile),
+      )
+    : loadDemoSloThresholdProfile();
+
+void loadDemoSloThresholdProfile().catch(() => {
+  demoSloThresholdProfileCache = undefined;
+});
 
 const formatTrendMs = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value)
@@ -7497,8 +7538,14 @@ const resolveDemoSnapshotSessionId = async (requestedSessionId: string) => {
   return latest?.sessionId ?? "latest";
 };
 
-const resolveHealthyDemoSessionId = async () => {
-  const events = await deliveryTraceStore.list({ limit: 1_000 });
+const resolveHealthyDemoSessionId = async (
+  input: {
+    events?: readonly StoredVoiceTraceEvent[];
+  } = {},
+) => {
+  const events = input.events
+    ? [...input.events]
+    : await rawDeliveryTraceStore.list({ limit: 1_000 });
   const latest = events
     .filter(
       (event) =>
@@ -7516,11 +7563,13 @@ const resolveHealthyDemoSessionId = async () => {
 const buildDemoVoiceSessionSnapshot = async (input: {
   operationsRecord?: VoiceOperationsRecord;
   sessionId: string;
+  traceStore?: VoiceTraceEventStore;
   turnId?: string;
 }): Promise<VoiceSessionSnapshotInput> => {
   const sessionId = await resolveDemoSnapshotSessionId(input.sessionId);
+  const traceStore = input.traceStore ?? deliveryTraceStore;
   const [events, turnQuality, operationsRecord] = await Promise.all([
-    deliveryTraceStore.list({ limit: 500, sessionId }),
+    traceStore.list({ limit: 500, sessionId }),
     summarizeVoiceTurnQuality({
       limit: 25,
       store: runtimeStorage.session,
@@ -7656,22 +7705,54 @@ const buildLatestDemoVoiceCallDebuggerReport = async () => {
   });
 };
 
-const buildHealthyDemoVoiceSupportBundle = async (input: {
-  context?: ReturnType<typeof createVoiceProofPackBuildContext>;
-} = {}): Promise<{
+const buildHealthyDemoVoiceSupportBundle = async (
+  input: {
+    context?: ReturnType<typeof createVoiceProofPackBuildContext>;
+    proofSnapshot?: Awaited<ReturnType<typeof createVoiceProofRefreshSnapshot>>;
+    snapshot?: Awaited<ReturnType<typeof createVoiceProofRefreshSnapshot>>;
+  } = {},
+): Promise<{
   callDebuggerReport: VoiceCallDebuggerReport;
   sessionSnapshot: VoiceSessionSnapshot;
   sessionId: string;
 }> => {
-  const sessionId = await resolveHealthyDemoSessionId();
-  const operationsRecord = input.context
-    ? await input.context.cache(`operationsRecord:${sessionId}`, () =>
-        buildDemoOperationsRecord(sessionId),
+  const context = input.context;
+  const sessionId = context
+    ? await context.time("supportBundle:sessionId", () =>
+        resolveHealthyDemoSessionId({
+          events: input.snapshot?.traceEvents,
+        }),
       )
-    : await buildDemoOperationsRecord(sessionId);
-  const sessionSnapshot = buildVoiceSessionSnapshot(
-    await buildDemoVoiceSessionSnapshot({ operationsRecord, sessionId }),
-  );
+    : await resolveHealthyDemoSessionId({
+        events: input.snapshot?.traceEvents,
+      });
+  const supportTraceStore = input.snapshot?.traceStore ?? rawDeliveryTraceStore;
+  const operationsRecord = context
+    ? await context.cache(`operationsRecord:${sessionId}`, () =>
+        context.time("supportBundle:operationsRecord", () =>
+          buildDemoOperationsRecord(sessionId, {
+            audit: input.proofSnapshot?.auditStore,
+            store: supportTraceStore,
+          }),
+        ),
+      )
+    : await buildDemoOperationsRecord(sessionId, {
+        audit: input.proofSnapshot?.auditStore,
+        store: supportTraceStore,
+      });
+  const sessionSnapshot = context
+    ? await context.time("supportBundle:sessionSnapshot", async () =>
+        buildVoiceSessionSnapshot(
+          await buildDemoVoiceSessionSnapshot({
+            operationsRecord,
+            sessionId,
+            traceStore: supportTraceStore,
+          }),
+        ),
+      )
+    : buildVoiceSessionSnapshot(
+        await buildDemoVoiceSessionSnapshot({ operationsRecord, sessionId }),
+      );
   const failureReplay = buildVoiceFailureReplay(operationsRecord, {
     operationsRecordHref: `/voice-operations/${encodeURIComponent(sessionId)}`,
   });
@@ -8463,22 +8544,31 @@ const isDemoBargeInProofTrace = (trace: VoiceTraceEvent) =>
   trace.metadata?.source !== "demo" &&
   trace.metadata?.proof !== "barge-in-seed";
 
-const getBargeInReportEvents = async () => {
-  const traces = await runtimeStorage.traces.list();
+const getBargeInReportEvents = async (
+  input: {
+    events?: readonly StoredVoiceTraceEvent[];
+  } = {},
+) => {
+  const traces = input.events
+    ? [...input.events]
+    : await runtimeStorage.traces.list();
   const live = traces.filter(isDemoBargeInProofTrace);
 
   return live.length > 0 ? live : traces;
 };
 
-const getBargeInProofSource = async () =>
-  (await getBargeInReportEvents()).some(isDemoBargeInProofTrace)
-    ? "live"
-    : "demo";
-
-const buildDemoBargeInReport = async () => {
-  const source = await getBargeInProofSource();
-  const thresholdProfile = await loadDemoSloThresholdProfile();
-  const report = summarizeVoiceBargeIn(await getBargeInReportEvents(), {
+const buildDemoBargeInReport = async (
+  input: {
+    context?: ReturnType<typeof createVoiceProofPackBuildContext>;
+    events?: readonly StoredVoiceTraceEvent[];
+  } = {},
+) => {
+  const events = await getBargeInReportEvents(input);
+  const source = events.some(isDemoBargeInProofTrace) ? "live" : "demo";
+  const thresholdProfile = await loadProofPackSloThresholdProfile(
+    input.context,
+  );
+  const report = summarizeVoiceBargeIn(events, {
     thresholdMs: thresholdProfile.bargeIn.thresholdMs ?? 250,
   });
 
@@ -9316,28 +9406,34 @@ const proofPackObservabilityExportOptions = () => {
   return options;
 };
 
-const buildProductionReadinessObservabilityExport = async (input: {
-  context?: ReturnType<typeof createVoiceProofPackBuildContext>;
-  snapshot?: Awaited<ReturnType<typeof createVoiceProofRefreshSnapshot>>;
-  query?: Record<string, unknown>;
-  request?: Request;
-} = {}) =>
+const buildProductionReadinessObservabilityExport = async (
+  input: {
+    context?: ReturnType<typeof createVoiceProofPackBuildContext>;
+    snapshot?: Awaited<ReturnType<typeof createVoiceProofRefreshSnapshot>>;
+    query?: Record<string, unknown>;
+    request?: Request;
+  } = {},
+) =>
   buildVoiceObservabilityExport({
     ...proofPackObservabilityExportOptions(),
     audit: input.snapshot?.auditStore ?? productionReadinessAuditStore,
-    events: input.snapshot?.traceEvents ?? (await productionReadinessTraceStore.list()),
+    events:
+      input.snapshot?.traceEvents ??
+      (await productionReadinessTraceStore.list()),
     includeOperationsRecords: false,
     store: input.snapshot?.traceStore ?? productionReadinessTraceStore,
     traceDeliveries: undefined,
   });
 
-const buildProofPackProviderSloReport = async (input: {
-  context?: ReturnType<typeof createVoiceProofPackBuildContext>;
-  snapshot?: Awaited<ReturnType<typeof createVoiceProofRefreshSnapshot>>;
-} = {}) => {
-  const thresholdProfile = input.context
-    ? await input.context.cache("sloThresholdProfile", loadDemoSloThresholdProfile)
-    : await loadDemoSloThresholdProfile();
+const buildProofPackProviderSloReport = async (
+  input: {
+    context?: ReturnType<typeof createVoiceProofPackBuildContext>;
+    snapshot?: Awaited<ReturnType<typeof createVoiceProofRefreshSnapshot>>;
+  } = {},
+) => {
+  const thresholdProfile = await loadProofPackSloThresholdProfile(
+    input.context,
+  );
 
   return buildVoiceProviderSloReport({
     ...providerSloOptions,
@@ -9368,18 +9464,32 @@ const buildDemoVoiceProofPack = async (input: {
   const proofSnapshot = context.cache("proofRefreshSnapshot", () =>
     createVoiceProofRefreshSnapshot({
       audit: productionReadinessAuditStore,
+      traceFilter: { limit: 1_000 },
       traceStore: productionReadinessTraceStore,
     }),
   );
   const providerSloSnapshot = context.cache("providerSloSnapshot", () =>
     createVoiceProofRefreshSnapshot({
+      traceFilter: { limit: 2_000 },
       traceStore: providerSloProofTraceStore,
+    }),
+  );
+  const deliverySnapshot = context.cache("deliveryTraceSnapshot", () =>
+    createVoiceProofRefreshSnapshot({
+      traceFilter: { limit: 1_000 },
+      traceStore: rawDeliveryTraceStore,
     }),
   );
   const providerSloReport = context.cache("providerSloReport", async () =>
     buildProofPackProviderSloReport({
       context,
       snapshot: await providerSloSnapshot,
+    }),
+  );
+  const bargeInReport = context.cache("bargeInReport", async () =>
+    buildDemoBargeInReport({
+      context,
+      events: (await deliverySnapshot).traceEvents,
     }),
   );
   const proofPackInput = await buildVoiceProofPackInput({
@@ -9396,9 +9506,11 @@ const buildDemoVoiceProofPack = async (input: {
         return [];
       }
 
-      return context.cache(`operationsRecord:${sessionId}`, () =>
-        buildDemoOperationsRecord(sessionId),
-      ).then((record) => [record]);
+      return context
+        .cache(`operationsRecord:${sessionId}`, () =>
+          buildDemoOperationsRecord(sessionId),
+        )
+        .then((record) => [record]);
     },
     loadProductionReadiness: () =>
       buildVoiceProductionReadinessReport(
@@ -9407,9 +9519,12 @@ const buildDemoVoiceProofPack = async (input: {
           includeObservabilityExport: false,
           onTiming: (timing) => {
             if (process.env.VOICE_PROOF_PACK_DEBUG_TIMINGS === "1") {
-              console.log(`[readiness] ${timing.label}: ${timing.durationMs}ms`);
+              console.log(
+                `[readiness] ${timing.label}: ${timing.durationMs}ms`,
+              );
             }
           },
+          bargeInReport,
           proofPackContext: context,
           providerSloReport,
           refresh: false,
@@ -9417,7 +9532,11 @@ const buildDemoVoiceProofPack = async (input: {
       ),
     loadProviderSlo: () => providerSloReport,
     loadSupportBundle: async () => {
-      const bundle = await buildHealthyDemoVoiceSupportBundle({ context });
+      const bundle = await buildHealthyDemoVoiceSupportBundle({
+        context,
+        proofSnapshot: await proofSnapshot,
+        snapshot: await deliverySnapshot,
+      });
 
       return {
         callDebuggerReports: [bundle.callDebuggerReport],
@@ -9485,46 +9604,46 @@ const buildDemoVoiceProofPack = async (input: {
 
   return context.time("writeProofPack", () =>
     writeVoiceProofPack(
-    {
-      callDebuggerReports: [normalizedCallDebuggerReport],
-      generatedAt: input.generatedAt,
-      observabilityExport: proofPackInput.observabilityExport,
-      operationsRecords: [normalizedOperationsRecord],
-      productionReadiness: normalizedProductionReadiness,
-      providerSlo,
-      runId: input.runId,
-      sections: [
-        {
-          evidence: [
-            {
-              label: "Provider decision traces",
-              status: "pass",
-              value: "refreshed",
-            },
-            {
-              label: "Barge-in and delivery proof",
-              status: "pass",
-              value: "refreshed",
-            },
-            {
-              label: "Synthetic provider error cleanup",
-              status: "pass",
-              value: "complete",
-            },
-          ],
-          status: "pass",
-          summary:
-            "Production readiness refresh generated self-hosted proof evidence.",
-          title: "Proof refresh",
-        },
-      ],
-      sessionSnapshots: [normalizedSessionSnapshot],
-    },
-    {
-      jsonFileName: "latest.json",
-      markdownFileName: "latest.md",
-      outputDir: ".voice-runtime/proof-pack",
-    },
+      {
+        callDebuggerReports: [normalizedCallDebuggerReport],
+        generatedAt: input.generatedAt,
+        observabilityExport: proofPackInput.observabilityExport,
+        operationsRecords: [normalizedOperationsRecord],
+        productionReadiness: normalizedProductionReadiness,
+        providerSlo,
+        runId: input.runId,
+        sections: [
+          {
+            evidence: [
+              {
+                label: "Provider decision traces",
+                status: "pass",
+                value: "refreshed",
+              },
+              {
+                label: "Barge-in and delivery proof",
+                status: "pass",
+                value: "refreshed",
+              },
+              {
+                label: "Synthetic provider error cleanup",
+                status: "pass",
+                value: "complete",
+              },
+            ],
+            status: "pass",
+            summary:
+              "Production readiness refresh generated self-hosted proof evidence.",
+            title: "Proof refresh",
+          },
+        ],
+        sessionSnapshots: [normalizedSessionSnapshot],
+      },
+      {
+        jsonFileName: "latest.json",
+        markdownFileName: "latest.md",
+        outputDir: ".voice-runtime/proof-pack",
+      },
     ),
   );
 };
@@ -9740,10 +9859,13 @@ const buildDemoObservabilityExportReplay = async () => {
 const productionReadinessOptions = (
   input: {
     fast?: boolean;
+    bargeInReport?: Promise<Awaited<ReturnType<typeof buildDemoBargeInReport>>>;
     includeObservabilityExport?: boolean;
     onTiming?: (timing: VoiceProductionReadinessTiming) => void;
     proofPackContext?: ReturnType<typeof createVoiceProofPackBuildContext>;
-    providerSloReport?: Promise<VoiceProviderSloReport> | VoiceProviderSloReport;
+    providerSloReport?:
+      | Promise<VoiceProviderSloReport>
+      | VoiceProviderSloReport;
     refresh?: boolean;
   } = {},
 ) => ({
@@ -9793,7 +9915,11 @@ const productionReadinessOptions = (
   auditDeliveries: false as const,
   bargeInReports: () =>
     timeReadinessResolver("bargeInReports", async () => [
-      await buildDemoBargeInReport(),
+      input.bargeInReport
+        ? await input.bargeInReport
+        : await buildDemoBargeInReport({
+            context: input.proofPackContext,
+          }),
     ]),
   cacheMs: productionReadinessProofRuntime.options.cacheMs,
   htmlPath: "/production-readiness",
@@ -9874,10 +10000,7 @@ const productionReadinessOptions = (
       return input.providerSloReport;
     }
     const thresholdProfile = input.proofPackContext
-      ? await input.proofPackContext.cache(
-          "sloThresholdProfile",
-          loadDemoSloThresholdProfile,
-        )
+      ? await loadProofPackSloThresholdProfile(input.proofPackContext)
       : await timeReadinessResolver(
           "providerSloThresholds",
           loadDemoSloThresholdProfile,
@@ -9897,12 +10020,9 @@ const productionReadinessOptions = (
     } else {
       await refreshFastProductionReadinessProof();
     }
-    const thresholdProfile = input.proofPackContext
-      ? await input.proofPackContext.cache(
-          "sloThresholdProfile",
-          loadDemoSloThresholdProfile,
-        )
-      : await loadDemoSloThresholdProfile();
+    const thresholdProfile = await loadProofPackSloThresholdProfile(
+      input.proofPackContext,
+    );
 
     return {
       ...createVoiceSloReadinessThresholdOptions(thresholdProfile),
@@ -9917,7 +10037,11 @@ const productionReadinessOptions = (
       : async () =>
           timeReadinessResolver("proofSources", async () => {
             const [bargeInReport, reconnectReport] = await Promise.all([
-              buildDemoBargeInReport(),
+              input.bargeInReport
+                ? input.bargeInReport
+                : buildDemoBargeInReport({
+                    context: input.proofPackContext,
+                  }),
               buildDemoReconnectContractReport(),
             ]);
 
@@ -10966,12 +11090,18 @@ const liveOpsRuntime = {
   getControl: (sessionId: string) => liveOpsSessionControls.get(sessionId),
 };
 
-const buildDemoOperationsRecord = (sessionId: string) =>
+const buildDemoOperationsRecord = (
+  sessionId: string,
+  input: {
+    audit?: VoiceAuditEventStore;
+    store?: VoiceTraceEventStore;
+  } = {},
+) =>
   buildVoiceOperationsRecord({
-    audit: runtimeStorage.audit,
+    audit: input.audit ?? runtimeStorage.audit,
     redact: voiceSupportArtifactRedaction,
     sessionId,
-    store: deliveryTraceStore,
+    store: input.store ?? deliveryTraceStore,
   });
 
 const renderFailureReplayHTML = (
