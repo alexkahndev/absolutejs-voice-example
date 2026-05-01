@@ -10,6 +10,7 @@ import {
   defineVoiceProviderSimulationControlsElement,
   defineVoiceProviderStatusElement,
   defineVoiceRoutingStatusElement,
+  defineVoiceSessionSnapshotElement,
   defineVoiceTraceTimelineElement,
   defineVoiceTurnLatencyElement,
   defineVoiceTurnQualityElement,
@@ -31,6 +32,7 @@ defineVoiceProviderContractsElement();
 defineVoiceProviderSimulationControlsElement();
 defineVoiceProviderStatusElement();
 defineVoiceRoutingStatusElement();
+defineVoiceSessionSnapshotElement();
 defineVoiceTraceTimelineElement();
 defineVoiceTurnLatencyElement();
 defineVoiceTurnQualityElement();

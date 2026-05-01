@@ -14,6 +14,7 @@ import {
   VoiceProviderStatus,
   VoiceReadinessFailures,
   VoiceRoutingStatus,
+  VoiceSessionSnapshot,
   useVoiceTraceTimeline,
   VoiceTurnLatency,
   VoiceTurnQuality,
@@ -782,6 +783,14 @@ onUnmounted(() => {
           :interval-ms="10000"
           path="/api/production-readiness"
           title="Readiness Gate Explanations"
+        />
+
+        <VoiceSessionSnapshot
+          class="voice-card voice-provider-health-card"
+          description="Vue renders a downloadable support bundle with session media graph, provider routing, and turn-quality evidence."
+          :interval-ms="5000"
+          path="/api/voice/session-snapshot/latest"
+          title="Session Debug Snapshot"
         />
 
         <VoiceRoutingStatus

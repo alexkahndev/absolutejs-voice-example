@@ -14,6 +14,7 @@
     createVoiceProviderStatus,
     createVoiceReadinessFailures,
     createVoiceRoutingStatus,
+    createVoiceSessionSnapshot,
     createVoiceStream,
     createVoiceTraceTimeline,
     createVoiceTurnLatency,
@@ -142,6 +143,7 @@
   let profileSwitchHTML = $state("");
   let proofTrendsHTML = $state("");
   let readinessFailuresHTML = $state("");
+  let sessionSnapshotHTML = $state("");
   let providerCapabilitiesHTML = $state("");
   let providerContractsHTML = $state("");
   let providerSimulationHTML = $state("");
@@ -247,6 +249,16 @@
     readinessFailures.getSnapshot(),
     readinessFailuresWidgetOptions,
   );
+  const sessionSnapshot = createVoiceSessionSnapshot(
+    "/api/voice/session-snapshot/latest",
+    {
+      description:
+        "Svelte renders a downloadable support bundle with session media graph, provider routing, and turn-quality evidence.",
+      intervalMs: 5_000,
+      title: "Session Debug Snapshot",
+    },
+  );
+  sessionSnapshotHTML = sessionSnapshot.getHTML();
   const providerStatus = createVoiceProviderStatus("/api/provider-status", {
     intervalMs: 5_000,
   });
@@ -299,6 +311,7 @@
   let unsubscribeProfileSwitch = () => {};
   let unsubscribeProofTrends = () => {};
   let unsubscribeReadinessFailures = () => {};
+  let unsubscribeSessionSnapshot = () => {};
   let unsubscribeProviderSimulation = () => {};
   let unbindProviderSimulation = () => {};
   let unsubscribeProviderCapabilities = () => {};
@@ -633,6 +646,9 @@
         readinessFailuresWidgetOptions,
       );
     });
+    unsubscribeSessionSnapshot = sessionSnapshot.subscribe(() => {
+      sessionSnapshotHTML = sessionSnapshot.getHTML();
+    });
     unsubscribeDeliveryRuntime = deliveryRuntime.subscribe(() => {
       deliveryRuntimeHTML = deliveryRuntime.getHTML();
     });
@@ -692,6 +708,7 @@
       readinessFailures.getSnapshot(),
       readinessFailuresWidgetOptions,
     );
+    sessionSnapshotHTML = sessionSnapshot.getHTML();
     providerCapabilitiesHTML = providerCapabilities.getHTML();
     providerContractsHTML = providerContracts.getHTML();
     providerSimulationHTML = providerSimulation.getHTML();
@@ -706,6 +723,7 @@
     void proofTrends.refresh().catch(() => {});
     void profileSwitchRecommendation.refresh().catch(() => {});
     void readinessFailures.refresh().catch(() => {});
+    void sessionSnapshot.refresh().catch(() => {});
     void providerCapabilities.refresh().catch(() => {});
     void providerContracts.refresh().catch(() => {});
     void providerStatus.refresh().catch(() => {});
@@ -785,8 +803,10 @@
     unsubscribeProfileSwitch();
     unsubscribeProofTrends();
     unsubscribeReadinessFailures();
+    unsubscribeSessionSnapshot();
     unsubscribeProviderSimulation();
     readinessFailures.close();
+    sessionSnapshot.close();
     unbindProviderSimulation();
     unsubscribeProviderCapabilities();
     unsubscribeProviderContracts();
@@ -987,6 +1007,10 @@
 
       <div class="voice-card voice-provider-health-card">
         {@html readinessFailuresHTML}
+      </div>
+
+      <div class="voice-card voice-provider-health-card">
+        {@html sessionSnapshotHTML}
       </div>
 
       <div class="voice-card voice-routing-card voice-routing-status-host">

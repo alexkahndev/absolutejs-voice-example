@@ -17,6 +17,7 @@ import {
   VoiceProviderStatus,
   VoiceReadinessFailures,
   VoiceRoutingStatus,
+  VoiceSessionSnapshot,
   VoiceTraceTimeline,
   VoiceTurnLatency,
   VoiceTurnQuality,
@@ -671,6 +672,14 @@ export const ReactVoiceDemo = ({
               intervalMs={10_000}
               path="/api/production-readiness"
               title="Readiness Gate Explanations"
+            />
+
+            <VoiceSessionSnapshot
+              className="voice-card voice-provider-health-card"
+              description="React renders a downloadable support bundle with session media graph, provider routing, and turn-quality evidence."
+              intervalMs={5_000}
+              path="/api/voice/session-snapshot/latest"
+              title="Session Debug Snapshot"
             />
 
             <VoiceRoutingStatus

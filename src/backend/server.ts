@@ -121,6 +121,7 @@ import {
   summarizeVoiceTurnQuality,
   createVoiceSTTProviderRouter,
   createVoiceSessionListRoutes,
+  createVoiceSessionSnapshotRoutes,
   createVoiceSessionReplayRoutes,
   createVoiceSimulationSuiteRoutes,
   createVoiceTTSProviderRouter,
@@ -222,6 +223,7 @@ import {
   type VoiceTurnCorrectionHandler,
   type VoiceTurnRecord,
   type VoiceSessionRecord,
+  type VoiceSessionSnapshotInput,
   type VoiceOnTurnObjectHandler,
   type VoicePlatformCoverageEvidence,
   type VoicePlatformCoverageSurface,
@@ -7237,6 +7239,138 @@ const buildDemoMediaPipelineReportOptions = async () => {
   };
 };
 
+const buildDemoVoiceSessionMediaSnapshot = async (sessionId: string) => {
+  const events = await deliveryTraceStore.list({
+    limit: 500,
+    sessionId,
+  });
+  const frames = events
+    .map((event): MediaFrame | undefined => {
+      const traceEventId = `${event.type}:${String(event.at)}:${event.turnId ?? event.sessionId}`;
+      const base = {
+        at: event.at,
+        format: realtimeChannelFormat,
+        id: traceEventId,
+        metadata: { traceType: event.type },
+        sessionId: event.sessionId,
+        traceEventId,
+        turnId: event.turnId,
+      } satisfies Partial<MediaFrame>;
+
+      if (event.type === "turn.transcript") {
+        return createMediaFrame({
+          ...base,
+          durationMs: 20,
+          kind: "input-audio",
+          metadata: { ...base.metadata, speechProbability: 0.9 },
+          source: "browser",
+        } as MediaFrame);
+      }
+
+      if (event.type === "turn.assistant") {
+        return createMediaFrame({
+          ...base,
+          durationMs: 20,
+          kind: "assistant-audio",
+          source: "provider",
+        } as MediaFrame);
+      }
+
+      if (event.type === "turn.committed") {
+        return createMediaFrame({
+          ...base,
+          kind: "turn-commit",
+          source: "voice-runtime",
+        } as MediaFrame);
+      }
+
+      return undefined;
+    })
+    .filter((frame): frame is MediaFrame => frame !== undefined);
+  const graph = createMediaProcessorGraph({
+    name: "absolutejs-session-debug-media-graph",
+    nodes: [
+      {
+        kind: "filter",
+        name: "session-audio-and-turn-events",
+        process: (frame) =>
+          frame.kind === "input-audio" ||
+          frame.kind === "assistant-audio" ||
+          frame.kind === "turn-commit",
+      },
+      {
+        kind: "processor",
+        name: "session-debug-marker",
+        process: (frame) => ({
+          ...frame,
+          metadata: {
+            ...frame.metadata,
+            debugSnapshot: true,
+            mediaProcessorGraph: "absolutejs-session-debug-media-graph",
+          },
+        }),
+      },
+    ],
+  });
+
+  if (frames.length > 0) {
+    await graph.processMany(frames);
+  }
+
+  return graph.snapshot();
+};
+
+const resolveDemoSnapshotSessionId = async (requestedSessionId: string) => {
+  if (requestedSessionId && requestedSessionId !== "latest") {
+    return requestedSessionId;
+  }
+
+  const events = await deliveryTraceStore.list({ limit: 500 });
+  const latest = events
+    .filter((event) => event.sessionId && event.sessionId !== "live-session-now")
+    .sort((left, right) => right.at - left.at)[0];
+
+  return latest?.sessionId ?? "latest";
+};
+
+const buildDemoVoiceSessionSnapshot = async (input: {
+  sessionId: string;
+  turnId?: string;
+}): Promise<VoiceSessionSnapshotInput> => {
+  const sessionId = await resolveDemoSnapshotSessionId(input.sessionId);
+  const [events, turnQuality] = await Promise.all([
+    deliveryTraceStore.list({ limit: 500, sessionId }),
+    summarizeVoiceTurnQuality({
+      limit: 25,
+      store: runtimeStorage.session,
+    }),
+  ]);
+  const providerRoutingEvents = events.filter(
+    (event) =>
+      event.type.includes("provider") ||
+      event.type.includes("routing") ||
+      event.metadata?.provider !== undefined,
+  );
+  const session = await runtimeStorage.session.get(sessionId);
+  const mediaSnapshot = await buildDemoVoiceSessionMediaSnapshot(sessionId);
+
+  return {
+    media: [mediaSnapshot],
+    name: "AbsoluteJS voice demo session debug bundle",
+    providerRoutingEvents,
+    quality: [
+      {
+        name: "turn-quality",
+        report: turnQuality,
+        status: turnQuality.warnings > 0 ? "warn" : "pass",
+      },
+    ],
+    scenarioId: session?.scenarioId ?? undefined,
+    sessionId,
+    turnId: input.turnId,
+  };
+};
+
 const buildDemoBrowserMediaReport = () =>
   buildMediaWebRTCStatsReport({
     maxJitterMs: 30,
@@ -10669,6 +10803,11 @@ const server = new Elysia()
       htmlPath: "/sessions/:sessionId",
       path: "/api/voice-sessions/:sessionId/replay",
       store: deliveryTraceStore,
+    }),
+  )
+  .use(
+    createVoiceSessionSnapshotRoutes({
+      source: buildDemoVoiceSessionSnapshot,
     }),
   )
   .use(failureReplayRoutes)

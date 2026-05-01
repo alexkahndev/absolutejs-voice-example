@@ -12,6 +12,7 @@ import {
   defineVoiceProfileComparisonElement,
   defineVoiceProfileSwitchRecommendationElement,
   defineVoiceProviderSimulationControlsElement,
+  createVoiceSessionSnapshotViewModel,
 } from "@absolutejs/voice/client";
 import { createVoiceOpsActionCenterActions } from "@absolutejs/voice/client";
 import {
@@ -26,6 +27,7 @@ import {
   VoiceProofTrendsService,
   VoiceReadinessFailuresService,
   VoiceRoutingStatusService,
+  VoiceSessionSnapshotService,
   VoiceStreamService,
   VoiceTraceTimelineService,
   VoiceTurnLatencyService,
@@ -452,6 +454,56 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
               <a href="/production-readiness">Open readiness</a> ·
               <a href="/voice/slo-readiness-thresholds">Open thresholds</a>
             </p>
+          </article>
+
+          <article
+            class="voice-card voice-provider-health-card absolute-voice-session-snapshot"
+            [class.absolute-voice-session-snapshot--ready]="
+              sessionSnapshotModel().status === 'ready'
+            "
+            [class.absolute-voice-session-snapshot--warning]="
+              sessionSnapshotModel().status === 'warning'
+            "
+          >
+            <header class="absolute-voice-session-snapshot__header">
+              <span class="absolute-voice-session-snapshot__eyebrow">
+                {{ sessionSnapshotModel().title }}
+              </span>
+              <strong class="absolute-voice-session-snapshot__label">
+                {{ sessionSnapshotModel().label }}
+              </strong>
+            </header>
+            <p class="absolute-voice-session-snapshot__description">
+              {{ sessionSnapshotModel().description }}
+            </p>
+            @if (sessionSnapshotModel().showDownload) {
+              <button
+                class="absolute-voice-session-snapshot__download"
+                type="button"
+                (click)="downloadSessionSnapshot()"
+              >
+                Download support bundle
+              </button>
+            }
+            @if (sessionSnapshotModel().rows.length > 0) {
+              <dl>
+                @for (row of sessionSnapshotModel().rows; track row.label) {
+                  <div>
+                    <dt>{{ row.label }}</dt>
+                    <dd>{{ row.value }}</dd>
+                  </div>
+                }
+              </dl>
+            } @else {
+              <p class="absolute-voice-session-snapshot__empty">
+                Load a session snapshot to see support diagnostics.
+              </p>
+            }
+            @if (sessionSnapshotModel().error) {
+              <p class="absolute-voice-session-snapshot__error">
+                {{ sessionSnapshotModel().error }}
+              </p>
+            }
           </article>
 
           <article class="voice-card voice-routing-card">
@@ -1451,6 +1503,27 @@ export class AngularVoiceDemoComponent {
       intervalMs: 10_000,
     },
   );
+  sessionSnapshot = inject(VoiceSessionSnapshotService).connect(
+    "/api/voice/session-snapshot/latest",
+    {
+      intervalMs: 5_000,
+    },
+  );
+  sessionSnapshotModel = computed(() =>
+    createVoiceSessionSnapshotViewModel(
+      {
+        error: this.sessionSnapshot.error(),
+        isLoading: this.sessionSnapshot.isLoading(),
+        snapshot: this.sessionSnapshot.snapshot(),
+        updatedAt: this.sessionSnapshot.updatedAt(),
+      },
+      {
+        description:
+          "Angular renders a downloadable support bundle with session media graph, provider routing, and turn-quality evidence.",
+        title: "Session Debug Snapshot",
+      },
+    ),
+  );
   providerStatus = inject(VoiceProviderStatusService).connect(
     "/api/provider-status",
     {
@@ -1645,6 +1718,20 @@ export class AngularVoiceDemoComponent {
         this.currentVoice().sessionId() || undefined,
       ),
     );
+  }
+
+  downloadSessionSnapshot() {
+    const snapshot = this.sessionSnapshot.snapshot();
+    if (!snapshot) {
+      return;
+    }
+
+    const href = URL.createObjectURL(this.sessionSnapshot.download());
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.download = `voice-session-${snapshot.sessionId}.snapshot.json`;
+    anchor.click();
+    URL.revokeObjectURL(href);
   }
 
   async refreshBargeInProof() {
@@ -1853,6 +1940,7 @@ export class AngularVoiceDemoComponent {
     this.opsActionCenter.close();
     this.platformCoverage.close();
     this.proofTrends.close();
+    this.sessionSnapshot.close();
     this.providerCapabilities.close();
     this.providerContracts.close();
     this.providerStatus.close();
