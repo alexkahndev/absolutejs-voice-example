@@ -225,6 +225,8 @@ import {
   type VoiceOpsWebhookEnvelope,
   type VoiceSessionListItem,
   type StoredVoiceTraceEvent,
+  type StoredVoiceAuditEvent,
+  type VoiceAuditEventStore,
   type VoiceTraceEvent,
   type VoiceTraceEventStore,
   type VoiceTraceSinkDeliveryRecord,
@@ -7645,16 +7647,73 @@ const buildLatestDemoVoiceCallDebuggerReport = async () => {
   });
 };
 
+const createSessionScopedTraceStore = (
+  store: VoiceTraceEventStore,
+  sessionId: string,
+): VoiceTraceEventStore => ({
+  append: (event) => store.append(event),
+  get: (id) => store.get(id),
+  list: (filter) =>
+    store.list({
+      ...filter,
+      sessionId: filter?.sessionId ?? sessionId,
+    }),
+  remove: (id) => store.remove(id),
+});
+
+const createScenarioScopedTraceStore = (
+  store: VoiceTraceEventStore,
+  scenarioId: string,
+): VoiceTraceEventStore => ({
+  append: (event) => store.append(event),
+  get: (id) => store.get(id),
+  list: async (filter) => {
+    const { scenarioId: _scenarioId, ...baseFilter } = filter ?? {};
+    const events = await store.list(baseFilter);
+    const scopedScenarioId = filter?.scenarioId ?? scenarioId;
+    return events.filter((event) => event.scenarioId === scopedScenarioId);
+  },
+  remove: (id) => store.remove(id),
+});
+
+const createSessionScopedAuditStore = (
+  store: VoiceAuditEventStore,
+  sessionId: string,
+): VoiceAuditEventStore<StoredVoiceAuditEvent> => ({
+  append: (event) => store.append(event),
+  get: (id) => store.get(id),
+  list: (filter) =>
+    Promise.resolve(
+      store.list({
+        ...filter,
+        sessionId: filter?.sessionId ?? sessionId,
+      }),
+    ),
+});
+
 const buildHealthyDemoVoiceSupportBundle = async (): Promise<{
   callDebuggerReport: Awaited<ReturnType<typeof buildVoiceCallDebuggerReport>>;
   sessionSnapshot: VoiceSessionSnapshot;
+  sessionId: string;
 }> => {
   const sessionId = await resolveHealthyDemoSessionId();
+  const scopedTraceStore = createSessionScopedTraceStore(
+    deliveryTraceStore,
+    sessionId,
+  );
+  const scopedAuditStore = createSessionScopedAuditStore(
+    runtimeStorage.audit,
+    sessionId,
+  );
   const sessionSnapshot = buildVoiceSessionSnapshot(
     await buildDemoVoiceSessionSnapshot({ sessionId }),
   );
   const callDebuggerReport = await buildVoiceCallDebuggerReport(
-    demoVoiceCallDebuggerOptions(),
+    {
+      ...demoVoiceCallDebuggerOptions(),
+      audit: scopedAuditStore,
+      store: scopedTraceStore,
+    },
     {
       request: new Request(
         `http://localhost/voice-call-debugger/${encodeURIComponent(sessionId)}`,
@@ -7665,6 +7724,7 @@ const buildHealthyDemoVoiceSupportBundle = async (): Promise<{
 
   return {
     callDebuggerReport,
+    sessionId,
     sessionSnapshot,
   };
 };
@@ -9244,8 +9304,10 @@ const buildProofPackProviderSloReport = async () => {
 
   return buildVoiceProviderSloReport({
     ...providerSloOptions,
-    events: await deliveryTraceStore.list(),
-    store: deliveryTraceStore,
+    store: createScenarioScopedTraceStore(
+      deliveryTraceStore,
+      providerSloProofScenarioId,
+    ),
     thresholds: {
       ...providerSloOptions.thresholds,
       ...thresholdProfile.providerSlo,
@@ -9270,7 +9332,7 @@ const buildDemoVoiceProofPack = async (input: {
       buildProductionReadinessObservabilityExport(),
     ]);
   const operationsRecord = await buildDemoOperationsRecord(
-    supportBundle.sessionSnapshot.sessionId,
+    supportBundle.sessionId,
   );
   const normalizedProductionReadiness = productionReadiness.checks.every(
     (check) => check.status !== "fail",
