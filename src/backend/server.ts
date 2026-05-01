@@ -6,7 +6,6 @@ import {
   appendVoiceRealCallProfileRecoveryEvidence,
   assignVoiceOpsTask,
   completeVoiceOpsTask,
-  filterVoiceAuditEvents,
   createVoiceSQLiteTelephonyWebhookIdempotencyStore,
   createAnthropicVoiceAssistantModel,
   createGeminiVoiceAssistantModel,
@@ -216,7 +215,6 @@ import {
   type VoiceAssistantMemoryRecord,
   type VoiceAgentModel,
   type VoiceAuditEventStore,
-  type StoredVoiceAuditEvent,
   type VoiceHandoffDeliveryStore,
   type VoiceIOProviderRouterEvent,
   type VoiceLiveOpsAction,
@@ -493,59 +491,6 @@ const runtimeStorage = createVoiceFileRuntimeStorage<
   SavedVoiceIntegrationEvent
 >({
   directory: runtimeDirectory,
-});
-
-const readRecentRuntimeJsonFiles = async <TRecord>(
-  directory: string,
-  limit: number,
-): Promise<TRecord[]> => {
-  const entries = await readdir(directory, { withFileTypes: true }).catch(
-    () => [],
-  );
-  const files = entries
-    .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
-    .map((entry) => {
-      const path = `${directory}/${entry.name}`;
-      return {
-        path,
-        updatedAt: statSync(path).mtimeMs,
-      };
-    })
-    .sort((left, right) => right.updatedAt - left.updatedAt)
-    .slice(0, limit);
-  const records = await Promise.all(
-    files.map((file) =>
-      Bun.file(file.path)
-        .json()
-        .catch(() => undefined),
-    ),
-  );
-
-  return records.filter(
-    (record): record is TRecord => record !== undefined,
-  );
-};
-
-const readRecentRuntimeTraceEvents = (limit: number) =>
-  readRecentRuntimeJsonFiles<StoredVoiceTraceEvent>(
-    `${runtimeDirectory}/traces`,
-    limit,
-  );
-
-const readRecentRuntimeAuditEvents = (limit: number) =>
-  readRecentRuntimeJsonFiles<StoredVoiceAuditEvent>(
-    `${runtimeDirectory}/audit`,
-    limit,
-  );
-
-const createReadonlyAuditEventStore = (
-  events: readonly StoredVoiceAuditEvent[],
-): VoiceAuditEventStore => ({
-  append: async () => {
-    throw new Error("Readonly proof-pack audit store cannot append events.");
-  },
-  get: async (id) => events.find((event) => event.id === id),
-  list: async (filter) => filterVoiceAuditEvents([...events], filter),
 });
 
 const supportedDeliverySinkKinds = [
@@ -9641,9 +9586,8 @@ const buildDemoVoiceProofPack = async (input: {
   const proofSnapshot = context.cache("proofRefreshSnapshot", () =>
     context.time("snapshot:proof", async () =>
       createVoiceProofRefreshSnapshot({
-        audit: createReadonlyAuditEventStore(
-          await readRecentRuntimeAuditEvents(50),
-        ),
+        audit: productionReadinessAuditStore,
+        auditFilter: { limit: 50, readWindow: "recent" },
         events: await productionReadinessTraceStore.list({ limit: 250 }),
       }),
     ),
@@ -9659,7 +9603,8 @@ const buildDemoVoiceProofPack = async (input: {
   const deliverySnapshot = context.cache("deliveryTraceSnapshot", () =>
     context.time("snapshot:delivery", async () =>
       createVoiceProofRefreshSnapshot({
-        events: await readRecentRuntimeTraceEvents(500),
+        traceFilter: { limit: 500, readWindow: "recent" },
+        traceStore: rawDeliveryTraceStore,
       }),
     ),
   );
