@@ -262,6 +262,7 @@ import {
   type VoiceProofTrendSummary,
   type VoiceBrowserCallProfileReport,
   type VoiceProductionReadinessCheck,
+  type VoiceProductionReadinessTiming,
   voice,
   voiceComplianceRedactionDefaults,
   voiceGuardrailPolicyPresets,
@@ -9404,6 +9405,11 @@ const buildDemoVoiceProofPack = async (input: {
         productionReadinessOptions({
           fast: true,
           includeObservabilityExport: false,
+          onTiming: (timing) => {
+            if (process.env.VOICE_PROOF_PACK_DEBUG_TIMINGS === "1") {
+              console.log(`[readiness] ${timing.label}: ${timing.durationMs}ms`);
+            }
+          },
           proofPackContext: context,
           providerSloReport,
           refresh: false,
@@ -9735,6 +9741,7 @@ const productionReadinessOptions = (
   input: {
     fast?: boolean;
     includeObservabilityExport?: boolean;
+    onTiming?: (timing: VoiceProductionReadinessTiming) => void;
     proofPackContext?: ReturnType<typeof createVoiceProofPackBuildContext>;
     providerSloReport?: Promise<VoiceProviderSloReport> | VoiceProviderSloReport;
     refresh?: boolean;
@@ -9792,6 +9799,7 @@ const productionReadinessOptions = (
   htmlPath: "/production-readiness",
   opsActionHistory:
     input.fast === true ? (false as const) : runtimeStorage.audit,
+  onTiming: input.onTiming,
   opsRecovery: () =>
     timeReadinessResolver(
       "opsRecovery",
