@@ -32,6 +32,7 @@ import {
   evaluateVoiceMediaPipelineEvidence,
   evaluateVoiceLiveOpsControlEvidence,
   evaluateVoiceLiveOpsEvidence,
+  createVoiceEvidenceAssertion,
   buildVoiceFailureReplay,
   buildVoicePlatformCoverageSummary,
   type VoiceCompetitiveCoverageReport,
@@ -68,6 +69,7 @@ import {
   type VoiceTelephonyWebhookNormalizationEvidenceDecision,
   type VoiceTelephonyWebhookVerificationEvidenceAttempt,
   type VoiceToolContractSuiteReport,
+  type VoiceProofAssertionResult as JsonAssertionResult,
 } from "@absolutejs/voice";
 
 type ProofMethod = "GET" | "POST";
@@ -114,13 +116,6 @@ type CommandProofResult = {
   name: string;
   ok: boolean;
   status?: number;
-  summary?: Record<string, unknown>;
-};
-
-type JsonAssertionResult = {
-  kind: "json-assertion";
-  name: string;
-  ok: boolean;
   summary?: Record<string, unknown>;
 };
 
@@ -2146,22 +2141,11 @@ const productionReadinessEvidenceReport = productionReadinessReport
     })
   : undefined;
 const productionReadinessEvidenceAssertion: JsonAssertionResult =
-  productionReadinessReport
-    ? {
-        kind: "json-assertion",
-        name: "productionReadinessEvidence",
-        ok: productionReadinessEvidenceReport?.ok === true,
-        summary:
-          productionReadinessEvidenceReport as unknown as Record<string, unknown>,
-      }
-    : {
-        kind: "json-assertion",
-        name: "productionReadinessEvidence",
-        ok: false,
-        summary: {
-          issues: ["Missing productionReadiness proof result body."],
-        },
-      };
+  createVoiceEvidenceAssertion({
+    evidence: productionReadinessEvidenceReport,
+    missingIssue: "Missing productionReadiness proof result body.",
+    name: "productionReadinessEvidence",
+  });
 const browserCallProfileReport = proofResults.find(
   (result) => result.name === "browserCallProfiles",
 )?.body as VoiceBrowserCallProfileReport | undefined;
@@ -2229,22 +2213,11 @@ const campaignReadinessEvidenceReport = campaignReadinessReport
     })
   : undefined;
 const campaignReadinessEvidenceAssertion: JsonAssertionResult =
-  campaignReadinessReport
-    ? {
-        kind: "json-assertion",
-        name: "campaignReadinessEvidence",
-        ok: campaignReadinessEvidenceReport?.ok === true,
-        summary:
-          campaignReadinessEvidenceReport as unknown as Record<string, unknown>,
-      }
-    : {
-        kind: "json-assertion",
-        name: "campaignReadinessEvidence",
-        ok: false,
-        summary: {
-          issues: ["Missing campaignReadiness proof result body."],
-        },
-      };
+  createVoiceEvidenceAssertion({
+    evidence: campaignReadinessEvidenceReport,
+    missingIssue: "Missing campaignReadiness proof result body.",
+    name: "campaignReadinessEvidence",
+  });
 const campaignDialerProofReport = seedResults.find(
   (result) => result.name === "campaignDialerProof",
 )?.body as VoiceCampaignDialerProofReport | undefined;
@@ -2258,25 +2231,11 @@ const campaignDialerProofEvidenceReport = campaignDialerProofReport
     })
   : undefined;
 const campaignDialerProofEvidenceAssertion: JsonAssertionResult =
-  campaignDialerProofReport
-    ? {
-        kind: "json-assertion",
-        name: "campaignDialerProofEvidence",
-        ok: campaignDialerProofEvidenceReport?.ok === true,
-        summary:
-          campaignDialerProofEvidenceReport as unknown as Record<
-            string,
-            unknown
-          >,
-      }
-    : {
-        kind: "json-assertion",
-        name: "campaignDialerProofEvidence",
-        ok: false,
-        summary: {
-        issues: ["Missing campaignDialerProof seed result body."],
-      },
-    };
+  createVoiceEvidenceAssertion({
+    evidence: campaignDialerProofEvidenceReport,
+    missingIssue: "Missing campaignDialerProof seed result body.",
+    name: "campaignDialerProofEvidence",
+  });
 const dataControlReport = proofResults.find(
   (result) => result.name === "dataControl",
 )?.body as VoiceDataControlReport | undefined;
@@ -2442,16 +2401,11 @@ const telephonyWebhookNormalizationEvidenceReport =
     requiredProviders: ["plivo", "telnyx", "twilio"],
     requireRouteResults: true,
   });
-const telephonyWebhookNormalizationEvidenceAssertion: JsonAssertionResult = {
-  kind: "json-assertion",
-  name: "telephonyWebhookNormalizationEvidence",
-  ok: telephonyWebhookNormalizationEvidenceReport.ok,
-  summary:
-    telephonyWebhookNormalizationEvidenceReport as unknown as Record<
-      string,
-      unknown
-    >,
-};
+const telephonyWebhookNormalizationEvidenceAssertion: JsonAssertionResult =
+  createVoiceEvidenceAssertion({
+    evidence: telephonyWebhookNormalizationEvidenceReport,
+    name: "telephonyWebhookNormalizationEvidence",
+  });
 const telephonyWebhookIdempotencyEvidenceReport =
   evaluateVoiceTelephonyWebhookNormalizationEvidence({
     decisions: telephonyWebhookDecisionsReport?.decisions ?? [],
@@ -2461,16 +2415,11 @@ const telephonyWebhookIdempotencyEvidenceReport =
     requiredDuplicateProviders: ["telnyx", "twilio"],
     requireRouteResults: true,
   });
-const telephonyWebhookIdempotencyEvidenceAssertion: JsonAssertionResult = {
-  kind: "json-assertion",
-  name: "telephonyWebhookIdempotencyEvidence",
-  ok: telephonyWebhookIdempotencyEvidenceReport.ok,
-  summary:
-    telephonyWebhookIdempotencyEvidenceReport as unknown as Record<
-      string,
-      unknown
-    >,
-};
+const telephonyWebhookIdempotencyEvidenceAssertion: JsonAssertionResult =
+  createVoiceEvidenceAssertion({
+    evidence: telephonyWebhookIdempotencyEvidenceReport,
+    name: "telephonyWebhookIdempotencyEvidence",
+  });
 const telephonyWebhookVerificationEvidenceReport =
   evaluateVoiceTelephonyWebhookNormalizationEvidence({
     maxRejectedVerificationSideEffects: 0,
@@ -2480,16 +2429,11 @@ const telephonyWebhookVerificationEvidenceReport =
     requiredRejectedVerificationProviders: ["plivo", "telnyx", "twilio"],
     verificationAttempts: telephonyWebhookVerificationProofReport?.attempts ?? [],
   });
-const telephonyWebhookVerificationEvidenceAssertion: JsonAssertionResult = {
-  kind: "json-assertion",
-  name: "telephonyWebhookVerificationEvidence",
-  ok: telephonyWebhookVerificationEvidenceReport.ok,
-  summary:
-    telephonyWebhookVerificationEvidenceReport as unknown as Record<
-      string,
-      unknown
-    >,
-};
+const telephonyWebhookVerificationEvidenceAssertion: JsonAssertionResult =
+  createVoiceEvidenceAssertion({
+    evidence: telephonyWebhookVerificationEvidenceReport,
+    name: "telephonyWebhookVerificationEvidence",
+  });
 const opsRecoveryReport = proofResults.find(
   (result) => result.name === "opsRecovery",
 )?.body as VoiceOpsRecoveryReport | undefined;
@@ -2932,25 +2876,11 @@ const providerRoutingContractEvidenceReport =
       )
     : undefined;
 const providerRoutingContractEvidenceAssertion: JsonAssertionResult =
-  providerRoutingContractEvidenceReport
-    ? {
-        kind: "json-assertion",
-        name: "providerRoutingContractEvidence",
-        ok: providerRoutingContractEvidenceReport.ok,
-        summary:
-          providerRoutingContractEvidenceReport as unknown as Record<
-            string,
-            unknown
-          >,
-      }
-    : {
-        kind: "json-assertion",
-        name: "providerRoutingContractEvidence",
-        ok: false,
-        summary: {
-          issues: ["Missing provider routing contract proof result body."],
-        },
-      };
+  createVoiceEvidenceAssertion({
+    evidence: providerRoutingContractEvidenceReport,
+    missingIssue: "Missing provider routing contract proof result body.",
+    name: "providerRoutingContractEvidence",
+  });
 const agentSquadContractReport = proofResults.find(
   (result) => result.name === "agentSquadContract",
 )?.body as VoiceAgentSquadContractReport | undefined;
