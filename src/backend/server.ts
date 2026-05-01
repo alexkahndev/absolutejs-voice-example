@@ -2147,6 +2147,7 @@ let realCallProfileDefaultsCache:
       report: ReturnType<typeof buildVoiceRealCallProfileHistoryReport>;
     }
   | undefined;
+const realCallProfileDefaultsCacheMs = 60_000;
 const readRealCallProfileDefaultsReport = async () => {
   const now = Date.now();
   if (
@@ -2160,7 +2161,7 @@ const readRealCallProfileDefaultsReport = async () => {
     await readRealCallProfileHistory(),
   );
   realCallProfileDefaultsCache = {
-    expiresAt: now + 5_000,
+    expiresAt: now + realCallProfileDefaultsCacheMs,
     report,
   };
   return report;
@@ -4379,7 +4380,16 @@ const seedDemoRealCallProfileHistory = async () => {
     status: "pass",
     updatedAt: new Date(now + profiles.length * 10).toISOString(),
   });
-  realCallProfileDefaultsCache = undefined;
+  realCallProfileDefaultsCache = {
+    expiresAt: Date.now() + realCallProfileDefaultsCacheMs,
+    report: buildVoiceRealCallProfileHistoryReport({
+      evidence,
+      generatedAt: new Date(now).toISOString(),
+      maxAgeMs: proofTrendsMaxAgeMs,
+      reports: [report],
+      source: realCallProfilesRoot,
+    }),
+  };
 
   return report;
 };
@@ -8496,6 +8506,44 @@ const deliveryWorkerRuntime = (() => {
 })();
 const demoAuditDeliveryWorker = createDemoAuditDeliveryWorker();
 const demoTraceDeliveryWorker = createDemoTraceDeliveryWorker();
+const demoDeliveryRuntimeSummaryCacheMs = 60_000;
+let demoDeliveryRuntimeSummaryCache:
+  | {
+      expiresAt: number;
+      promise: Promise<{
+        audit: Awaited<ReturnType<typeof summarizeVoiceAuditSinkDeliveries>>;
+        trace: Awaited<ReturnType<typeof summarizeVoiceTraceSinkDeliveries>>;
+      }>;
+    }
+  | undefined;
+const summarizeDemoDeliveryRuntime = () => {
+  const now = Date.now();
+  if (
+    demoDeliveryRuntimeSummaryCache &&
+    demoDeliveryRuntimeSummaryCache.expiresAt > now
+  ) {
+    return demoDeliveryRuntimeSummaryCache.promise;
+  }
+
+  const promise = Promise.all([
+    runtimeStorage.auditDeliveries.list(),
+    runtimeStorage.traceDeliveries.list(),
+  ])
+    .then(async ([auditDeliveries, traceDeliveries]) => ({
+      audit: await summarizeVoiceAuditSinkDeliveries(auditDeliveries),
+      trace: await summarizeVoiceTraceSinkDeliveries(traceDeliveries),
+    }))
+    .catch((error) => {
+      demoDeliveryRuntimeSummaryCache = undefined;
+      throw error;
+    });
+  demoDeliveryRuntimeSummaryCache = {
+    expiresAt: now + demoDeliveryRuntimeSummaryCacheMs,
+    promise,
+  };
+
+  return promise;
+};
 const deliveryRuntimeControl = deliveryWorkerRuntime ?? {
   audit: demoAuditDeliveryWorker,
   isRunning: () => false,
@@ -8506,14 +8554,7 @@ const deliveryRuntimeControl = deliveryWorkerRuntime ?? {
     trace: 0,
     total: 0,
   }),
-  summarize: async () => ({
-    audit: await summarizeVoiceAuditSinkDeliveries(
-      await runtimeStorage.auditDeliveries.list(),
-    ),
-    trace: await summarizeVoiceTraceSinkDeliveries(
-      await runtimeStorage.traceDeliveries.list(),
-    ),
-  }),
+  summarize: summarizeDemoDeliveryRuntime,
   tick: async () => {
     const [audit, trace] = await Promise.all([
       demoAuditDeliveryWorker.drain(),
@@ -8524,6 +8565,9 @@ const deliveryRuntimeControl = deliveryWorkerRuntime ?? {
   },
   trace: demoTraceDeliveryWorker,
 };
+void summarizeDemoDeliveryRuntime().catch(() => {
+  demoDeliveryRuntimeSummaryCache = undefined;
+});
 
 const createAuditDeliveryWorker = () =>
   deliveryWorkerRuntime?.audit ?? demoAuditDeliveryWorker;
@@ -8746,21 +8790,40 @@ const storeReconnectTrace = async (body: unknown) => {
   return { ok: true, sessionId };
 };
 
-const getLiveReconnectContractSnapshots = async () =>
-  summarizeVoiceReconnectContractSnapshots(await runtimeStorage.traces.list());
+const getLiveReconnectContractSnapshots = async (input: {
+  events?: readonly StoredVoiceTraceEvent[];
+} = {}) =>
+  summarizeVoiceReconnectContractSnapshots(
+    input.events ? [...input.events] : await runtimeStorage.traces.list(),
+  );
 
-const getReconnectContractSnapshotSource = async () =>
-  (await getLiveReconnectContractSnapshots()).length > 0 ? "live" : "demo";
+const getReconnectContractSnapshotSource = async (input: {
+  events?: readonly StoredVoiceTraceEvent[];
+} = {}) =>
+  (await getLiveReconnectContractSnapshots(input)).length > 0
+    ? "live"
+    : "demo";
 
-const getReconnectContractSnapshots = async () => {
-  const snapshots = await getLiveReconnectContractSnapshots();
+const getReconnectContractSnapshots = async (input: {
+  events?: readonly StoredVoiceTraceEvent[];
+} = {}) => {
+  const snapshots = await getLiveReconnectContractSnapshots(input);
 
   return snapshots.length > 0 ? snapshots : getDemoReconnectContractSnapshots();
 };
 
-const buildDemoReconnectContractReport = async () => {
-  const source = await getReconnectContractSnapshotSource();
-  const snapshots = await getReconnectContractSnapshots();
+const buildDemoReconnectContractReport = async (input: {
+  events?: readonly StoredVoiceTraceEvent[];
+} = {}) => {
+  const snapshots = await getReconnectContractSnapshots(input);
+  const source = snapshots.some((snapshot) =>
+    input.events?.some(
+      (event) =>
+        event.type === "client.reconnect" && event.at === snapshot.at,
+    ),
+  )
+    ? "live"
+    : "demo";
   const report = runVoiceReconnectContract({
     snapshots,
   });
@@ -9492,6 +9555,45 @@ const buildDemoVoiceProofPack = async (input: {
       events: (await deliverySnapshot).traceEvents,
     }),
   );
+  const reconnectReport = context.cache("reconnectReport", async () =>
+    buildDemoReconnectContractReport({
+      events: (await deliverySnapshot).traceEvents,
+    }),
+  );
+  const deliveryRuntimeSummary = context.cache("deliveryRuntime", () =>
+    context.time("deliveryRuntimeSummary", () =>
+      deliveryRuntimeControl.summarize(),
+    ),
+  );
+  const browserCallProfileReadiness = context.cache(
+    "browserCallProfileReadiness",
+    () =>
+      context.time(
+        "additionalChecks:browserCallProfile",
+        buildBrowserCallProfileReadinessCheck,
+      ),
+  );
+  const realCallProfileReadiness = context.cache("realCallProfileReadiness", () =>
+    context.time(
+      "additionalChecks:realCallProfile",
+      buildRealCallProfileReadinessCheck,
+    ),
+  );
+  const realCallProfileRecoveryReadiness = context.cache(
+    "realCallProfileRecoveryReadiness",
+    () =>
+      context.time("additionalChecks:realCallProfileRecovery", () =>
+        buildVoiceRealCallProfileRecoveryJobHistoryCheck(
+          realCallProfileRecoveryJobStore,
+          {
+            href: "/voice/real-call-profile-recovery",
+            maxAgeMs: 5 * 60 * 1000,
+            minCompletedJobs: 1,
+            sourceHref: "/api/voice/real-call-profile-history/actions/jobs",
+          },
+        ),
+      ),
+  );
   const proofPackInput = await buildVoiceProofPackInput({
     context,
     generatedAt: input.generatedAt,
@@ -9525,8 +9627,13 @@ const buildDemoVoiceProofPack = async (input: {
             }
           },
           bargeInReport,
+          browserCallProfileReadiness,
+          deliveryRuntimeSummary,
+          realCallProfileReadiness,
+          realCallProfileRecoveryReadiness,
           proofPackContext: context,
           providerSloReport,
+          reconnectReport,
           refresh: false,
         }),
       ),
@@ -9860,12 +9967,19 @@ const productionReadinessOptions = (
   input: {
     fast?: boolean;
     bargeInReport?: Promise<Awaited<ReturnType<typeof buildDemoBargeInReport>>>;
+    browserCallProfileReadiness?: Promise<VoiceProductionReadinessCheck>;
+    deliveryRuntimeSummary?: ReturnType<typeof deliveryRuntimeControl.summarize>;
     includeObservabilityExport?: boolean;
     onTiming?: (timing: VoiceProductionReadinessTiming) => void;
+    realCallProfileReadiness?: Promise<VoiceProductionReadinessCheck>;
+    realCallProfileRecoveryReadiness?: Promise<VoiceProductionReadinessCheck>;
     proofPackContext?: ReturnType<typeof createVoiceProofPackBuildContext>;
     providerSloReport?:
       | Promise<VoiceProviderSloReport>
       | VoiceProviderSloReport;
+    reconnectReport?: Promise<
+      Awaited<ReturnType<typeof buildDemoReconnectContractReport>>
+    >;
     refresh?: boolean;
   } = {},
 ) => ({
@@ -9876,7 +9990,9 @@ const productionReadinessOptions = (
         runVoiceCampaignReadinessProof({ store: campaignStore }),
       ),
     carriers: loadCarrierMatrixInputs,
-    deliveryRuntime: summarizeProductionReadinessDeliveryRuntime,
+    deliveryRuntime: input.deliveryRuntimeSummary
+      ? () => input.deliveryRuntimeSummary!
+      : summarizeProductionReadinessDeliveryRuntime,
     explain: true,
     links: productionReadinessLinks,
     observabilityExportDeliveryHistory: {
@@ -9896,17 +10012,20 @@ const productionReadinessOptions = (
   additionalChecks: () =>
     timeReadinessResolver("additionalChecks", async () => [
       await productionReadinessProofRuntime.buildFreshnessCheck(),
-      await buildBrowserCallProfileReadinessCheck(),
-      await buildRealCallProfileReadinessCheck(),
-      await buildVoiceRealCallProfileRecoveryJobHistoryCheck(
-        realCallProfileRecoveryJobStore,
-        {
-          href: "/voice/real-call-profile-recovery",
-          maxAgeMs: 5 * 60 * 1000,
-          minCompletedJobs: 1,
-          sourceHref: "/api/voice/real-call-profile-history/actions/jobs",
-        },
-      ),
+      await (input.browserCallProfileReadiness ??
+        buildBrowserCallProfileReadinessCheck()),
+      await (input.realCallProfileReadiness ??
+        buildRealCallProfileReadinessCheck()),
+      await (input.realCallProfileRecoveryReadiness ??
+        buildVoiceRealCallProfileRecoveryJobHistoryCheck(
+          realCallProfileRecoveryJobStore,
+          {
+            href: "/voice/real-call-profile-recovery",
+            maxAgeMs: 5 * 60 * 1000,
+            minCompletedJobs: 1,
+            sourceHref: "/api/voice/real-call-profile-history/actions/jobs",
+          },
+        )),
     ]),
   agentSquadContracts: () =>
     timeReadinessResolver("agentSquadContracts", async () => [
@@ -10042,7 +10161,9 @@ const productionReadinessOptions = (
                 : buildDemoBargeInReport({
                     context: input.proofPackContext,
                   }),
-              buildDemoReconnectContractReport(),
+              input.reconnectReport
+                ? input.reconnectReport
+                : buildDemoReconnectContractReport(),
             ]);
 
             return {
@@ -10180,9 +10301,11 @@ const productionReadinessOptions = (
           }),
   reconnectContracts: async () => [
     await timeReadinessResolver("reconnectContracts", async () =>
-      runVoiceReconnectContract({
-        snapshots: await getReconnectContractSnapshots(),
-      }),
+      input.reconnectReport
+        ? await input.reconnectReport
+        : runVoiceReconnectContract({
+            snapshots: await getReconnectContractSnapshots(),
+          }),
     ),
   ],
   store: productionReadinessTraceStore,
