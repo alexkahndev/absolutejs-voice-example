@@ -50,6 +50,7 @@ import {
   buildVoiceBrowserCallProfileReport,
   createVoiceBrowserCallProfileRoutes,
   evaluateVoiceBrowserCallProfileEvidence,
+  buildVoiceCallDebuggerReport,
   createVoiceCallDebuggerRoutes,
   createVoiceRealtimeChannelRoutes,
   createVoiceMediaPipelineRoutes,
@@ -123,6 +124,7 @@ import {
   summarizeVoiceTurnQuality,
   createVoiceSTTProviderRouter,
   createVoiceSessionListRoutes,
+  buildVoiceSessionSnapshot,
   createVoiceSessionSnapshotRoutes,
   createVoiceSessionReplayRoutes,
   createVoiceSimulationSuiteRoutes,
@@ -7447,6 +7449,36 @@ const buildDemoVoiceSessionSnapshot = async (input: {
   };
 };
 
+const demoVoiceCallDebuggerOptions = () => ({
+  audit: runtimeStorage.audit,
+  integrationEvents: runtimeStorage.events,
+  operationsRecordHref: ({ sessionId }: { sessionId: string }) =>
+    `/voice-operations/${encodeURIComponent(sessionId)}`,
+  redact: voiceSupportArtifactRedaction,
+  reviews: runtimeStorage.reviews as unknown as VoiceCallReviewStore,
+  snapshot: ({ sessionId, turnId }: { sessionId: string; turnId?: string }) =>
+    buildDemoVoiceSessionSnapshot({ sessionId, turnId }),
+  store: deliveryTraceStore,
+  tasks: runtimeStorage.tasks as unknown as VoiceOpsTaskStore,
+  title: "AbsoluteJS Voice Call Debugger",
+});
+
+const buildLatestDemoVoiceSessionSnapshot = async () =>
+  buildVoiceSessionSnapshot(
+    await buildDemoVoiceSessionSnapshot({ sessionId: "latest" }),
+  );
+
+const buildLatestDemoVoiceCallDebuggerReport = async () => {
+  const snapshot = await buildLatestDemoVoiceSessionSnapshot();
+
+  return buildVoiceCallDebuggerReport(demoVoiceCallDebuggerOptions(), {
+    request: new Request(
+      `http://localhost/voice-call-debugger/${encodeURIComponent(snapshot.sessionId)}`,
+    ),
+    sessionId: snapshot.sessionId,
+  });
+};
+
 const buildDemoBrowserMediaReport = () =>
   buildMediaWebRTCStatsReport({
     maxJitterMs: 30,
@@ -8940,11 +8972,17 @@ const observabilityExportOptions = () => ({
   ],
   audit: runtimeStorage.audit,
   auditDeliveries: runtimeStorage.auditDeliveries,
+  callDebuggerReports: async () => [await buildLatestDemoVoiceCallDebuggerReport()],
   links: {
+    callDebugger: (sessionId: string) =>
+      `/voice-call-debugger/${encodeURIComponent(sessionId)}`,
     operationsRecord: (sessionId: string) =>
       `/voice-operations/${encodeURIComponent(sessionId)}`,
+    sessionSnapshot: (sessionId: string) =>
+      `/api/voice/session-snapshot/${encodeURIComponent(sessionId)}`,
   },
   redact: voiceSupportArtifactRedaction,
+  sessionSnapshots: async () => [await buildLatestDemoVoiceSessionSnapshot()],
   store: deliveryTraceStore,
   traceDeliveries: runtimeStorage.traceDeliveries,
 });
@@ -10887,19 +10925,7 @@ const server = new Elysia()
     }),
   )
   .use(
-    createVoiceCallDebuggerRoutes({
-      audit: runtimeStorage.audit,
-      integrationEvents: runtimeStorage.events,
-      operationsRecordHref: ({ sessionId }) =>
-        `/voice-operations/${encodeURIComponent(sessionId)}`,
-      redact: voiceSupportArtifactRedaction,
-      reviews: runtimeStorage.reviews as unknown as VoiceCallReviewStore,
-      snapshot: ({ sessionId, turnId }) =>
-        buildDemoVoiceSessionSnapshot({ sessionId, turnId }),
-      store: deliveryTraceStore,
-      tasks: runtimeStorage.tasks as unknown as VoiceOpsTaskStore,
-      title: "AbsoluteJS Voice Call Debugger",
-    }),
+    createVoiceCallDebuggerRoutes(demoVoiceCallDebuggerOptions()),
   )
   .use(failureReplayRoutes)
   .use(
