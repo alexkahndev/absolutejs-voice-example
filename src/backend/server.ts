@@ -6,6 +6,7 @@ import {
   appendVoiceRealCallProfileRecoveryEvidence,
   assignVoiceOpsTask,
   completeVoiceOpsTask,
+  filterVoiceAuditEvents,
   createVoiceSQLiteTelephonyWebhookIdempotencyStore,
   createAnthropicVoiceAssistantModel,
   createGeminiVoiceAssistantModel,
@@ -215,6 +216,7 @@ import {
   type VoiceAssistantMemoryRecord,
   type VoiceAgentModel,
   type VoiceAuditEventStore,
+  type StoredVoiceAuditEvent,
   type VoiceHandoffDeliveryStore,
   type VoiceIOProviderRouterEvent,
   type VoiceLiveOpsAction,
@@ -491,6 +493,60 @@ const runtimeStorage = createVoiceFileRuntimeStorage<
 >({
   directory: runtimeDirectory,
 });
+
+const readRecentRuntimeJsonFiles = async <TRecord>(
+  directory: string,
+  limit: number,
+): Promise<TRecord[]> => {
+  const entries = await readdir(directory, { withFileTypes: true }).catch(
+    () => [],
+  );
+  const files = entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".json"))
+    .map((entry) => {
+      const path = `${directory}/${entry.name}`;
+      return {
+        path,
+        updatedAt: statSync(path).mtimeMs,
+      };
+    })
+    .sort((left, right) => right.updatedAt - left.updatedAt)
+    .slice(0, limit);
+  const records = await Promise.all(
+    files.map((file) =>
+      Bun.file(file.path)
+        .json()
+        .catch(() => undefined),
+    ),
+  );
+
+  return records.filter(
+    (record): record is TRecord => record !== undefined,
+  );
+};
+
+const readRecentRuntimeTraceEvents = (limit: number) =>
+  readRecentRuntimeJsonFiles<StoredVoiceTraceEvent>(
+    `${runtimeDirectory}/traces`,
+    limit,
+  );
+
+const readRecentRuntimeAuditEvents = (limit: number) =>
+  readRecentRuntimeJsonFiles<StoredVoiceAuditEvent>(
+    `${runtimeDirectory}/audit`,
+    limit,
+  );
+
+const createReadonlyAuditEventStore = (
+  events: readonly StoredVoiceAuditEvent[],
+): VoiceAuditEventStore => ({
+  append: async () => {
+    throw new Error("Readonly proof-pack audit store cannot append events.");
+  },
+  get: async (id) => events.find((event) => event.id === id),
+  list: async (filter) => filterVoiceAuditEvents([...events], filter),
+});
+
 const supportedDeliverySinkKinds = [
   "file",
   "webhook",
@@ -7452,11 +7508,19 @@ const buildDemoMediaPipelineReportOptions = async (
   };
 };
 
-const buildDemoVoiceSessionMediaSnapshot = async (sessionId: string) => {
-  const events = await deliveryTraceStore.list({
-    limit: 500,
-    sessionId,
-  });
+const buildDemoVoiceSessionMediaSnapshot = async (
+  sessionId: string,
+  input: {
+    events?: readonly StoredVoiceTraceEvent[];
+    traceStore?: VoiceTraceEventStore;
+  } = {},
+) => {
+  const events =
+    input.events ??
+    (await (input.traceStore ?? deliveryTraceStore).list({
+      limit: 500,
+      sessionId,
+    }));
   const frames = events
     .map((event): MediaFrame | undefined => {
       const traceEventId = `${event.type}:${String(event.at)}:${event.turnId ?? event.sessionId}`;
@@ -7573,13 +7637,18 @@ const resolveHealthyDemoSessionId = async (
 const buildDemoVoiceSessionSnapshot = async (input: {
   operationsRecord?: VoiceOperationsRecord;
   sessionId: string;
+  session?: VoiceSessionRecord;
+  traceEvents?: readonly StoredVoiceTraceEvent[];
   traceStore?: VoiceTraceEventStore;
   turnId?: string;
 }): Promise<VoiceSessionSnapshotInput> => {
   const sessionId = await resolveDemoSnapshotSessionId(input.sessionId);
   const traceStore = input.traceStore ?? deliveryTraceStore;
+  const traceEvents =
+    input.traceEvents ??
+    (await traceStore.list({ limit: 500, sessionId }));
   const [events, turnQuality, operationsRecord] = await Promise.all([
-    traceStore.list({ limit: 500, sessionId }),
+    traceEvents,
     summarizeVoiceTurnQuality({
       limit: 25,
       store: runtimeStorage.session,
@@ -7587,7 +7656,7 @@ const buildDemoVoiceSessionSnapshot = async (input: {
     input.operationsRecord ?? buildDemoOperationsRecord(sessionId),
   ]);
   const providerFallback = await buildVoiceProviderDecisionTraceReport({
-    events,
+    events: [...events],
     sessionId,
   });
   const providerRoutingEvents = events.filter(
@@ -7596,8 +7665,11 @@ const buildDemoVoiceSessionSnapshot = async (input: {
       event.type.includes("routing") ||
       event.metadata?.provider !== undefined,
   );
-  const session = await runtimeStorage.session.get(sessionId);
-  const mediaSnapshot = await buildDemoVoiceSessionMediaSnapshot(sessionId);
+  const session = input.session ?? (await runtimeStorage.session.get(sessionId));
+  const mediaSnapshot = await buildDemoVoiceSessionMediaSnapshot(sessionId, {
+    events,
+    traceStore,
+  });
   const failureReplay = buildVoiceFailureReplay(operationsRecord, {
     operationsRecordHref: `/voice-operations/${encodeURIComponent(sessionId)}`,
   });
@@ -7737,6 +7809,9 @@ const buildHealthyDemoVoiceSupportBundle = async (
         events: input.snapshot?.traceEvents,
       });
   const supportTraceStore = input.snapshot?.traceStore ?? rawDeliveryTraceStore;
+  const supportTraceEvents = input.snapshot?.traceEvents.filter(
+    (event) => event.sessionId === sessionId,
+  );
   const operationsRecord = context
     ? await context.cache(`operationsRecord:${sessionId}`, () =>
         context.time("supportBundle:operationsRecord", () =>
@@ -7756,6 +7831,7 @@ const buildHealthyDemoVoiceSupportBundle = async (
           await buildDemoVoiceSessionSnapshot({
             operationsRecord,
             sessionId,
+            traceEvents: supportTraceEvents,
             traceStore: supportTraceStore,
           }),
         ),
@@ -7763,14 +7839,24 @@ const buildHealthyDemoVoiceSupportBundle = async (
     : buildVoiceSessionSnapshot(
         await buildDemoVoiceSessionSnapshot({ operationsRecord, sessionId }),
       );
-  const failureReplay = buildVoiceFailureReplay(operationsRecord, {
-    operationsRecordHref: `/voice-operations/${encodeURIComponent(sessionId)}`,
-  });
+  const failureReplay = context
+    ? await context.time("supportBundle:failureReplay", () =>
+        buildVoiceFailureReplay(operationsRecord, {
+          operationsRecordHref: `/voice-operations/${encodeURIComponent(sessionId)}`,
+        }),
+      )
+    : buildVoiceFailureReplay(operationsRecord, {
+        operationsRecordHref: `/voice-operations/${encodeURIComponent(sessionId)}`,
+      });
+  const incidentMarkdown = context
+    ? await context.time("supportBundle:incidentMarkdown", () =>
+        renderVoiceOperationsRecordIncidentMarkdown(operationsRecord),
+      )
+    : renderVoiceOperationsRecordIncidentMarkdown(operationsRecord);
   const callDebuggerReport: VoiceCallDebuggerReport = {
     checkedAt: Date.now(),
     failureReplay,
-    incidentMarkdown:
-      renderVoiceOperationsRecordIncidentMarkdown(operationsRecord),
+    incidentMarkdown,
     operationsRecord,
     sessionId,
     snapshot: sessionSnapshot,
@@ -9471,19 +9557,41 @@ const proofPackObservabilityExportOptions = () => {
 
 const buildProductionReadinessObservabilityExport = async (
   input: {
+    callDebuggerReports?: VoiceCallDebuggerReport[];
     context?: ReturnType<typeof createVoiceProofPackBuildContext>;
+    operationsRecords?: VoiceOperationsRecord[];
     snapshot?: Awaited<ReturnType<typeof createVoiceProofRefreshSnapshot>>;
+    sessionSnapshots?: VoiceSessionSnapshot[];
     query?: Record<string, unknown>;
     request?: Request;
   } = {},
 ) =>
-  buildVoiceObservabilityExport({
+  input.context
+    ? input.context.time("observabilityExport:core", async () =>
+        buildVoiceObservabilityExport({
+          ...proofPackObservabilityExportOptions(),
+          audit: input.snapshot?.auditStore ?? productionReadinessAuditStore,
+          callDebuggerReports: input.callDebuggerReports,
+          events:
+            input.snapshot?.traceEvents ??
+            (await productionReadinessTraceStore.list()),
+          includeOperationsRecords: false,
+          operationsRecords: input.operationsRecords,
+          sessionSnapshots: input.sessionSnapshots,
+          store: input.snapshot?.traceStore ?? productionReadinessTraceStore,
+          traceDeliveries: undefined,
+        }),
+      )
+    : buildVoiceObservabilityExport({
     ...proofPackObservabilityExportOptions(),
     audit: input.snapshot?.auditStore ?? productionReadinessAuditStore,
+    callDebuggerReports: input.callDebuggerReports,
     events:
       input.snapshot?.traceEvents ??
       (await productionReadinessTraceStore.list()),
     includeOperationsRecords: false,
+    operationsRecords: input.operationsRecords,
+    sessionSnapshots: input.sessionSnapshots,
     store: input.snapshot?.traceStore ?? productionReadinessTraceStore,
     traceDeliveries: undefined,
   });
@@ -9525,23 +9633,29 @@ const buildDemoVoiceProofPack = async (input: {
     },
   });
   const proofSnapshot = context.cache("proofRefreshSnapshot", () =>
-    createVoiceProofRefreshSnapshot({
-      audit: productionReadinessAuditStore,
-      traceFilter: { limit: 1_000 },
-      traceStore: productionReadinessTraceStore,
-    }),
+    context.time("snapshot:proof", async () =>
+      createVoiceProofRefreshSnapshot({
+        audit: createReadonlyAuditEventStore(
+          await readRecentRuntimeAuditEvents(50),
+        ),
+        events: await productionReadinessTraceStore.list({ limit: 250 }),
+      }),
+    ),
   );
   const providerSloSnapshot = context.cache("providerSloSnapshot", () =>
-    createVoiceProofRefreshSnapshot({
-      traceFilter: { limit: 2_000 },
-      traceStore: providerSloProofTraceStore,
-    }),
+    context.time("snapshot:providerSlo", () =>
+      createVoiceProofRefreshSnapshot({
+        traceFilter: { limit: 2_000 },
+        traceStore: providerSloProofTraceStore,
+      }),
+    ),
   );
   const deliverySnapshot = context.cache("deliveryTraceSnapshot", () =>
-    createVoiceProofRefreshSnapshot({
-      traceFilter: { limit: 1_000 },
-      traceStore: rawDeliveryTraceStore,
-    }),
+    context.time("snapshot:delivery", async () =>
+      createVoiceProofRefreshSnapshot({
+        events: await readRecentRuntimeTraceEvents(500),
+      }),
+    ),
   );
   const providerSloReport = context.cache("providerSloReport", async () =>
     buildProofPackProviderSloReport({
@@ -9594,13 +9708,36 @@ const buildDemoVoiceProofPack = async (input: {
         ),
       ),
   );
+  const supportBundle = context.cache("supportBundleArtifacts", async () =>
+    buildHealthyDemoVoiceSupportBundle({
+      context,
+      proofSnapshot: await proofSnapshot,
+      snapshot: await deliverySnapshot,
+    }),
+  );
   const proofPackInput = await buildVoiceProofPackInput({
     context,
     generatedAt: input.generatedAt,
     loadObservabilityExport: async () =>
-      buildProductionReadinessObservabilityExport({
-        context,
-        snapshot: await proofSnapshot,
+      context.time("observabilityExport:build", async () => {
+        const bundle = await supportBundle;
+        const sessionId = bundle.sessionSnapshot.sessionId;
+        const operationsRecord = await context.cache(
+          `operationsRecord:${sessionId}`,
+          async () =>
+            buildDemoOperationsRecord(sessionId, {
+              audit: (await proofSnapshot).auditStore,
+              store: (await deliverySnapshot).traceStore,
+            }),
+        );
+
+        return buildProductionReadinessObservabilityExport({
+          callDebuggerReports: [bundle.callDebuggerReport],
+          context,
+          operationsRecords: [operationsRecord],
+          snapshot: await proofSnapshot,
+          sessionSnapshots: [bundle.sessionSnapshot],
+        });
       }),
     loadOperationsRecords: ({ supportBundle }) => {
       const sessionId = supportBundle?.sessionSnapshots?.[0]?.sessionId;
@@ -9639,11 +9776,7 @@ const buildDemoVoiceProofPack = async (input: {
       ),
     loadProviderSlo: () => providerSloReport,
     loadSupportBundle: async () => {
-      const bundle = await buildHealthyDemoVoiceSupportBundle({
-        context,
-        proofSnapshot: await proofSnapshot,
-        snapshot: await deliverySnapshot,
-      });
+      const bundle = await supportBundle;
 
       return {
         callDebuggerReports: [bundle.callDebuggerReport],
