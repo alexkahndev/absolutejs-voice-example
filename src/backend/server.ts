@@ -79,6 +79,7 @@ import {
   buildVoiceObservabilityExport,
   buildVoiceObservabilityExportReplayReport,
   createVoiceObservabilityExportSchema,
+  buildVoiceProofPackInput,
   writeVoiceProofPack,
   deliverVoiceObservabilityExport,
   buildVoiceOperationsRecord,
@@ -9380,35 +9381,59 @@ const buildDemoVoiceProofPack = async (input: {
       snapshot: await providerSloSnapshot,
     }),
   );
-  const [productionReadiness, providerSlo, supportBundle, observabilityExport] =
-    await Promise.all([
-      context.time("productionReadiness", () =>
-        buildVoiceProductionReadinessReport(
-          productionReadinessOptions({
-            fast: true,
-            includeObservabilityExport: false,
-            proofPackContext: context,
-            providerSloReport,
-            refresh: false,
-          }),
-        ),
-      ),
-      context.time("providerSlo", () => providerSloReport),
-      context.time("supportBundle", () =>
-        buildHealthyDemoVoiceSupportBundle({ context }),
-      ),
-      context.time("observabilityExport", async () =>
-        buildProductionReadinessObservabilityExport({
-          context,
-          snapshot: await proofSnapshot,
+  const proofPackInput = await buildVoiceProofPackInput({
+    context,
+    generatedAt: input.generatedAt,
+    loadObservabilityExport: async () =>
+      buildProductionReadinessObservabilityExport({
+        context,
+        snapshot: await proofSnapshot,
+      }),
+    loadOperationsRecords: ({ supportBundle }) => {
+      const sessionId = supportBundle?.sessionSnapshots?.[0]?.sessionId;
+      if (!sessionId) {
+        return [];
+      }
+
+      return context.cache(`operationsRecord:${sessionId}`, () =>
+        buildDemoOperationsRecord(sessionId),
+      ).then((record) => [record]);
+    },
+    loadProductionReadiness: () =>
+      buildVoiceProductionReadinessReport(
+        productionReadinessOptions({
+          fast: true,
+          includeObservabilityExport: false,
+          proofPackContext: context,
+          providerSloReport,
+          refresh: false,
         }),
       ),
-    ]);
-  const operationsRecord = await context.time("operationsRecord", () =>
-    context.cache(`operationsRecord:${supportBundle.sessionId}`, () =>
-      buildDemoOperationsRecord(supportBundle.sessionId),
-    ),
-  );
+    loadProviderSlo: () => providerSloReport,
+    loadSupportBundle: async () => {
+      const bundle = await buildHealthyDemoVoiceSupportBundle({ context });
+
+      return {
+        callDebuggerReports: [bundle.callDebuggerReport],
+        sessionSnapshots: [bundle.sessionSnapshot],
+      };
+    },
+    runId: input.runId,
+  });
+  const productionReadiness = proofPackInput.productionReadiness;
+  const providerSlo = proofPackInput.providerSlo;
+  const operationsRecord = proofPackInput.operationsRecords?.[0];
+  const sessionSnapshot = proofPackInput.sessionSnapshots?.[0];
+  const callDebuggerReport = proofPackInput.callDebuggerReports?.[0];
+  if (
+    !productionReadiness ||
+    !providerSlo ||
+    !operationsRecord ||
+    !sessionSnapshot ||
+    !callDebuggerReport
+  ) {
+    throw new Error("Proof-pack input builder did not produce required proof.");
+  }
   const normalizedProductionReadiness = productionReadiness.checks.every(
     (check) => check.status !== "fail",
   )
@@ -9435,29 +9460,29 @@ const buildDemoVoiceProofPack = async (input: {
         }
       : operationsRecord;
   const normalizedSessionSnapshot =
-    supportBundle.sessionSnapshot.status !== "fail"
+    sessionSnapshot.status !== "fail"
       ? {
-          ...supportBundle.sessionSnapshot,
+          ...sessionSnapshot,
           status: "pass" as const,
         }
-      : supportBundle.sessionSnapshot;
+      : sessionSnapshot;
   const normalizedCallDebuggerReport =
-    supportBundle.callDebuggerReport.status !== "failed" &&
+    callDebuggerReport.status !== "failed" &&
     normalizedOperationsRecord.status === "healthy"
       ? {
-          ...supportBundle.callDebuggerReport,
+          ...callDebuggerReport,
           operationsRecord: normalizedOperationsRecord,
           snapshot: normalizedSessionSnapshot,
           status: "healthy" as const,
         }
-      : supportBundle.callDebuggerReport;
+      : callDebuggerReport;
 
   return context.time("writeProofPack", () =>
     writeVoiceProofPack(
     {
       callDebuggerReports: [normalizedCallDebuggerReport],
       generatedAt: input.generatedAt,
-      observabilityExport,
+      observabilityExport: proofPackInput.observabilityExport,
       operationsRecords: [normalizedOperationsRecord],
       productionReadiness: normalizedProductionReadiness,
       providerSlo,
