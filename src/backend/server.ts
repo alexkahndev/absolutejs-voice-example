@@ -7581,6 +7581,7 @@ const resolveHealthyDemoSessionId = async (
 };
 
 const buildDemoVoiceSessionSnapshot = async (input: {
+  context?: ReturnType<typeof createVoiceProofPackBuildContext>;
   operationsRecord?: VoiceOperationsRecord;
   sessionId: string;
   session?: VoiceSessionRecord;
@@ -7592,30 +7593,63 @@ const buildDemoVoiceSessionSnapshot = async (input: {
   const traceStore = input.traceStore ?? deliveryTraceStore;
   const traceEvents =
     input.traceEvents ??
-    (await traceStore.list({ limit: 500, sessionId }));
+    (await (input.context
+      ? input.context.time("supportBundle:sessionSnapshot:traceEvents", () =>
+          traceStore.list({ limit: 500, sessionId }),
+        )
+      : traceStore.list({ limit: 500, sessionId })));
   const [events, turnQuality, operationsRecord] = await Promise.all([
     traceEvents,
-    summarizeVoiceTurnQuality({
-      limit: 25,
-      store: runtimeStorage.session,
-    }),
+    input.context
+      ? input.context.time("supportBundle:sessionSnapshot:turnQuality", () =>
+          summarizeVoiceTurnQuality({
+            limit: 25,
+            sessionIds: [sessionId],
+            store: runtimeStorage.session,
+          }),
+        )
+      : summarizeVoiceTurnQuality({
+          limit: 25,
+          sessionIds: [sessionId],
+          store: runtimeStorage.session,
+        }),
     input.operationsRecord ?? buildDemoOperationsRecord(sessionId),
   ]);
-  const providerFallback = await buildVoiceProviderDecisionTraceReport({
-    events: [...events],
-    sessionId,
-  });
+  const providerFallback = await (input.context
+    ? input.context.time("supportBundle:sessionSnapshot:providerFallback", () =>
+        buildVoiceProviderDecisionTraceReport({
+          events: [...events],
+          sessionId,
+        }),
+      )
+    : buildVoiceProviderDecisionTraceReport({
+        events: [...events],
+        sessionId,
+      }));
   const providerRoutingEvents = events.filter(
     (event) =>
       event.type.includes("provider") ||
       event.type.includes("routing") ||
       event.metadata?.provider !== undefined,
   );
-  const session = input.session ?? (await runtimeStorage.session.get(sessionId));
-  const mediaSnapshot = await buildDemoVoiceSessionMediaSnapshot(sessionId, {
-    events,
-    traceStore,
-  });
+  const session =
+    input.session ??
+    (await (input.context
+      ? input.context.time("supportBundle:sessionSnapshot:session", () =>
+          runtimeStorage.session.get(sessionId),
+        )
+      : runtimeStorage.session.get(sessionId)));
+  const mediaSnapshot = await (input.context
+    ? input.context.time("supportBundle:sessionSnapshot:media", () =>
+        buildDemoVoiceSessionMediaSnapshot(sessionId, {
+          events,
+          traceStore,
+        }),
+      )
+    : buildDemoVoiceSessionMediaSnapshot(sessionId, {
+        events,
+        traceStore,
+      }));
   const failureReplay = buildVoiceFailureReplay(operationsRecord, {
     operationsRecordHref: `/voice-operations/${encodeURIComponent(sessionId)}`,
   });
@@ -7775,6 +7809,7 @@ const buildHealthyDemoVoiceSupportBundle = async (
     ? await context.time("supportBundle:sessionSnapshot", async () =>
         buildVoiceSessionSnapshot(
           await buildDemoVoiceSessionSnapshot({
+            context,
             operationsRecord,
             sessionId,
             traceEvents: supportTraceEvents,
