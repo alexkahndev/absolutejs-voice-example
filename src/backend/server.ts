@@ -45,6 +45,7 @@ import {
   createVoiceObservabilityExportReplayRoutes,
   createVoiceProofPackRoutes,
   createVoiceProofPackBuildContext,
+  createVoiceProofRefreshSnapshot,
   createVoiceProofPackStaleWhileRefreshSource,
   createVoiceCompetitiveCoverageRoutes,
   buildVoiceRealtimeChannelReport,
@@ -9315,24 +9316,22 @@ const proofPackObservabilityExportOptions = () => {
 
 const buildProductionReadinessObservabilityExport = async (input: {
   context?: ReturnType<typeof createVoiceProofPackBuildContext>;
+  snapshot?: Awaited<ReturnType<typeof createVoiceProofRefreshSnapshot>>;
   query?: Record<string, unknown>;
   request?: Request;
 } = {}) =>
   buildVoiceObservabilityExport({
     ...proofPackObservabilityExportOptions(),
-    audit: productionReadinessAuditStore,
-    events: input.context
-      ? await input.context.cache("productionReadinessTraceEvents", () =>
-          productionReadinessTraceStore.list(),
-        )
-      : await productionReadinessTraceStore.list(),
+    audit: input.snapshot?.auditStore ?? productionReadinessAuditStore,
+    events: input.snapshot?.traceEvents ?? (await productionReadinessTraceStore.list()),
     includeOperationsRecords: false,
-    store: productionReadinessTraceStore,
+    store: input.snapshot?.traceStore ?? productionReadinessTraceStore,
     traceDeliveries: undefined,
   });
 
 const buildProofPackProviderSloReport = async (input: {
   context?: ReturnType<typeof createVoiceProofPackBuildContext>;
+  snapshot?: Awaited<ReturnType<typeof createVoiceProofRefreshSnapshot>>;
 } = {}) => {
   const thresholdProfile = input.context
     ? await input.context.cache("sloThresholdProfile", loadDemoSloThresholdProfile)
@@ -9340,9 +9339,12 @@ const buildProofPackProviderSloReport = async (input: {
 
   return buildVoiceProviderSloReport({
     ...providerSloOptions,
-    store: createVoiceScopedTraceEventStore(providerSloProofTraceStore, {
-      scenarioId: providerSloProofScenarioId,
-    }),
+    store: createVoiceScopedTraceEventStore(
+      input.snapshot?.traceStore ?? providerSloProofTraceStore,
+      {
+        scenarioId: providerSloProofScenarioId,
+      },
+    ),
     thresholds: {
       ...providerSloOptions.thresholds,
       ...thresholdProfile.providerSlo,
@@ -9361,8 +9363,22 @@ const buildDemoVoiceProofPack = async (input: {
       }
     },
   });
-  const providerSloReport = context.cache("providerSloReport", () =>
-    buildProofPackProviderSloReport({ context }),
+  const proofSnapshot = context.cache("proofRefreshSnapshot", () =>
+    createVoiceProofRefreshSnapshot({
+      audit: productionReadinessAuditStore,
+      traceStore: productionReadinessTraceStore,
+    }),
+  );
+  const providerSloSnapshot = context.cache("providerSloSnapshot", () =>
+    createVoiceProofRefreshSnapshot({
+      traceStore: providerSloProofTraceStore,
+    }),
+  );
+  const providerSloReport = context.cache("providerSloReport", async () =>
+    buildProofPackProviderSloReport({
+      context,
+      snapshot: await providerSloSnapshot,
+    }),
   );
   const [productionReadiness, providerSlo, supportBundle, observabilityExport] =
     await Promise.all([
@@ -9381,8 +9397,11 @@ const buildDemoVoiceProofPack = async (input: {
       context.time("supportBundle", () =>
         buildHealthyDemoVoiceSupportBundle({ context }),
       ),
-      context.time("observabilityExport", () =>
-        buildProductionReadinessObservabilityExport({ context }),
+      context.time("observabilityExport", async () =>
+        buildProductionReadinessObservabilityExport({
+          context,
+          snapshot: await proofSnapshot,
+        }),
       ),
     ]);
   const operationsRecord = await context.time("operationsRecord", () =>
