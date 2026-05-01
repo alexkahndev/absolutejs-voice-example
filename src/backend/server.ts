@@ -43,6 +43,7 @@ import {
   createVoiceOpsStatusRoutes,
   createVoiceObservabilityExportRoutes,
   createVoiceObservabilityExportReplayRoutes,
+  createVoiceProofPackRoutes,
   createVoiceCompetitiveCoverageRoutes,
   buildVoiceRealtimeChannelReport,
   buildVoiceRealtimeChannelRuntimeSamplesFromTrace,
@@ -74,6 +75,7 @@ import {
   buildVoiceOpsRecoveryReport,
   buildVoiceObservabilityExport,
   buildVoiceObservabilityExportReplayReport,
+  writeVoiceProofPack,
   deliverVoiceObservabilityExport,
   buildVoiceOperationsRecord,
   buildVoiceProductionReadinessGate,
@@ -9004,6 +9006,14 @@ const observabilityExportOptions = () => ({
 const buildDemoObservabilityExport = () =>
   buildVoiceObservabilityExport(observabilityExportOptions());
 
+const readLatestDemoVoiceProofPack = async () => {
+  await refreshProductionReadinessProof();
+  return (await Bun.file(latestProofPackJsonPath).json()) as Record<
+    string,
+    unknown
+  >;
+};
+
 const buildProductionReadinessObservabilityExport = async () =>
   buildVoiceObservabilityExport({
     ...observabilityExportOptions(),
@@ -9039,34 +9049,52 @@ const refreshProductionReadinessProof = () =>
       }),
     ]);
 
-    const proofPack = {
-      generatedAt: metadata.generatedAt,
-      ok: true,
-      outputDir: ".voice-runtime/proof-pack",
-      runId: metadata.runId,
-      source: metadata.source,
-    };
-
     await Promise.all([
       mkdir(dirname(latestProofPackJsonPath), { recursive: true }),
       mkdir(dirname(latestProofTrendsJsonPath), { recursive: true }),
     ]);
+    const proofPack = await writeVoiceProofPack(
+      {
+        generatedAt: metadata.generatedAt,
+        runId: metadata.runId,
+        sections: [
+          {
+            evidence: [
+              {
+                label: "Provider SLO latency samples",
+                status: "pass",
+                value: "refreshed",
+              },
+              {
+                label: "Provider decision traces",
+                status: "pass",
+                value: "refreshed",
+              },
+              {
+                label: "Barge-in and delivery proof",
+                status: "pass",
+                value: "refreshed",
+              },
+              {
+                label: "Synthetic provider error cleanup",
+                status: "pass",
+                value: "complete",
+              },
+            ],
+            status: "pass",
+            summary:
+              "Production readiness refresh generated self-hosted proof evidence.",
+            title: "Production readiness proof",
+          },
+        ],
+      },
+      {
+        jsonFileName: "latest.json",
+        markdownFileName: "latest.md",
+        outputDir: ".voice-runtime/proof-pack",
+      },
+    );
     await Promise.all([
-      Bun.write(latestProofPackJsonPath, JSON.stringify(proofPack, null, 2)),
-      Bun.write(
-        latestProofPackMarkdownPath,
-        [
-          "# AbsoluteJS Voice Production Readiness Proof",
-          "",
-          `Generated: ${metadata.generatedAt}`,
-          "",
-          "- Provider SLO latency samples refreshed.",
-          "- Provider decision traces refreshed.",
-          "- Barge-in and delivery proof refreshed.",
-          "- Stale synthetic provider errors cleaned from the demo runtime.",
-          "",
-        ].join("\n"),
-      ),
       Bun.write(
         latestProofTrendsJsonPath,
         JSON.stringify(
@@ -9083,7 +9111,7 @@ const refreshProductionReadinessProof = () =>
             generatedAt: metadata.generatedAt,
             ok: true,
             outputDir: ".voice-runtime/proof-trends",
-            runId: proofPack.runId,
+            runId: proofPack.proofPack.runId,
             summary: {
               cycles: 1,
               maxLiveP95Ms: 420,
@@ -11145,6 +11173,11 @@ const server = new Elysia()
     createVoiceObservabilityExportRoutes({
       ...observabilityExportOptions(),
       title: "AbsoluteJS Voice Demo Observability Export",
+    }),
+  )
+  .use(
+    createVoiceProofPackRoutes({
+      source: readLatestDemoVoiceProofPack,
     }),
   )
   .use(
