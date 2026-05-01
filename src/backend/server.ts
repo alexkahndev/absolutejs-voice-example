@@ -50,6 +50,7 @@ import {
   buildVoiceBrowserCallProfileReport,
   createVoiceBrowserCallProfileRoutes,
   evaluateVoiceBrowserCallProfileEvidence,
+  createVoiceCallDebuggerRoutes,
   createVoiceRealtimeChannelRoutes,
   createVoiceMediaPipelineRoutes,
   createVoiceRealtimeProviderContractMatrixPreset,
@@ -7366,6 +7367,17 @@ const buildDemoVoiceSessionSnapshot = async (input: {
   return {
     artifacts: [
       {
+        href: `/voice-call-debugger/${encodeURIComponent(sessionId)}`,
+        kind: "custom",
+        label: "Call debugger",
+        report: {
+          html: true,
+          json: true,
+          markdown: true,
+        },
+        status: "pass",
+      },
+      {
         href: `/voice-operations/${encodeURIComponent(sessionId)}`,
         kind: "operations-record",
         label: "Operations record",
@@ -10872,6 +10884,21 @@ const server = new Elysia()
   .use(
     createVoiceSessionSnapshotRoutes({
       source: buildDemoVoiceSessionSnapshot,
+    }),
+  )
+  .use(
+    createVoiceCallDebuggerRoutes({
+      audit: runtimeStorage.audit,
+      integrationEvents: runtimeStorage.events,
+      operationsRecordHref: ({ sessionId }) =>
+        `/voice-operations/${encodeURIComponent(sessionId)}`,
+      redact: voiceSupportArtifactRedaction,
+      reviews: runtimeStorage.reviews as unknown as VoiceCallReviewStore,
+      snapshot: ({ sessionId, turnId }) =>
+        buildDemoVoiceSessionSnapshot({ sessionId, turnId }),
+      store: deliveryTraceStore,
+      tasks: runtimeStorage.tasks as unknown as VoiceOpsTaskStore,
+      title: "AbsoluteJS Voice Call Debugger",
     }),
   )
   .use(failureReplayRoutes)
