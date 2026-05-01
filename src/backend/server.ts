@@ -103,6 +103,7 @@ import {
   buildVoiceProviderOrchestrationReport,
   createVoiceProviderOrchestrationProfile,
   createVoiceProviderOrchestrationRoutes,
+  buildVoiceProviderSloReport,
   buildVoiceProviderDecisionTraceReport,
   createVoiceProviderDecisionTraceEvent,
   createVoiceProviderDecisionTraceRoutes,
@@ -9007,6 +9008,11 @@ const buildDemoObservabilityExport = () =>
   buildVoiceObservabilityExport(observabilityExportOptions());
 
 const readLatestDemoVoiceProofPack = async () => {
+  const file = Bun.file(latestProofPackJsonPath);
+  if (await file.exists()) {
+    return (await file.json()) as Record<string, unknown>;
+  }
+
   await refreshProductionReadinessProof();
   return (await Bun.file(latestProofPackJsonPath).json()) as Record<
     string,
@@ -9023,6 +9029,88 @@ const buildProductionReadinessObservabilityExport = async () =>
     store: productionReadinessTraceStore,
     traceDeliveries: undefined,
   });
+
+const buildProofPackProviderSloReport = async () => {
+  const thresholdProfile = await loadDemoSloThresholdProfile();
+
+  return buildVoiceProviderSloReport({
+    ...providerSloOptions,
+    events: await deliveryTraceStore.list(),
+    store: deliveryTraceStore,
+    thresholds: {
+      ...providerSloOptions.thresholds,
+      ...thresholdProfile.providerSlo,
+    },
+  });
+};
+
+const buildDemoVoiceProofPack = async (input: {
+  generatedAt: string;
+  runId: string;
+}) => {
+  const [
+    productionReadiness,
+    providerSlo,
+    sessionSnapshot,
+    callDebuggerReport,
+    observabilityExport,
+  ] = await Promise.all([
+    buildVoiceProductionReadinessReport(
+      productionReadinessOptions({
+        includeObservabilityExport: false,
+        refresh: false,
+      }),
+    ),
+    buildProofPackProviderSloReport(),
+    buildLatestDemoVoiceSessionSnapshot(),
+    buildLatestDemoVoiceCallDebuggerReport(),
+    buildProductionReadinessObservabilityExport(),
+  ]);
+  const operationsRecord = await buildDemoOperationsRecord(sessionSnapshot.sessionId);
+
+  return writeVoiceProofPack(
+    {
+      callDebuggerReports: [callDebuggerReport],
+      generatedAt: input.generatedAt,
+      observabilityExport,
+      operationsRecords: [operationsRecord],
+      productionReadiness,
+      providerSlo,
+      runId: input.runId,
+      sections: [
+        {
+          evidence: [
+            {
+              label: "Provider decision traces",
+              status: "pass",
+              value: "refreshed",
+            },
+            {
+              label: "Barge-in and delivery proof",
+              status: "pass",
+              value: "refreshed",
+            },
+            {
+              label: "Synthetic provider error cleanup",
+              status: "pass",
+              value: "complete",
+            },
+          ],
+          status: "pass",
+          summary:
+            "Production readiness refresh generated self-hosted proof evidence.",
+          title: "Proof refresh",
+        },
+      ],
+      sessionSnapshots: [sessionSnapshot],
+    },
+    {
+      jsonFileName: "latest.json",
+      markdownFileName: "latest.md",
+      outputDir: ".voice-runtime/proof-pack",
+    },
+  );
+};
 
 const refreshProductionReadinessProof = () =>
   productionReadinessProofRuntime.refresh(async (metadata) => {
@@ -9053,47 +9141,10 @@ const refreshProductionReadinessProof = () =>
       mkdir(dirname(latestProofPackJsonPath), { recursive: true }),
       mkdir(dirname(latestProofTrendsJsonPath), { recursive: true }),
     ]);
-    const proofPack = await writeVoiceProofPack(
-      {
-        generatedAt: metadata.generatedAt,
-        runId: metadata.runId,
-        sections: [
-          {
-            evidence: [
-              {
-                label: "Provider SLO latency samples",
-                status: "pass",
-                value: "refreshed",
-              },
-              {
-                label: "Provider decision traces",
-                status: "pass",
-                value: "refreshed",
-              },
-              {
-                label: "Barge-in and delivery proof",
-                status: "pass",
-                value: "refreshed",
-              },
-              {
-                label: "Synthetic provider error cleanup",
-                status: "pass",
-                value: "complete",
-              },
-            ],
-            status: "pass",
-            summary:
-              "Production readiness refresh generated self-hosted proof evidence.",
-            title: "Production readiness proof",
-          },
-        ],
-      },
-      {
-        jsonFileName: "latest.json",
-        markdownFileName: "latest.md",
-        outputDir: ".voice-runtime/proof-pack",
-      },
-    );
+    const proofPack = await buildDemoVoiceProofPack({
+      generatedAt: metadata.generatedAt,
+      runId: metadata.runId,
+    });
     await Promise.all([
       Bun.write(
         latestProofTrendsJsonPath,
@@ -9228,7 +9279,12 @@ const buildDemoObservabilityExportReplay = async () => {
   };
 };
 
-const productionReadinessOptions = () => ({
+const productionReadinessOptions = (
+  input: {
+    includeObservabilityExport?: boolean;
+    refresh?: boolean;
+  } = {},
+) => ({
   ...createVoiceReadinessProfile("phone-agent", {
     auditDeliveries: runtimeStorage.auditDeliveries,
     campaignReadiness: () =>
@@ -9270,18 +9326,27 @@ const productionReadinessOptions = () => ({
   htmlPath: "/production-readiness",
   opsActionHistory: runtimeStorage.audit,
   opsRecovery: buildProductionReadinessOpsRecoveryReport,
-  observabilityExport: buildFreshDemoObservabilityExport,
-  observabilityExportReplay: buildDemoObservabilityExportReplay,
-  observabilityExportDeliveryHistory: async () => {
-    await buildFreshDemoObservabilityExport();
+  observabilityExport:
+    input.includeObservabilityExport === false
+      ? (false as const)
+      : buildFreshDemoObservabilityExport,
+  observabilityExportReplay:
+    input.includeObservabilityExport === false
+      ? (false as const)
+      : buildDemoObservabilityExportReplay,
+  observabilityExportDeliveryHistory:
+    input.includeObservabilityExport === false
+      ? (false as const)
+      : async () => {
+          await buildFreshDemoObservabilityExport();
 
-    return {
-      failOnMissing: false,
-      failOnStale: true,
-      maxAgeMs: 2 * 60 * 60 * 1000,
-      store: observabilityExportDeliveryReceipts,
-    };
-  },
+          return {
+            failOnMissing: false,
+            failOnStale: true,
+            maxAgeMs: 2 * 60 * 60 * 1000,
+            store: observabilityExportDeliveryReceipts,
+          };
+        },
   path: "/api/production-readiness",
   profileSwitchReadiness: buildProductionReadinessProfileSwitchReport,
   browserMedia: async () =>
@@ -9316,7 +9381,9 @@ const productionReadinessOptions = () => ({
     };
   },
   resolveOptions: async () => {
-    await refreshProductionReadinessProof();
+    if (input.refresh !== false) {
+      await refreshProductionReadinessProof();
+    }
     const thresholdProfile = await loadDemoSloThresholdProfile();
 
     return {
