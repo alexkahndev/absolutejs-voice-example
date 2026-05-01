@@ -3590,7 +3590,10 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
         <section class="panel" style="margin-top:14px">
           <h2>Readiness Recovery Plan</h2>
           <p class="muted">Mapped from failed or warning production-readiness checks. POST actions run here; GET actions open the relevant proof surface.</p>
-          <p><button id="load-demo-plan" type="button">Demo recovery plan</button></p>
+          <p>
+            <button id="load-demo-plan" type="button">Demo recovery plan</button>
+            <button id="run-visible-plan" type="button">Run visible POST actions</button>
+          </p>
           <div id="readiness-plan" class="actions"></div>
         </section>
         <section class="panel" style="margin-top:14px">
@@ -3605,8 +3608,10 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
         const proofJobs = document.querySelector("#proof-jobs");
         const readinessPlan = document.querySelector("#readiness-plan");
         const loadDemoPlanButton = document.querySelector("#load-demo-plan");
+        const runVisiblePlanButton = document.querySelector("#run-visible-plan");
         const jobs = document.querySelector("#jobs");
         const pollers = new Map();
+        let visibleReadinessActions = [];
         const staticJobs = [
           {
             description: "Run real browser microphone/WebSocket profile proof against this demo server.",
@@ -3626,6 +3631,16 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
 
         const showPayload = (value) => {
           payload.textContent = JSON.stringify(value, null, 2);
+        };
+
+        const runPostAction = async (action) => {
+          const response = await fetch(action.href, { method: "POST" });
+          const result = await response.json();
+          if (result.jobId) {
+            renderJob({ id: result.jobId, actionId: result.actionId, status: result.jobStatus ?? "queued", message: result.message });
+            pollJob(result.jobId);
+          }
+          return result;
         };
 
         const actionCard = (action) => {
@@ -3655,13 +3670,8 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
             button.disabled = true;
             button.textContent = "Queued...";
             try {
-              const response = await fetch(action.href, { method: "POST" });
-              const result = await response.json();
+              const result = await runPostAction(action);
               showPayload(result);
-              if (result.jobId) {
-                renderJob({ id: result.jobId, actionId: result.actionId, status: result.jobStatus ?? "queued", message: result.message });
-                pollJob(result.jobId);
-              }
               button.textContent = "Run again";
             } catch (error) {
               showPayload({ error: error instanceof Error ? error.message : String(error) });
@@ -3721,6 +3731,7 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
           const result = await response.json();
           showPayload(result);
           const actions = result.actions ?? [];
+          visibleReadinessActions = actions;
           readinessPlan.replaceChildren();
           if (actions.length === 0) {
             const empty = document.createElement("div");
@@ -3731,6 +3742,37 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
           }
           readinessPlan.replaceChildren(...actions.map(actionCard));
         };
+
+        runVisiblePlanButton.addEventListener("click", async () => {
+          const postActions = visibleReadinessActions.filter((action) => action.method === "POST");
+          runVisiblePlanButton.disabled = true;
+          try {
+            if (postActions.length === 0) {
+              showPayload({ actions: [], message: "No visible POST recovery actions to run." });
+              return;
+            }
+            const results = await Promise.allSettled(postActions.map(runPostAction));
+            showPayload({
+              actionCount: postActions.length,
+              generatedAt: new Date().toISOString(),
+              results: results.map((result, index) => ({
+                actionId: postActions[index]?.id,
+                href: postActions[index]?.href,
+                label: postActions[index]?.label,
+                status: result.status,
+                value: result.status === "fulfilled" ? result.value : undefined,
+                reason: result.status === "rejected"
+                  ? result.reason instanceof Error
+                    ? result.reason.message
+                    : String(result.reason)
+                  : undefined
+              }))
+            });
+            await loadJobs();
+          } finally {
+            runVisiblePlanButton.disabled = false;
+          }
+        });
 
         loadDemoPlanButton.addEventListener("click", async () => {
           loadDemoPlanButton.disabled = true;
