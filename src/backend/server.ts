@@ -44,6 +44,7 @@ import {
   createVoiceObservabilityExportRoutes,
   createVoiceObservabilityExportReplayRoutes,
   createVoiceProofPackRoutes,
+  createVoiceProofPackBuildContext,
   createVoiceProofPackStaleWhileRefreshSource,
   createVoiceCompetitiveCoverageRoutes,
   buildVoiceRealtimeChannelReport,
@@ -7651,13 +7652,19 @@ const buildLatestDemoVoiceCallDebuggerReport = async () => {
   });
 };
 
-const buildHealthyDemoVoiceSupportBundle = async (): Promise<{
+const buildHealthyDemoVoiceSupportBundle = async (input: {
+  context?: ReturnType<typeof createVoiceProofPackBuildContext>;
+} = {}): Promise<{
   callDebuggerReport: VoiceCallDebuggerReport;
   sessionSnapshot: VoiceSessionSnapshot;
   sessionId: string;
 }> => {
   const sessionId = await resolveHealthyDemoSessionId();
-  const operationsRecord = await buildDemoOperationsRecord(sessionId);
+  const operationsRecord = input.context
+    ? await input.context.cache(`operationsRecord:${sessionId}`, () =>
+        buildDemoOperationsRecord(sessionId),
+      )
+    : await buildDemoOperationsRecord(sessionId);
   const sessionSnapshot = buildVoiceSessionSnapshot(
     await buildDemoVoiceSessionSnapshot({ operationsRecord, sessionId }),
   );
@@ -9330,27 +9337,20 @@ const buildProofPackProviderSloReport = async () => {
   });
 };
 
-const timeProofPackBuilder = async <T>(
-  label: string,
-  run: () => Promise<T> | T,
-) => {
-  const startedAt = Date.now();
-  try {
-    return await run();
-  } finally {
-    if (process.env.VOICE_PROOF_PACK_DEBUG_TIMINGS === "1") {
-      console.log(`[proof-pack] ${label}: ${Date.now() - startedAt}ms`);
-    }
-  }
-};
-
 const buildDemoVoiceProofPack = async (input: {
   generatedAt: string;
   runId: string;
 }) => {
+  const context = createVoiceProofPackBuildContext({
+    onTiming: (timing) => {
+      if (process.env.VOICE_PROOF_PACK_DEBUG_TIMINGS === "1") {
+        console.log(`[proof-pack] ${timing.label}: ${timing.durationMs}ms`);
+      }
+    },
+  });
   const [productionReadiness, providerSlo, supportBundle, observabilityExport] =
     await Promise.all([
-      timeProofPackBuilder("productionReadiness", () =>
+      context.time("productionReadiness", () =>
         buildVoiceProductionReadinessReport(
           productionReadinessOptions({
             fast: true,
@@ -9359,16 +9359,18 @@ const buildDemoVoiceProofPack = async (input: {
           }),
         ),
       ),
-      timeProofPackBuilder("providerSlo", () => buildProofPackProviderSloReport()),
-      timeProofPackBuilder("supportBundle", () =>
-        buildHealthyDemoVoiceSupportBundle(),
+      context.time("providerSlo", () => buildProofPackProviderSloReport()),
+      context.time("supportBundle", () =>
+        buildHealthyDemoVoiceSupportBundle({ context }),
       ),
-      timeProofPackBuilder("observabilityExport", () =>
+      context.time("observabilityExport", () =>
         buildProductionReadinessObservabilityExport(),
       ),
     ]);
-  const operationsRecord = await timeProofPackBuilder("operationsRecord", () =>
-    buildDemoOperationsRecord(supportBundle.sessionId),
+  const operationsRecord = await context.time("operationsRecord", () =>
+    context.cache(`operationsRecord:${supportBundle.sessionId}`, () =>
+      buildDemoOperationsRecord(supportBundle.sessionId),
+    ),
   );
   const normalizedProductionReadiness = productionReadiness.checks.every(
     (check) => check.status !== "fail",
@@ -9413,7 +9415,7 @@ const buildDemoVoiceProofPack = async (input: {
         }
       : supportBundle.callDebuggerReport;
 
-  return timeProofPackBuilder("writeProofPack", () =>
+  return context.time("writeProofPack", () =>
     writeVoiceProofPack(
     {
       callDebuggerReports: [normalizedCallDebuggerReport],
