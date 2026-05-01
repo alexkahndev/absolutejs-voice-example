@@ -108,6 +108,7 @@ import {
   buildVoiceProviderDecisionTraceReport,
   createVoiceProviderDecisionTraceEvent,
   createVoiceProviderDecisionTraceRoutes,
+  createVoiceProofTraceStore,
   createVoiceProviderSloRoutes,
   createVoiceSloCalibrationRoutes,
   createVoiceSloReadinessThresholdOptions,
@@ -8815,7 +8816,12 @@ const buildProductionReadinessOpsRecoveryReport = () =>
   });
 
 const providerSloProofScenarioId = "provider-slo-proof";
-const providerSloProofTraceStore = createVoiceMemoryTraceEventStore();
+const providerSloProofTraceStore = createVoiceProofTraceStore({
+  mirrorStore: deliveryTraceStore,
+  scope: {
+    scenarioId: providerSloProofScenarioId,
+  },
+});
 
 const providerSloOptions = {
   maxAgeMs: 10 * 60 * 1000,
@@ -8909,10 +8915,7 @@ const seedDemoProviderSloProof = async () => {
     }),
   );
   const events: StoredVoiceTraceEvent[] = await Promise.all(
-    proofEvents.map(async (event) => {
-      await providerSloProofTraceStore.append(event);
-      return deliveryTraceStore.append(event);
-    }),
+    proofEvents.map((event) => providerSloProofTraceStore.append(event)),
   );
 
   return {
