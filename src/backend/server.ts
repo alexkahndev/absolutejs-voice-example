@@ -73,6 +73,7 @@ import {
   buildVoiceOperationsRecord,
   buildVoiceProductionReadinessGate,
   buildVoiceProductionReadinessReport,
+  buildVoiceReadinessRecoveryActions,
   buildEmptyVoiceProofTrendReport,
   buildVoicePostCallAnalysisReport,
   buildVoiceGuardrailReport,
@@ -3563,7 +3564,7 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
     </head>
     <body>
       <main>
-        <p><a href="/ops-console">Back to Ops Console</a> · <a href="/production-readiness">Production Readiness</a> · <a href="/voice/real-call-profile-history">Profile History</a> · <a href="/api/voice/real-call-profile-history/actions">Actions JSON</a></p>
+        <p><a href="/ops-console">Back to Ops Console</a> · <a href="/production-readiness">Production Readiness</a> · <a href="/voice/real-call-profile-history">Profile History</a> · <a href="/api/voice/real-call-profile-history/actions">Actions JSON</a> · <a href="/api/production-readiness/recovery-actions">Readiness Recovery Plan</a></p>
         <section class="hero">
           <p class="muted">Executable proof repair</p>
           <h1>Run recovery jobs instead of reading stale instructions</h1>
@@ -10348,6 +10349,36 @@ const server = new Elysia()
     }),
   )
   .use(createVoiceProductionReadinessRoutes(productionReadinessOptions()))
+  .get("/api/production-readiness/recovery-actions", async () => {
+    try {
+      let report;
+      try {
+        report = await buildVoiceProductionReadinessReport(
+          productionReadinessOptions(),
+        );
+      } catch (error) {
+        if (!(error instanceof Error) || !error.message.includes("ENOENT")) {
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        report = await buildVoiceProductionReadinessReport(
+          productionReadinessOptions(),
+        );
+      }
+
+      return Response.json(buildVoiceReadinessRecoveryActions(report));
+    } catch (error) {
+      return Response.json(
+        {
+          actions: [],
+          error: error instanceof Error ? error.message : String(error),
+          generatedAt: new Date().toISOString(),
+          sourceChecks: 0,
+        },
+        { status: 500 },
+      );
+    }
+  })
   .use(
     createVoiceOpsRecoveryRoutes({
       ...opsRecoveryOptions(),
