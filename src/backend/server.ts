@@ -218,6 +218,7 @@ import {
   type VoiceLiveOpsControlState,
   type VoiceProviderHealthSummary,
   type VoiceProviderOrchestrationReport,
+  type VoiceProviderSloReport,
   type VoiceProviderRouterEvent,
   type VoiceOpsTaskStatus,
   type VoiceOpsTaskStore,
@@ -9312,18 +9313,30 @@ const proofPackObservabilityExportOptions = () => {
   return options;
 };
 
-const buildProductionReadinessObservabilityExport = async () =>
+const buildProductionReadinessObservabilityExport = async (input: {
+  context?: ReturnType<typeof createVoiceProofPackBuildContext>;
+  query?: Record<string, unknown>;
+  request?: Request;
+} = {}) =>
   buildVoiceObservabilityExport({
     ...proofPackObservabilityExportOptions(),
     audit: productionReadinessAuditStore,
-    events: await productionReadinessTraceStore.list(),
+    events: input.context
+      ? await input.context.cache("productionReadinessTraceEvents", () =>
+          productionReadinessTraceStore.list(),
+        )
+      : await productionReadinessTraceStore.list(),
     includeOperationsRecords: false,
     store: productionReadinessTraceStore,
     traceDeliveries: undefined,
   });
 
-const buildProofPackProviderSloReport = async () => {
-  const thresholdProfile = await loadDemoSloThresholdProfile();
+const buildProofPackProviderSloReport = async (input: {
+  context?: ReturnType<typeof createVoiceProofPackBuildContext>;
+} = {}) => {
+  const thresholdProfile = input.context
+    ? await input.context.cache("sloThresholdProfile", loadDemoSloThresholdProfile)
+    : await loadDemoSloThresholdProfile();
 
   return buildVoiceProviderSloReport({
     ...providerSloOptions,
@@ -9348,6 +9361,9 @@ const buildDemoVoiceProofPack = async (input: {
       }
     },
   });
+  const providerSloReport = context.cache("providerSloReport", () =>
+    buildProofPackProviderSloReport({ context }),
+  );
   const [productionReadiness, providerSlo, supportBundle, observabilityExport] =
     await Promise.all([
       context.time("productionReadiness", () =>
@@ -9355,16 +9371,18 @@ const buildDemoVoiceProofPack = async (input: {
           productionReadinessOptions({
             fast: true,
             includeObservabilityExport: false,
+            proofPackContext: context,
+            providerSloReport,
             refresh: false,
           }),
         ),
       ),
-      context.time("providerSlo", () => buildProofPackProviderSloReport()),
+      context.time("providerSlo", () => providerSloReport),
       context.time("supportBundle", () =>
         buildHealthyDemoVoiceSupportBundle({ context }),
       ),
       context.time("observabilityExport", () =>
-        buildProductionReadinessObservabilityExport(),
+        buildProductionReadinessObservabilityExport({ context }),
       ),
     ]);
   const operationsRecord = await context.time("operationsRecord", () =>
@@ -9673,6 +9691,8 @@ const productionReadinessOptions = (
   input: {
     fast?: boolean;
     includeObservabilityExport?: boolean;
+    proofPackContext?: ReturnType<typeof createVoiceProofPackBuildContext>;
+    providerSloReport?: Promise<VoiceProviderSloReport> | VoiceProviderSloReport;
     refresh?: boolean;
   } = {},
 ) => ({
@@ -9798,10 +9818,18 @@ const productionReadinessOptions = (
       buildDemoProviderOrchestrationReport,
     ),
   providerSlo: async () => {
-    const thresholdProfile = await timeReadinessResolver(
-      "providerSloThresholds",
-      loadDemoSloThresholdProfile,
-    );
+    if (input.providerSloReport) {
+      return input.providerSloReport;
+    }
+    const thresholdProfile = input.proofPackContext
+      ? await input.proofPackContext.cache(
+          "sloThresholdProfile",
+          loadDemoSloThresholdProfile,
+        )
+      : await timeReadinessResolver(
+          "providerSloThresholds",
+          loadDemoSloThresholdProfile,
+        );
 
     return {
       ...providerSloOptions,
@@ -9817,7 +9845,12 @@ const productionReadinessOptions = (
     } else {
       await refreshFastProductionReadinessProof();
     }
-    const thresholdProfile = await loadDemoSloThresholdProfile();
+    const thresholdProfile = input.proofPackContext
+      ? await input.proofPackContext.cache(
+          "sloThresholdProfile",
+          loadDemoSloThresholdProfile,
+        )
+      : await loadDemoSloThresholdProfile();
 
     return {
       ...createVoiceSloReadinessThresholdOptions(thresholdProfile),
