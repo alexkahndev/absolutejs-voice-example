@@ -8869,6 +8869,24 @@ const observabilityExportDeliveryReceipts =
     directory: ".voice-runtime/observability-export-receipts",
   });
 
+const proofArtifact = (input: {
+  id: string;
+  kind: "proof-pack";
+  label: string;
+  path: string;
+}) => {
+  const exists = existsSync(input.path);
+
+  return {
+    id: input.id,
+    kind: input.kind,
+    label: input.label,
+    path: input.path,
+    required: false,
+    status: exists ? ("pass" as const) : ("warn" as const),
+  };
+};
+
 const proofScreenshotArtifact = (id: string, label: string, file: string) => {
   const path = `.voice-runtime/proof-pack/screenshots/latest/${file}`;
   const maxScreenshotAgeMs = 2 * 60 * 60 * 1000;
@@ -8892,28 +8910,24 @@ const proofScreenshotArtifact = (id: string, label: string, file: string) => {
 const observabilityExportOptions = () => ({
   artifactIntegrity: {
     maxAgeMs: 2 * 60 * 60 * 1000,
+    missingSeverity: "warn" as const,
+    staleSeverity: "warn" as const,
   },
   deliveryDestinations: observabilityExportDeliveryDestinations(),
   deliveryReceipts: observabilityExportDeliveryReceipts,
   artifacts: [
-    {
+    proofArtifact({
       id: "latest-proof-pack",
       kind: "proof-pack" as const,
       label: "Latest proof pack",
       path: latestProofPackMarkdownPath,
-      required: true,
-      status: "pass" as const,
-    },
-    {
+    }),
+    proofArtifact({
       id: "latest-proof-trends",
       kind: "proof-pack" as const,
       label: "Latest sustained proof trends",
       path: latestProofTrendsMarkdownPath,
-      required: false,
-      status: existsSync(latestProofTrendsMarkdownPath)
-        ? ("pass" as const)
-        : ("warn" as const),
-    },
+    }),
     ...proofScreenshotArtifact(
       "production-readiness-screenshot",
       "Production readiness screenshot",
