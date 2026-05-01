@@ -57,11 +57,11 @@ import {
   createVoiceProofTrendRoutes,
   createVoiceRealCallProfileHistoryRoutes,
   createVoiceRealCallProfileRecoveryActionRoutes,
+  createVoiceRealCallProfileTraceCollector,
   createVoiceSQLiteRealCallProfileRecoveryJobStore,
   buildVoiceRealCallProfileHistoryReport,
   buildVoiceRealCallProfileReadinessCheck,
   buildVoiceRealCallProfileRecoveryJobHistoryCheck,
-  loadVoiceRealCallProfileEvidenceFromTraceStore,
   createVoiceFileObservabilityExportDeliveryReceiptStore,
   buildVoiceCompetitiveCoverageReport,
   buildVoiceFailureReplay,
@@ -638,7 +638,7 @@ const rawDeliveryTraceStore: VoiceTraceEventStore = {
     );
   },
 };
-const deliveryTraceStore: VoiceTraceEventStore = createVoiceProfileTraceTagger({
+const profileTaggedTraceStore = createVoiceProfileTraceTagger({
   defaultProfile: {
     description:
       "Default real browser or phone call profile for general recording sessions.",
@@ -673,6 +673,15 @@ const deliveryTraceStore: VoiceTraceEventStore = createVoiceProfileTraceTagger({
   ],
   resolveProfile: (event) => sessionVoiceProfileIds.get(event.sessionId),
   store: rawDeliveryTraceStore,
+});
+const deliveryTraceStore = createVoiceRealCallProfileTraceCollector({
+  defaultProfileId: "meeting-recorder",
+  defaultProfileLabel: "Meeting recorder",
+  profileDescriptions: {
+    "meeting-recorder":
+      "Default real browser or phone call profile inferred from the shared trace store.",
+  },
+  store: profileTaggedTraceStore,
 });
 const productionReadinessProofRuntime =
   createVoiceProductionReadinessProofRuntime({
@@ -4146,16 +4155,7 @@ const readRealCallProfileHistory = async () => {
   );
 
   return {
-    evidence: await loadVoiceRealCallProfileEvidenceFromTraceStore({
-      defaultProfileId: "meeting-recorder",
-      defaultProfileLabel: "Meeting recorder",
-      limit: 5000,
-      profileDescriptions: {
-        "meeting-recorder":
-          "Default real browser or phone call profile inferred from the shared trace store.",
-      },
-      store: runtimeStorage.traces,
-    }),
+    evidence: await deliveryTraceStore.listEvidence({ limit: 5000 }),
     generatedAt: new Date().toISOString(),
     maxAgeMs: proofTrendsMaxAgeMs,
     reports: reports.filter(
