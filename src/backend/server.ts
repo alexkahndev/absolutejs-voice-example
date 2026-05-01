@@ -176,6 +176,7 @@ import {
   recommendVoiceReadinessProfile,
   renderVoiceProviderContractMatrixHTML,
   renderVoiceFailureReplayMarkdown,
+  renderVoiceOperationsRecordIncidentMarkdown,
   renderVoiceOperationsRecordHTML,
   resolveVoiceTelephonyOutcome,
   signVoiceTwilioWebhook,
@@ -240,6 +241,8 @@ import {
   type VoiceSessionSnapshotInput,
   type VoiceObservabilityExportArtifact,
   type VoiceObservabilityExportArtifactIndex,
+  type VoiceCallDebuggerReport,
+  type VoiceOperationsRecord,
   type VoiceOnTurnObjectHandler,
   type VoicePlatformCoverageEvidence,
   type VoicePlatformCoverageSurface,
@@ -7491,33 +7494,22 @@ const resolveDemoSnapshotSessionId = async (requestedSessionId: string) => {
 
 const resolveHealthyDemoSessionId = async () => {
   const events = await deliveryTraceStore.list({ limit: 1_000 });
-  const sessionIds = [
-    ...new Set(
-      events
-        .filter(
-          (event) =>
-            event.sessionId &&
-            event.sessionId !== "live-session-now" &&
-            !event.sessionId.startsWith("provider-slo-proof-") &&
-            !event.sessionId.startsWith("provider-decision-proof-") &&
-            !event.sessionId.startsWith("production-readiness-live-latency-"),
-        )
-        .sort((left, right) => right.at - left.at)
-        .map((event) => event.sessionId),
-    ),
-  ];
+  const latest = events
+    .filter(
+      (event) =>
+        event.sessionId &&
+        event.sessionId !== "live-session-now" &&
+        !event.sessionId.startsWith("provider-slo-proof-") &&
+        !event.sessionId.startsWith("provider-decision-proof-") &&
+        !event.sessionId.startsWith("production-readiness-live-latency-"),
+    )
+    .sort((left, right) => right.at - left.at)[0];
 
-  for (const sessionId of sessionIds) {
-    const record = await buildDemoOperationsRecord(sessionId);
-    if (record.status === "healthy") {
-      return sessionId;
-    }
-  }
-
-  return resolveDemoSnapshotSessionId("latest");
+  return latest?.sessionId ?? resolveDemoSnapshotSessionId("latest");
 };
 
 const buildDemoVoiceSessionSnapshot = async (input: {
+  operationsRecord?: VoiceOperationsRecord;
   sessionId: string;
   turnId?: string;
 }): Promise<VoiceSessionSnapshotInput> => {
@@ -7528,7 +7520,7 @@ const buildDemoVoiceSessionSnapshot = async (input: {
       limit: 25,
       store: runtimeStorage.session,
     }),
-    buildDemoOperationsRecord(sessionId),
+    input.operationsRecord ?? buildDemoOperationsRecord(sessionId),
   ]);
   const providerFallback = await buildVoiceProviderDecisionTraceReport({
     events,
@@ -7660,39 +7652,37 @@ const buildLatestDemoVoiceCallDebuggerReport = async () => {
 };
 
 const buildHealthyDemoVoiceSupportBundle = async (): Promise<{
-  callDebuggerReport: Awaited<ReturnType<typeof buildVoiceCallDebuggerReport>>;
+  callDebuggerReport: VoiceCallDebuggerReport;
   sessionSnapshot: VoiceSessionSnapshot;
   sessionId: string;
 }> => {
   const sessionId = await resolveHealthyDemoSessionId();
-  const scopedTraceStore = createVoiceScopedTraceEventStore(
-    deliveryTraceStore,
-    {
-      sessionId,
-    },
-  );
-  const scopedAuditStore = createVoiceScopedAuditEventStore(
-    runtimeStorage.audit,
-    {
-      sessionId,
-    },
-  );
+  const operationsRecord = await buildDemoOperationsRecord(sessionId);
   const sessionSnapshot = buildVoiceSessionSnapshot(
-    await buildDemoVoiceSessionSnapshot({ sessionId }),
+    await buildDemoVoiceSessionSnapshot({ operationsRecord, sessionId }),
   );
-  const callDebuggerReport = await buildVoiceCallDebuggerReport(
-    {
-      ...demoVoiceCallDebuggerOptions(),
-      audit: scopedAuditStore,
-      store: scopedTraceStore,
-    },
-    {
-      request: new Request(
-        `http://localhost/voice-call-debugger/${encodeURIComponent(sessionId)}`,
-      ),
-      sessionId,
-    },
-  );
+  const failureReplay = buildVoiceFailureReplay(operationsRecord, {
+    operationsRecordHref: `/voice-operations/${encodeURIComponent(sessionId)}`,
+  });
+  const callDebuggerReport: VoiceCallDebuggerReport = {
+    checkedAt: Date.now(),
+    failureReplay,
+    incidentMarkdown:
+      renderVoiceOperationsRecordIncidentMarkdown(operationsRecord),
+    operationsRecord,
+    sessionId,
+    snapshot: sessionSnapshot,
+    status:
+      operationsRecord.status === "failed" ||
+      failureReplay.status === "failed" ||
+      sessionSnapshot.status === "fail"
+        ? "failed"
+        : operationsRecord.status === "warning" ||
+            failureReplay.status === "degraded" ||
+            sessionSnapshot.status === "warn"
+          ? "warning"
+          : "healthy",
+  };
 
   return {
     callDebuggerReport,
@@ -9297,16 +9287,30 @@ const readLatestDemoVoiceProofPackFile = async () => {
 const productionReadinessAuditStore = {
   ...runtimeStorage.audit,
   list: async (filter?: Parameters<typeof runtimeStorage.audit.list>[0]) => {
-    const events = await runtimeStorage.audit.list(filter);
+    const events = await runtimeStorage.audit.list({
+      ...filter,
+      limit: Math.min(filter?.limit ?? 100, 100),
+    });
     return events.slice(-100);
   },
 };
 
+const proofPackObservabilityExportOptions = () => {
+  const {
+    callDebuggerReports: _callDebuggerReports,
+    sessionSnapshots: _sessionSnapshots,
+    ...options
+  } = observabilityExportOptions();
+
+  return options;
+};
+
 const buildProductionReadinessObservabilityExport = async () =>
   buildVoiceObservabilityExport({
-    ...observabilityExportOptions(),
+    ...proofPackObservabilityExportOptions(),
     audit: productionReadinessAuditStore,
     events: await productionReadinessTraceStore.list(),
+    includeOperationsRecords: false,
     store: productionReadinessTraceStore,
     traceDeliveries: undefined,
   });
@@ -9326,24 +9330,45 @@ const buildProofPackProviderSloReport = async () => {
   });
 };
 
+const timeProofPackBuilder = async <T>(
+  label: string,
+  run: () => Promise<T> | T,
+) => {
+  const startedAt = Date.now();
+  try {
+    return await run();
+  } finally {
+    if (process.env.VOICE_PROOF_PACK_DEBUG_TIMINGS === "1") {
+      console.log(`[proof-pack] ${label}: ${Date.now() - startedAt}ms`);
+    }
+  }
+};
+
 const buildDemoVoiceProofPack = async (input: {
   generatedAt: string;
   runId: string;
 }) => {
   const [productionReadiness, providerSlo, supportBundle, observabilityExport] =
     await Promise.all([
-      buildVoiceProductionReadinessReport(
-        productionReadinessOptions({
-          includeObservabilityExport: false,
-          refresh: false,
-        }),
+      timeProofPackBuilder("productionReadiness", () =>
+        buildVoiceProductionReadinessReport(
+          productionReadinessOptions({
+            fast: true,
+            includeObservabilityExport: false,
+            refresh: false,
+          }),
+        ),
       ),
-      buildProofPackProviderSloReport(),
-      buildHealthyDemoVoiceSupportBundle(),
-      buildProductionReadinessObservabilityExport(),
+      timeProofPackBuilder("providerSlo", () => buildProofPackProviderSloReport()),
+      timeProofPackBuilder("supportBundle", () =>
+        buildHealthyDemoVoiceSupportBundle(),
+      ),
+      timeProofPackBuilder("observabilityExport", () =>
+        buildProductionReadinessObservabilityExport(),
+      ),
     ]);
-  const operationsRecord = await buildDemoOperationsRecord(
-    supportBundle.sessionId,
+  const operationsRecord = await timeProofPackBuilder("operationsRecord", () =>
+    buildDemoOperationsRecord(supportBundle.sessionId),
   );
   const normalizedProductionReadiness = productionReadiness.checks.every(
     (check) => check.status !== "fail",
@@ -9388,7 +9413,8 @@ const buildDemoVoiceProofPack = async (input: {
         }
       : supportBundle.callDebuggerReport;
 
-  return writeVoiceProofPack(
+  return timeProofPackBuilder("writeProofPack", () =>
+    writeVoiceProofPack(
     {
       callDebuggerReports: [normalizedCallDebuggerReport],
       generatedAt: input.generatedAt,
@@ -9429,6 +9455,7 @@ const buildDemoVoiceProofPack = async (input: {
       markdownFileName: "latest.md",
       outputDir: ".voice-runtime/proof-pack",
     },
+    ),
   );
 };
 
