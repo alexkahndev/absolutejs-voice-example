@@ -33,6 +33,8 @@ import {
   evaluateVoiceLiveOpsControlEvidence,
   evaluateVoiceLiveOpsEvidence,
   createVoiceEvidenceAssertion,
+  getVoiceProofTargetLogicalFailure,
+  runVoiceProofTargets,
   buildVoiceFailureReplay,
   buildVoicePlatformCoverageSummary,
   type VoiceCompetitiveCoverageReport,
@@ -70,35 +72,10 @@ import {
   type VoiceTelephonyWebhookVerificationEvidenceAttempt,
   type VoiceToolContractSuiteReport,
   type VoiceProofAssertionResult as JsonAssertionResult,
+  type VoiceProofTarget as ProofTarget,
+  type VoiceProofTargetMethod as ProofMethod,
+  type VoiceProofTargetResult as ProofResult,
 } from "@absolutejs/voice";
-
-type ProofMethod = "GET" | "POST";
-
-type ProofTarget = {
-  accept?: string;
-  allowLogicalFail?: boolean;
-  body?: unknown;
-  kind: "json" | "text";
-  method?: ProofMethod;
-  name: string;
-  path: string;
-  requiredText?: string[];
-};
-
-type ProofResult = {
-  body?: unknown;
-  bytes: number;
-  elapsedMs: number;
-  error?: string;
-  kind: ProofTarget["kind"];
-  method: ProofMethod;
-  name: string;
-  ok: boolean;
-  path: string;
-  status?: number;
-  summary?: Record<string, unknown>;
-  url: string;
-};
 
 type CommandProofTarget = {
   command: string[];
@@ -1473,151 +1450,6 @@ const renderVapiCoverage = (coverage: VapiCoverageResult[]) => {
 ${rows}`;
 };
 
-const getLogicalFailure = (value: unknown) => {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-
-  const record = value as Record<string, unknown>;
-  if (record.status === "fail") {
-    return 'Response status is "fail".';
-  }
-  if (record.pass === false) {
-    return "Response pass is false.";
-  }
-  if (record.ok === false) {
-    return "Response ok is false.";
-  }
-
-  return undefined;
-};
-
-const fetchProofTarget = async (target: ProofTarget): Promise<ProofResult> => {
-  const method = target.method ?? "GET";
-  const url = `${baseUrl}${target.path}`;
-  const startedAt = performance.now();
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const response = await fetch(url, {
-      body: target.body === undefined ? undefined : JSON.stringify(target.body),
-      headers: {
-        accept:
-          target.accept ??
-          (target.kind === "json"
-            ? "application/json"
-            : "text/markdown,text/plain,*/*"),
-        ...(target.body === undefined
-          ? {}
-          : { "content-type": "application/json" }),
-      },
-      method,
-      signal: controller.signal,
-    });
-    const text = await response.text();
-    const bytes = encoder.encode(text).byteLength;
-    let body: unknown = text;
-    let parseError: string | undefined;
-
-    if (target.kind === "json" && text.trim()) {
-      try {
-        body = JSON.parse(text) as unknown;
-      } catch (error) {
-        parseError = error instanceof Error ? error.message : String(error);
-      }
-    }
-
-    const missingText =
-      target.kind === "text"
-        ? (target.requiredText ?? []).filter((item) => !text.includes(item))
-        : [];
-    const logicalFailure =
-      target.kind === "json" && !parseError && !target.allowLogicalFail
-        ? getLogicalFailure(body)
-        : undefined;
-    const safeName = target.name.replace(/[^a-z0-9_.-]/gi, "-");
-    await writeArtifact(
-      `${safeName}.${target.kind === "json" ? "json" : "md"}`,
-      target.kind === "json"
-        ? `${JSON.stringify(parseError ? { parseError, text } : body, null, 2)}\n`
-        : text,
-    );
-
-    return {
-      body,
-      bytes,
-      elapsedMs: Math.round(performance.now() - startedAt),
-      error:
-        parseError ??
-        logicalFailure ??
-        (missingText.length > 0
-          ? `Missing required text: ${missingText.join(", ")}`
-          : undefined),
-      kind: target.kind,
-      method,
-      name: target.name,
-      ok:
-        response.ok &&
-        !parseError &&
-        !logicalFailure &&
-        missingText.length === 0,
-      path: target.path,
-      status: response.status,
-      summary: parseError
-        ? { bytes, parseError }
-        : target.kind === "json"
-          ? (summarizeValue(body) as Record<string, unknown>)
-          : {
-              bytes,
-              requiredTextFound: missingText.length === 0,
-            },
-      url,
-    };
-  } catch (error) {
-    return {
-      bytes: 0,
-      elapsedMs: Math.round(performance.now() - startedAt),
-      error: error instanceof Error ? error.message : String(error),
-      kind: target.kind,
-      method,
-      name: target.name,
-      ok: false,
-      path: target.path,
-      url,
-    };
-  } finally {
-    clearTimeout(timeout);
-  }
-};
-
-const mapWithConcurrency = async <TInput, TOutput>(
-  items: TInput[],
-  limit: number,
-  mapper: (item: TInput) => Promise<TOutput>,
-) => {
-  const results = new Array<TOutput>(items.length);
-  let nextIndex = 0;
-
-  const workers = Array.from(
-    { length: Math.min(limit, items.length) },
-    async () => {
-      while (nextIndex < items.length) {
-        const index = nextIndex;
-        nextIndex += 1;
-        const item = items[index];
-        if (item === undefined) {
-          continue;
-        }
-        results[index] = await mapper(item);
-      }
-    },
-  );
-
-  await Promise.all(workers);
-  return results;
-};
-
 const runCommandProofTarget = async (
   target: CommandProofTarget,
 ): Promise<CommandProofResult> => {
@@ -1668,7 +1500,9 @@ const runCommandProofTarget = async (
     )}\n`,
   );
 
-  const logicalFailure = !parseError ? getLogicalFailure(body) : undefined;
+  const logicalFailure = !parseError
+    ? getVoiceProofTargetLogicalFailure(body)
+    : undefined;
 
   return {
     body,
@@ -1890,19 +1724,19 @@ const parallelSeedTargets = seedTargets.filter(
 const orderedSeedTargets = seedTargets.filter((target) =>
   orderedSeedNames.has(target.name),
 );
-const seedResults = await mapWithConcurrency(
-  parallelSeedTargets,
-  concurrency,
-  fetchProofTarget,
-);
+const runTargets = (targets: ProofTarget[], targetConcurrency = concurrency) =>
+  runVoiceProofTargets(targets, {
+    baseUrl,
+    concurrency: targetConcurrency,
+    timeoutMs,
+    writeArtifact: ({ content, name }) => writeArtifact(name, content),
+  });
+
+const seedResults = await runTargets(parallelSeedTargets);
 seedResults.push(
-  ...(await mapWithConcurrency(orderedSeedTargets, 1, fetchProofTarget)),
+  ...(await runTargets(orderedSeedTargets, 1)),
 );
-const proofResults = await mapWithConcurrency(
-  proofTargets,
-  concurrency,
-  fetchProofTarget,
-);
+const proofResults = await runTargets(proofTargets);
 const commandResults = await Promise.all(
   commandProofTargets.map(runCommandProofTarget),
 );
