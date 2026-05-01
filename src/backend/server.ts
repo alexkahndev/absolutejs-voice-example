@@ -3588,6 +3588,11 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
           <div id="jobs" class="jobs"></div>
         </section>
         <section class="panel" style="margin-top:14px">
+          <h2>Readiness Recovery Plan</h2>
+          <p class="muted">Mapped from failed or warning production-readiness checks. POST actions run here; GET actions open the relevant proof surface.</p>
+          <div id="readiness-plan" class="actions"></div>
+        </section>
+        <section class="panel" style="margin-top:14px">
           <h2>Latest Payload</h2>
           <pre id="payload">Loading...</pre>
         </section>
@@ -3597,6 +3602,7 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
         const payload = document.querySelector("#payload");
         const recommended = document.querySelector("#recommended");
         const proofJobs = document.querySelector("#proof-jobs");
+        const readinessPlan = document.querySelector("#readiness-plan");
         const jobs = document.querySelector("#jobs");
         const pollers = new Map();
         const staticJobs = [
@@ -3624,10 +3630,14 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
           const card = document.createElement("div");
           card.className = "card";
           const canPost = action.method === "POST";
+          const source = action.sourceCheckLabel
+            ? \`<p class="muted">\${action.sourceCheckLabel} · \${action.sourceStatus}</p>\`
+            : "";
           card.innerHTML = \`
             <header>
               <div>
                 <strong>\${action.label ?? action.id}</strong>
+                \${source}
                 <p class="muted">\${action.description ?? action.href}</p>
               </div>
               <span class="pill">\${action.method ?? "GET"}</span>
@@ -3701,6 +3711,22 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
             .forEach((job) => pollJob(job.id));
         };
 
+        const loadReadinessPlan = async () => {
+          const response = await fetch("/api/production-readiness/recovery-actions");
+          const result = await response.json();
+          showPayload(result);
+          const actions = result.actions ?? [];
+          readinessPlan.replaceChildren();
+          if (actions.length === 0) {
+            const empty = document.createElement("div");
+            empty.className = "card";
+            empty.innerHTML = "<p class=\\"muted\\">No failed or warning readiness checks currently expose recovery actions.</p>";
+            readinessPlan.append(empty);
+            return;
+          }
+          readinessPlan.replaceChildren(...actions.map(actionCard));
+        };
+
         const pollJob = (jobId) => {
           if (pollers.has(jobId)) return;
           const tick = async () => {
@@ -3722,7 +3748,8 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
         const load = async () => {
           const [actionsResponse] = await Promise.all([
             fetch(base + "/actions"),
-            loadJobs()
+            loadJobs(),
+            loadReadinessPlan()
           ]);
           const result = await actionsResponse.json();
           recommended.replaceChildren(...(result.actions ?? []).map(actionCard));
