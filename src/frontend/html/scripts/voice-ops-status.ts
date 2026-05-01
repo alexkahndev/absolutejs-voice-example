@@ -1,6 +1,7 @@
 import {
   createVoicePlatformCoverageStore,
   createVoiceOpsActionCenterActions,
+  defineVoiceCallDebuggerLaunchElement,
   defineVoiceDeliveryRuntimeElement,
   defineVoiceOpsStatusElement,
   defineVoiceProfileComparisonElement,
@@ -23,6 +24,7 @@ import {
 import { mountDemoBargeInProof } from "../../shared/browser";
 import { mountVoiceLiveOpsPanel } from "../../shared/browser";
 
+defineVoiceCallDebuggerLaunchElement();
 defineVoiceDeliveryRuntimeElement();
 defineVoiceOpsStatusElement();
 defineVoiceProfileComparisonElement();

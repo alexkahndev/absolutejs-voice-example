@@ -9,6 +9,7 @@ import {
 } from "@angular/core";
 import type { VoiceRoutingDecisionSummary } from "@absolutejs/voice";
 import {
+  defineVoiceCallDebuggerLaunchElement,
   defineVoiceProfileComparisonElement,
   defineVoiceProfileSwitchRecommendationElement,
   defineVoiceProviderSimulationControlsElement,
@@ -505,6 +506,14 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
               </p>
             }
           </article>
+
+          <absolute-voice-call-debugger-launch
+            class="voice-card voice-provider-health-card"
+            description="Angular opens the latest full call debugger with snapshot, replay, provider path, transcript, and incident markdown."
+            interval-ms="5000"
+            path="/api/voice-call-debugger/latest"
+            title="Debug Latest Call"
+          ></absolute-voice-call-debugger-launch>
 
           <article class="voice-card voice-routing-card">
             <span class="voice-framework-pill">Routing Trace</span>
@@ -1680,6 +1689,7 @@ export class AngularVoiceDemoComponent {
   private bargeInProofTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
+    defineVoiceCallDebuggerLaunchElement();
     defineVoiceProfileComparisonElement();
     defineVoiceProfileSwitchRecommendationElement();
     defineVoiceProviderSimulationControlsElement();

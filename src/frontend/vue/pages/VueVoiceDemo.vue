@@ -24,6 +24,7 @@ import {
   createVoiceOpsActionCenterActions,
   createVoiceProfileComparisonViewModel,
   createVoiceTraceTimelineViewModel,
+  mountVoiceCallDebuggerLaunch,
   mountVoiceOpsActionHistory,
   renderVoiceProfileSwitchRecommendationHTML,
 } from "@absolutejs/voice/client";
@@ -237,6 +238,7 @@ const waveLevels = ref(createInitialVoiceWaveLevels());
 const bargeInProofEl = ref<HTMLElement | null>(null);
 const opsActionHistoryEl = ref<HTMLElement | null>(null);
 const liveOpsPanelEl = ref<HTMLElement | null>(null);
+const callDebuggerLaunchEl = ref<HTMLElement | null>(null);
 const liveLatencyHTML = ref("");
 let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
@@ -244,6 +246,8 @@ let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
 let opsActionHistory: ReturnType<typeof mountVoiceOpsActionHistory> | null =
   null;
 let liveOpsPanel: ReturnType<typeof mountVoiceLiveOpsPanel> | null = null;
+let callDebuggerLaunch: ReturnType<typeof mountVoiceCallDebuggerLaunch> | null =
+  null;
 let unsubscribeProfileSwitch = () => {};
 const currentVoice = computed(() =>
   activeMode.value === "general" ? generalVoice : guidedVoice,
@@ -469,6 +473,18 @@ onMounted(() => {
       { intervalMs: 5_000 },
     );
   }
+  if (callDebuggerLaunchEl.value) {
+    callDebuggerLaunch = mountVoiceCallDebuggerLaunch(
+      callDebuggerLaunchEl.value,
+      "/api/voice-call-debugger/latest",
+      {
+        description:
+          "Vue opens the latest full call debugger with snapshot, replay, provider path, transcript, and incident markdown.",
+        intervalMs: 5_000,
+        title: "Debug Latest Call",
+      },
+    );
+  }
   if (liveOpsPanelEl.value) {
     liveOpsPanel = mountVoiceLiveOpsPanel(liveOpsPanelEl.value, {
       getSessionId: () => currentVoice.value.sessionId.value,
@@ -518,6 +534,7 @@ onUnmounted(() => {
   bargeInProof?.close();
   opsActionHistory?.close();
   liveOpsPanel?.close();
+  callDebuggerLaunch?.close();
   unsubscribeProfileSwitch();
   profileSwitchRecommendation.close();
   stopMic();
@@ -792,6 +809,11 @@ onUnmounted(() => {
           path="/api/voice/session-snapshot/latest"
           title="Session Debug Snapshot"
         />
+
+        <div
+          ref="callDebuggerLaunchEl"
+          class="voice-card voice-provider-health-card"
+        ></div>
 
         <VoiceRoutingStatus
           class="voice-card voice-routing-card"

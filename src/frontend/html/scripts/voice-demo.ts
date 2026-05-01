@@ -12,6 +12,7 @@ import {
   mountVoiceProviderStatus,
   mountVoiceReadinessFailures,
   mountVoiceRoutingStatus,
+  defineVoiceCallDebuggerLaunchElement,
   defineVoiceSessionSnapshotElement,
   defineVoiceTurnLatencyElement,
   mountVoiceTurnQuality,
@@ -84,6 +85,7 @@ type HtmxWindow = Window & {
 };
 
 const framework = document.body.dataset.framework ?? "html";
+defineVoiceCallDebuggerLaunchElement();
 defineVoiceSessionSnapshotElement();
 defineVoiceTurnLatencyElement();
 const chatList = document.querySelector("#chat-list");

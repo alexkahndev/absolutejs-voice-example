@@ -28,6 +28,7 @@
     renderVoiceProofTrendsHTML,
     renderVoiceReadinessFailuresHTML,
     createVoiceOpsActionCenterActions,
+    mountVoiceCallDebuggerLaunch,
     mountVoiceOpsActionHistory,
   } from "@absolutejs/voice/client";
   import type { VoiceStream, VoiceStreamState } from "@absolutejs/voice";
@@ -172,10 +173,13 @@
   let bargeInProofElement: HTMLElement | null = null;
   let opsActionHistoryElement: HTMLElement | null = null;
   let liveOpsPanelElement: HTMLElement | null = null;
+  let callDebuggerLaunchElement: HTMLElement | null = null;
   let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
   let opsActionHistory: ReturnType<typeof mountVoiceOpsActionHistory> | null =
     null;
   let liveOpsPanel: ReturnType<typeof mountVoiceLiveOpsPanel> | null = null;
+  let callDebuggerLaunch: ReturnType<typeof mountVoiceCallDebuggerLaunch> | null =
+    null;
   let providerSimulationElement: HTMLElement | null = null;
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
   let guidedVoice: VoiceStream<SavedIntake> | null = null;
@@ -747,6 +751,18 @@
         { intervalMs: 5_000 },
       );
     }
+    if (callDebuggerLaunchElement) {
+      callDebuggerLaunch = mountVoiceCallDebuggerLaunch(
+        callDebuggerLaunchElement,
+        "/api/voice-call-debugger/latest",
+        {
+          description:
+            "Svelte opens the latest full call debugger with snapshot, replay, provider path, transcript, and incident markdown.",
+          intervalMs: 5_000,
+          title: "Debug Latest Call",
+        },
+      );
+    }
     if (liveOpsPanelElement) {
       liveOpsPanel = mountVoiceLiveOpsPanel(liveOpsPanelElement, {
         getSessionId: () => currentVoice.sessionId,
@@ -818,6 +834,7 @@
     bargeInProof?.close();
     opsActionHistory?.close();
     liveOpsPanel?.close();
+    callDebuggerLaunch?.close();
     guidedVoice?.close();
     generalVoice?.close();
     opsStatus.close();
@@ -1012,6 +1029,11 @@
       <div class="voice-card voice-provider-health-card">
         {@html sessionSnapshotHTML}
       </div>
+
+      <div
+        bind:this={callDebuggerLaunchElement}
+        class="voice-card voice-provider-health-card"
+      ></div>
 
       <div class="voice-card voice-routing-card voice-routing-status-host">
         {@html routingStatusHTML}
