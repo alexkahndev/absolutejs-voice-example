@@ -7367,7 +7367,7 @@ const buildDemoVoiceSessionSnapshot = async (input: {
   return {
     artifacts: [
       {
-        href: `/voice-call-debugger/${encodeURIComponent(sessionId)}`,
+        href: "/voice-call-debugger/latest",
         kind: "custom",
         label: "Call debugger",
         report: {
