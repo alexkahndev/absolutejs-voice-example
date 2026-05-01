@@ -136,6 +136,8 @@ import {
   createVoiceTaskUpdatedEvent,
   createVoiceTraceDeliveryRoutes,
   createVoiceTraceEvent,
+  createVoiceScopedAuditEventStore,
+  createVoiceScopedTraceEventStore,
   createVoiceTraceSinkDeliveryRecord,
   createVoiceTraceTimelineRoutes,
   createVoiceTelephonyOutcomePolicy,
@@ -225,8 +227,6 @@ import {
   type VoiceOpsWebhookEnvelope,
   type VoiceSessionListItem,
   type StoredVoiceTraceEvent,
-  type StoredVoiceAuditEvent,
-  type VoiceAuditEventStore,
   type VoiceTraceEvent,
   type VoiceTraceEventStore,
   type VoiceTraceSinkDeliveryRecord,
@@ -7647,63 +7647,23 @@ const buildLatestDemoVoiceCallDebuggerReport = async () => {
   });
 };
 
-const createSessionScopedTraceStore = (
-  store: VoiceTraceEventStore,
-  sessionId: string,
-): VoiceTraceEventStore => ({
-  append: (event) => store.append(event),
-  get: (id) => store.get(id),
-  list: (filter) =>
-    store.list({
-      ...filter,
-      sessionId: filter?.sessionId ?? sessionId,
-    }),
-  remove: (id) => store.remove(id),
-});
-
-const createScenarioScopedTraceStore = (
-  store: VoiceTraceEventStore,
-  scenarioId: string,
-): VoiceTraceEventStore => ({
-  append: (event) => store.append(event),
-  get: (id) => store.get(id),
-  list: async (filter) => {
-    const { scenarioId: _scenarioId, ...baseFilter } = filter ?? {};
-    const events = await store.list(baseFilter);
-    const scopedScenarioId = filter?.scenarioId ?? scenarioId;
-    return events.filter((event) => event.scenarioId === scopedScenarioId);
-  },
-  remove: (id) => store.remove(id),
-});
-
-const createSessionScopedAuditStore = (
-  store: VoiceAuditEventStore,
-  sessionId: string,
-): VoiceAuditEventStore<StoredVoiceAuditEvent> => ({
-  append: (event) => store.append(event),
-  get: (id) => store.get(id),
-  list: (filter) =>
-    Promise.resolve(
-      store.list({
-        ...filter,
-        sessionId: filter?.sessionId ?? sessionId,
-      }),
-    ),
-});
-
 const buildHealthyDemoVoiceSupportBundle = async (): Promise<{
   callDebuggerReport: Awaited<ReturnType<typeof buildVoiceCallDebuggerReport>>;
   sessionSnapshot: VoiceSessionSnapshot;
   sessionId: string;
 }> => {
   const sessionId = await resolveHealthyDemoSessionId();
-  const scopedTraceStore = createSessionScopedTraceStore(
+  const scopedTraceStore = createVoiceScopedTraceEventStore(
     deliveryTraceStore,
-    sessionId,
+    {
+      sessionId,
+    },
   );
-  const scopedAuditStore = createSessionScopedAuditStore(
+  const scopedAuditStore = createVoiceScopedAuditEventStore(
     runtimeStorage.audit,
-    sessionId,
+    {
+      sessionId,
+    },
   );
   const sessionSnapshot = buildVoiceSessionSnapshot(
     await buildDemoVoiceSessionSnapshot({ sessionId }),
@@ -8855,6 +8815,7 @@ const buildProductionReadinessOpsRecoveryReport = () =>
   });
 
 const providerSloProofScenarioId = "provider-slo-proof";
+const providerSloProofTraceStore = createVoiceMemoryTraceEventStore();
 
 const providerSloOptions = {
   maxAgeMs: 10 * 60 * 1000,
@@ -8884,67 +8845,74 @@ const seedDemoProviderSloProof = async () => {
     configuredModelProviders.find(
       (provider) => provider !== primaryModelProvider,
     ) ?? "anthropic";
-  const events: StoredVoiceTraceEvent[] = await Promise.all(
-    [
-      {
-        elapsedMs: 700,
-        fallbackProvider: fallbackModelProvider,
-        kind: "llm",
-        provider: primaryModelProvider,
-        selectedProvider: fallbackModelProvider,
-        status: "fallback",
-      },
-      {
-        elapsedMs: 320,
-        kind: "llm",
-        provider: fallbackModelProvider,
-        selectedProvider: fallbackModelProvider,
-        status: "success",
-      },
-      {
-        elapsedMs: 300,
-        kind: "llm",
-        provider: primaryModelProvider,
-        selectedProvider: primaryModelProvider,
-        status: "success",
-      },
-      {
-        elapsedMs: 280,
-        kind: "llm",
-        provider: primaryModelProvider,
-        selectedProvider: primaryModelProvider,
-        status: "success",
-      },
-      {
-        elapsedMs: 82,
-        kind: "stt",
-        provider: configuredSTTProviders[0] ?? "deepgram",
-        status: "success",
-      },
-      {
-        elapsedMs: 45,
-        kind: "tts",
-        provider: configuredTTSProviders[0] ?? "emergency",
-        status: "success",
-      },
-    ].map((event, index) =>
-      deliveryTraceStore.append(
-        createVoiceTraceEvent({
-          at: now + index,
-          payload: {
-            elapsedMs: event.elapsedMs,
-            fallbackProvider: event.fallbackProvider,
-            kind: event.kind,
-            provider: event.provider,
-            providerStatus: event.status,
-            selectedProvider: event.selectedProvider ?? event.provider,
-          },
-          scenarioId: providerSloProofScenarioId,
-          sessionId,
-          type: "session.error",
-        }),
-      ),
+  await Promise.all(
+    (await providerSloProofTraceStore.list()).map((event) =>
+      providerSloProofTraceStore.remove(event.id),
     ),
+  );
+  const proofEvents = [
+    {
+      elapsedMs: 700,
+      fallbackProvider: fallbackModelProvider,
+      kind: "llm",
+      provider: primaryModelProvider,
+      selectedProvider: fallbackModelProvider,
+      status: "fallback",
+    },
+    {
+      elapsedMs: 320,
+      kind: "llm",
+      provider: fallbackModelProvider,
+      selectedProvider: fallbackModelProvider,
+      status: "success",
+    },
+    {
+      elapsedMs: 300,
+      kind: "llm",
+      provider: primaryModelProvider,
+      selectedProvider: primaryModelProvider,
+      status: "success",
+    },
+    {
+      elapsedMs: 280,
+      kind: "llm",
+      provider: primaryModelProvider,
+      selectedProvider: primaryModelProvider,
+      status: "success",
+    },
+    {
+      elapsedMs: 82,
+      kind: "stt",
+      provider: configuredSTTProviders[0] ?? "deepgram",
+      status: "success",
+    },
+    {
+      elapsedMs: 45,
+      kind: "tts",
+      provider: configuredTTSProviders[0] ?? "emergency",
+      status: "success",
+    },
+  ].map((event, index) =>
+    createVoiceTraceEvent({
+      at: now + index,
+      payload: {
+        elapsedMs: event.elapsedMs,
+        fallbackProvider: event.fallbackProvider,
+        kind: event.kind,
+        provider: event.provider,
+        providerStatus: event.status,
+        selectedProvider: event.selectedProvider ?? event.provider,
+      },
+      scenarioId: providerSloProofScenarioId,
+      sessionId,
+      type: "session.error",
+    }),
+  );
+  const events: StoredVoiceTraceEvent[] = await Promise.all(
+    proofEvents.map(async (event) => {
+      await providerSloProofTraceStore.append(event);
+      return deliveryTraceStore.append(event);
+    }),
   );
 
   return {
@@ -9304,10 +9272,9 @@ const buildProofPackProviderSloReport = async () => {
 
   return buildVoiceProviderSloReport({
     ...providerSloOptions,
-    store: createScenarioScopedTraceStore(
-      deliveryTraceStore,
-      providerSloProofScenarioId,
-    ),
+    store: createVoiceScopedTraceEventStore(providerSloProofTraceStore, {
+      scenarioId: providerSloProofScenarioId,
+    }),
     thresholds: {
       ...providerSloOptions.thresholds,
       ...thresholdProfile.providerSlo,
