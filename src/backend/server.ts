@@ -99,6 +99,7 @@ import {
   buildVoiceProviderOrchestrationReport,
   createVoiceProviderOrchestrationProfile,
   createVoiceProviderOrchestrationRoutes,
+  buildVoiceProviderDecisionTraceReport,
   createVoiceProviderDecisionTraceEvent,
   createVoiceProviderDecisionTraceRoutes,
   createVoiceProviderSloRoutes,
@@ -7338,13 +7339,18 @@ const buildDemoVoiceSessionSnapshot = async (input: {
   turnId?: string;
 }): Promise<VoiceSessionSnapshotInput> => {
   const sessionId = await resolveDemoSnapshotSessionId(input.sessionId);
-  const [events, turnQuality] = await Promise.all([
+  const [events, turnQuality, operationsRecord] = await Promise.all([
     deliveryTraceStore.list({ limit: 500, sessionId }),
     summarizeVoiceTurnQuality({
       limit: 25,
       store: runtimeStorage.session,
     }),
+    buildDemoOperationsRecord(sessionId),
   ]);
+  const providerFallback = await buildVoiceProviderDecisionTraceReport({
+    events,
+    sessionId,
+  });
   const providerRoutingEvents = events.filter(
     (event) =>
       event.type.includes("provider") ||
@@ -7353,8 +7359,66 @@ const buildDemoVoiceSessionSnapshot = async (input: {
   );
   const session = await runtimeStorage.session.get(sessionId);
   const mediaSnapshot = await buildDemoVoiceSessionMediaSnapshot(sessionId);
+  const failureReplay = buildVoiceFailureReplay(operationsRecord, {
+    operationsRecordHref: `/voice-operations/${encodeURIComponent(sessionId)}`,
+  });
 
   return {
+    artifacts: [
+      {
+        href: `/voice-operations/${encodeURIComponent(sessionId)}`,
+        kind: "operations-record",
+        label: "Operations record",
+        report: {
+          outcome: operationsRecord.outcome,
+          providers: operationsRecord.providerDecisionSummary,
+          status: operationsRecord.status,
+          traceEvents: operationsRecord.traceEvents.length,
+        },
+        status:
+          operationsRecord.status === "failed"
+            ? "fail"
+            : operationsRecord.status === "warning"
+              ? "warn"
+              : "pass",
+      },
+      {
+        href: `/voice-operations/${encodeURIComponent(sessionId)}/failure-replay`,
+        kind: "failure-replay",
+        label: "Failure replay",
+        report: failureReplay,
+        status:
+          failureReplay.status === "failed"
+            ? "fail"
+            : failureReplay.status === "degraded"
+              ? "warn"
+              : "pass",
+      },
+      {
+        href: `/voice-incidents/${encodeURIComponent(sessionId)}/markdown`,
+        kind: "incident-bundle",
+        label: "Incident bundle",
+        report: { markdownBytes: failureReplay.incidentMarkdown.length },
+        status: failureReplay.ok ? "pass" : "warn",
+      },
+      {
+        href: `/traces?sessionId=${encodeURIComponent(sessionId)}`,
+        kind: "trace",
+        label: "Trace timeline",
+        report: {
+          providerRoutingEvents: providerRoutingEvents.length,
+          traceEvents: events.length,
+        },
+        status: events.length > 0 ? "pass" : "warn",
+      },
+      {
+        href: "/voice/provider-decisions",
+        kind: "provider-fallback",
+        label: "Provider fallback proof",
+        report: providerFallback,
+        status: providerFallback.status,
+      },
+    ],
     media: [mediaSnapshot],
     name: "AbsoluteJS voice demo session debug bundle",
     providerRoutingEvents,
