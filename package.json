@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "bench:assistant:providers": "bun run ./scripts/run-assistant-provider-shootout.ts",
+    "build": "absolute build",
     "dev": "absolute dev",
     "format": "absolute prettier --write",
     "lint": "absolute eslint",
@@ -30,7 +31,7 @@
     "typecheck": "absolute typecheck"
   },
   "dependencies": {
-    "@absolutejs/absolute": "0.19.0-beta.739",
+    "@absolutejs/absolute": "0.19.0-beta.816",
     "@absolutejs/media": "0.0.1-beta.14",
     "@absolutejs/voice": "0.0.22-beta.431",
     "@absolutejs/voice-assemblyai": "0.0.19-beta.123",
