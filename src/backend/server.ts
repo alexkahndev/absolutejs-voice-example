@@ -3590,6 +3590,7 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
         <section class="panel" style="margin-top:14px">
           <h2>Readiness Recovery Plan</h2>
           <p class="muted">Mapped from failed or warning production-readiness checks. POST actions run here; GET actions open the relevant proof surface.</p>
+          <p><button id="load-demo-plan" type="button">Demo recovery plan</button></p>
           <div id="readiness-plan" class="actions"></div>
         </section>
         <section class="panel" style="margin-top:14px">
@@ -3603,6 +3604,7 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
         const recommended = document.querySelector("#recommended");
         const proofJobs = document.querySelector("#proof-jobs");
         const readinessPlan = document.querySelector("#readiness-plan");
+        const loadDemoPlanButton = document.querySelector("#load-demo-plan");
         const jobs = document.querySelector("#jobs");
         const pollers = new Map();
         const staticJobs = [
@@ -3711,8 +3713,11 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
             .forEach((job) => pollJob(job.id));
         };
 
-        const loadReadinessPlan = async () => {
-          const response = await fetch("/api/production-readiness/recovery-actions");
+        const loadReadinessPlan = async (demo = false) => {
+          const href = demo
+            ? "/api/production-readiness/recovery-actions?demoFailure=real-call"
+            : "/api/production-readiness/recovery-actions";
+          const response = await fetch(href);
           const result = await response.json();
           showPayload(result);
           const actions = result.actions ?? [];
@@ -3726,6 +3731,15 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
           }
           readinessPlan.replaceChildren(...actions.map(actionCard));
         };
+
+        loadDemoPlanButton.addEventListener("click", async () => {
+          loadDemoPlanButton.disabled = true;
+          try {
+            await loadReadinessPlan(true);
+          } finally {
+            loadDemoPlanButton.disabled = false;
+          }
+        });
 
         const pollJob = (jobId) => {
           if (pollers.has(jobId)) return;
@@ -10376,7 +10390,7 @@ const server = new Elysia()
     }),
   )
   .use(createVoiceProductionReadinessRoutes(productionReadinessOptions()))
-  .get("/api/production-readiness/recovery-actions", async () => {
+  .get("/api/production-readiness/recovery-actions", async ({ query }) => {
     try {
       let report;
       try {
@@ -10393,7 +10407,44 @@ const server = new Elysia()
         );
       }
 
-      return Response.json(buildVoiceReadinessRecoveryActions(report));
+      const checks =
+        query.demoFailure === "real-call"
+          ? [
+              ...report.checks,
+              {
+                actions: [
+                  {
+                    description:
+                      "Demo-only synthetic issue: run browser profile proof as the recovery job.",
+                    href: "/api/voice/real-call-profile-history/collect-browser-proof",
+                    label: "Run browser profile proof",
+                    method: "POST" as const,
+                  },
+                  {
+                    description:
+                      "Demo-only synthetic issue: run phone smoke proof as the recovery job.",
+                    href: "/api/voice/real-call-profile-history/collect-phone-proof",
+                    label: "Run phone smoke proof",
+                    method: "POST" as const,
+                  },
+                  {
+                    description:
+                      "Open the persisted recovery job history surface.",
+                    href: "/voice/real-call-profile-recovery",
+                    label: "Open recovery jobs",
+                  },
+                ],
+                detail:
+                  "Demo-only synthetic warning for showing the readiness recovery loop while production readiness is green.",
+                href: "/voice/real-call-profile-recovery",
+                label: "Demo real-call recovery loop",
+                status: "warn" as const,
+                value: "synthetic",
+              },
+            ]
+          : report.checks;
+
+      return Response.json(buildVoiceReadinessRecoveryActions(checks));
     } catch (error) {
       return Response.json(
         {
