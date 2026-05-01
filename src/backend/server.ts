@@ -75,6 +75,7 @@ import {
   buildVoiceOpsRecoveryReport,
   buildVoiceObservabilityExport,
   buildVoiceObservabilityExportReplayReport,
+  createVoiceObservabilityExportSchema,
   writeVoiceProofPack,
   deliverVoiceObservabilityExport,
   buildVoiceOperationsRecord,
@@ -236,6 +237,8 @@ import {
   type VoiceSessionRecord,
   type VoiceSessionSnapshot,
   type VoiceSessionSnapshotInput,
+  type VoiceObservabilityExportArtifact,
+  type VoiceObservabilityExportArtifactIndex,
   type VoiceOnTurnObjectHandler,
   type VoicePlatformCoverageEvidence,
   type VoicePlatformCoverageSurface,
@@ -9225,6 +9228,52 @@ const observabilityExportOptions = () => ({
   traceDeliveries: runtimeStorage.traceDeliveries,
 });
 
+const buildDemoObservabilityArtifactIndex =
+  (): VoiceObservabilityExportArtifactIndex => {
+    const sourceArtifacts: VoiceObservabilityExportArtifact[] =
+      observabilityExportOptions().artifacts;
+    const artifacts = sourceArtifacts.map((artifact) => ({
+      bytes: artifact.bytes,
+      checksum: artifact.checksum,
+      contentType: artifact.contentType,
+      downloadHref:
+        artifact.downloadHref ??
+        (artifact.path
+          ? `/api/voice/observability-export/artifacts/${encodeURIComponent(artifact.id)}`
+          : undefined),
+      freshness: artifact.freshness,
+      href: artifact.href,
+      id: artifact.id,
+      kind: artifact.kind,
+      label: artifact.label,
+      metadata: artifact.metadata,
+      required: artifact.required,
+      sessionId: artifact.sessionId,
+      status: artifact.status,
+    }));
+    const status = artifacts.some((artifact) => artifact.status === "fail")
+      ? "fail"
+      : artifacts.some((artifact) => artifact.status === "warn")
+        ? "warn"
+        : "pass";
+
+    return {
+      artifacts,
+      checkedAt: Date.now(),
+      schema: createVoiceObservabilityExportSchema(),
+      status,
+      summary: {
+        downloadable: artifacts.filter((artifact) => artifact.downloadHref)
+          .length,
+        failed: artifacts.filter((artifact) => artifact.status === "fail")
+          .length,
+        required: artifacts.filter((artifact) => artifact.required).length,
+        total: artifacts.length,
+        warn: artifacts.filter((artifact) => artifact.status === "warn").length,
+      },
+    };
+  };
+
 const buildDemoObservabilityExport = () =>
   buildVoiceObservabilityExport(observabilityExportOptions());
 
@@ -11620,6 +11669,7 @@ const server = new Elysia()
   .use(
     createVoiceObservabilityExportRoutes({
       ...observabilityExportOptions(),
+      artifactIndex: buildDemoObservabilityArtifactIndex,
       title: "AbsoluteJS Voice Demo Observability Export",
     }),
   )
