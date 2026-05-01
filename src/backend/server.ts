@@ -250,6 +250,7 @@ import {
   type VoiceObservabilityExportArtifactIndex,
   type VoiceCallDebuggerReport,
   type VoiceOperationsRecord,
+  type VoiceObservabilityExportTiming,
   type VoiceOnTurnObjectHandler,
   type VoicePlatformCoverageEvidence,
   type VoicePlatformCoverageSurface,
@@ -9559,6 +9560,7 @@ const buildProductionReadinessObservabilityExport = async (
   input: {
     callDebuggerReports?: VoiceCallDebuggerReport[];
     context?: ReturnType<typeof createVoiceProofPackBuildContext>;
+    onTiming?: (timing: VoiceObservabilityExportTiming) => void;
     operationsRecords?: VoiceOperationsRecord[];
     snapshot?: Awaited<ReturnType<typeof createVoiceProofRefreshSnapshot>>;
     sessionSnapshots?: VoiceSessionSnapshot[];
@@ -9571,11 +9573,13 @@ const buildProductionReadinessObservabilityExport = async (
         buildVoiceObservabilityExport({
           ...proofPackObservabilityExportOptions(),
           audit: input.snapshot?.auditStore ?? productionReadinessAuditStore,
+          auditDeliveries: undefined,
           callDebuggerReports: input.callDebuggerReports,
           events:
             input.snapshot?.traceEvents ??
             (await productionReadinessTraceStore.list()),
           includeOperationsRecords: false,
+          onTiming: input.onTiming,
           operationsRecords: input.operationsRecords,
           sessionSnapshots: input.sessionSnapshots,
           store: input.snapshot?.traceStore ?? productionReadinessTraceStore,
@@ -9585,11 +9589,13 @@ const buildProductionReadinessObservabilityExport = async (
     : buildVoiceObservabilityExport({
     ...proofPackObservabilityExportOptions(),
     audit: input.snapshot?.auditStore ?? productionReadinessAuditStore,
+    auditDeliveries: undefined,
     callDebuggerReports: input.callDebuggerReports,
     events:
       input.snapshot?.traceEvents ??
       (await productionReadinessTraceStore.list()),
     includeOperationsRecords: false,
+    onTiming: input.onTiming,
     operationsRecords: input.operationsRecords,
     sessionSnapshots: input.sessionSnapshots,
     store: input.snapshot?.traceStore ?? productionReadinessTraceStore,
@@ -9735,6 +9741,13 @@ const buildDemoVoiceProofPack = async (input: {
           callDebuggerReports: [bundle.callDebuggerReport],
           context,
           operationsRecords: [operationsRecord],
+          onTiming: (timing) => {
+            if (process.env.VOICE_PROOF_PACK_DEBUG_TIMINGS === "1") {
+              console.log(
+                `[observability-export] ${timing.label}: ${timing.durationMs}ms`,
+              );
+            }
+          },
           snapshot: await proofSnapshot,
           sessionSnapshots: [bundle.sessionSnapshot],
         });
