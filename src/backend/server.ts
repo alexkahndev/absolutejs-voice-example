@@ -2,6 +2,8 @@ import { getEnv, networking, prepare } from "@absolutejs/absolute";
 import {
   applyVoiceCampaignTelephonyOutcome,
   applyPhraseHintCorrections,
+  appendVoiceIOProviderRouterTraceEvent,
+  appendVoiceProviderRouterTraceEvent,
   appendVoiceRealCallProfileRecoveryEvidence,
   assignVoiceOpsTask,
   completeVoiceOpsTask,
@@ -74,6 +76,8 @@ import {
   buildVoiceOperationsRecord,
   buildVoiceProductionReadinessGate,
   buildVoiceProductionReadinessReport,
+  buildVoiceIOProviderRouterTraceEvent,
+  buildVoiceProviderRouterTraceEvent,
   buildVoiceReadinessRecoveryActions,
   buildEmptyVoiceProofTrendReport,
   buildVoicePostCallAnalysisReport,
@@ -1738,14 +1742,10 @@ const telephonyTTS = createVoiceTTSProviderRouter<VoiceTTSProvider>({
     ].filter(Boolean) as VoiceTTSProvider[];
   },
   onProviderEvent: async (event, input) => {
-    await deliveryTraceStore.append({
-      at: event.at,
-      payload: {
-        ...event,
-        providerStatus: event.status,
-      },
+    await appendVoiceIOProviderRouterTraceEvent({
+      event,
       sessionId: input.sessionId,
-      type: "session.error",
+      store: deliveryTraceStore,
     });
   },
   policy: "ordered",
@@ -2270,16 +2270,12 @@ const traceProviderEvent = async (
     VoiceAgentModel<unknown, VoiceSessionRecord, SavedIntake>["generate"]
   >[0],
 ) => {
-  await deliveryTraceStore.append({
-    at: event.at,
-    payload: {
-      ...event,
-      providerStatus: event.status,
-    },
+  await appendVoiceProviderRouterTraceEvent({
+    event,
     scenarioId: input.session.scenarioId,
     sessionId: input.session.id,
+    store: deliveryTraceStore,
     turnId: input.turn.id,
-    type: "session.error",
   });
 };
 const assistantModel = createVoiceProviderRouter<
@@ -2373,15 +2369,13 @@ const traceSTTProviderEvent = async (
   input: { sessionId: string },
 ) => {
   const routing = sessionRoutingModes.get(input.sessionId) ?? "balanced";
-  await deliveryTraceStore.append({
-    at: event.at,
+  await appendVoiceIOProviderRouterTraceEvent({
+    event,
     payload: {
-      ...event,
-      providerStatus: event.status,
       routing,
     },
     sessionId: input.sessionId,
-    type: "session.error",
+    store: deliveryTraceStore,
   });
 };
 const createDemoSTTRouter = (routing: VoiceRoutingMode): STTAdapter =>
@@ -2493,18 +2487,13 @@ const runDemoProviderRoutingContract = async () => {
     isProviderError: (error, provider) =>
       provider !== "deterministic" && isAssistantProviderError(error),
     onProviderEvent: async (event, input) => {
-      events.push({
-        at: event.at,
+      events.push(buildVoiceProviderRouterTraceEvent({
+        event,
         id: `${input.session.id}:${input.turn.id}:${event.provider}:${event.status}:${event.at}`,
-        payload: {
-          ...event,
-          providerStatus: event.status,
-        },
         scenarioId: "provider-routing-contract",
         sessionId: input.session.id,
         turnId: input.turn.id,
-        type: "session.error",
-      });
+      }));
     },
     providerLabel: (provider) =>
       provider === "openai"
@@ -9690,14 +9679,10 @@ const sttProviderFailureSimulator =
     kind: "stt",
     latencyBudgets: sttLatencyBudgets,
     onProviderEvent: async (event, input) => {
-      await deliveryTraceStore.append({
-        at: event.at,
-        payload: {
-          ...event,
-          providerStatus: event.status,
-        },
+      await appendVoiceIOProviderRouterTraceEvent({
+        event,
         sessionId: input.sessionId,
-        type: "session.error",
+        store: deliveryTraceStore,
       });
     },
     providers: configuredSTTProviders,
@@ -9726,17 +9711,12 @@ const runDemoSTTProviderRoutingContract = async () => {
     kind: "stt",
     latencyBudgets: sttLatencyBudgets,
     onProviderEvent: async (event, input) => {
-      events.push({
-        at: event.at,
+      events.push(buildVoiceIOProviderRouterTraceEvent({
+        event,
         id: `${input.sessionId}:${event.provider}:${event.status}:${event.at}`,
-        payload: {
-          ...event,
-          providerStatus: event.status,
-        },
         scenarioId: "stt-provider-routing-contract",
         sessionId: input.sessionId,
-        type: "session.error",
-      });
+      }));
     },
     providers: configuredSTTProviders,
     recoveryElapsedMs: {
@@ -9810,17 +9790,12 @@ const runDemoTTSProviderRoutingContract = async () => {
     kind: "tts",
     latencyBudgets: ttsLatencyBudgets,
     onProviderEvent: async (event, input) => {
-      events.push({
-        at: event.at,
+      events.push(buildVoiceIOProviderRouterTraceEvent({
+        event,
         id: `${input.sessionId}:${event.provider}:${event.status}:${event.at}`,
-        payload: {
-          ...event,
-          providerStatus: event.status,
-        },
         scenarioId: "tts-provider-routing-contract",
         sessionId: input.sessionId,
-        type: "session.error",
-      });
+      }));
     },
     providers: configuredTTSProviders,
     recoveryElapsedMs: {

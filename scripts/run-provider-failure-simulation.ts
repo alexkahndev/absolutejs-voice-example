@@ -2,7 +2,8 @@ type ProviderId = "openai" | "anthropic" | "gemini";
 
 export {};
 
-const baseUrl = process.env.VOICE_DEMO_URL ?? "http://127.0.0.1:3000";
+const baseUrl =
+  process.env.VOICE_DEMO_URL ?? `http://127.0.0.1:${process.env.PORT ?? "3004"}`;
 const providers = (
   process.argv.slice(2).length
     ? process.argv.slice(2)
