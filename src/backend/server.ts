@@ -6287,6 +6287,13 @@ const opsSurfaceLinks = [
   },
   {
     description:
+      "Shows whether the latest proof pack is fresh, stale, refreshing in the background, missing, or failed.",
+    href: "/api/voice/proof-pack",
+    label: "Proof Pack Refresh",
+    statusHref: "/api/voice/proof-pack/refresh-status",
+  },
+  {
+    description:
       "Read-back proof that the latest customer-owned export can be replayed from file or SQLite storage.",
     href: "/voice/observability-export/replay",
     label: "Observability Export Replay",
@@ -11675,6 +11682,9 @@ const server = new Elysia()
     createVoiceProofPackRoutes({
       source: readLatestDemoVoiceProofPack,
     }),
+  )
+  .get("/api/voice/proof-pack/refresh-status", () =>
+    Response.json(readLatestDemoVoiceProofPack.getStatus()),
   )
   .use(
     createVoiceObservabilityExportReplayRoutes({
