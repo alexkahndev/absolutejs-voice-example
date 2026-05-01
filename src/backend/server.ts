@@ -44,6 +44,7 @@ import {
   createVoiceObservabilityExportRoutes,
   createVoiceObservabilityExportReplayRoutes,
   createVoiceProofPackRoutes,
+  createVoiceProofPackStaleWhileRefreshSource,
   createVoiceCompetitiveCoverageRoutes,
   buildVoiceRealtimeChannelReport,
   buildVoiceRealtimeChannelRuntimeSamplesFromTrace,
@@ -9277,29 +9278,13 @@ const buildDemoObservabilityArtifactIndex =
 const buildDemoObservabilityExport = () =>
   buildVoiceObservabilityExport(observabilityExportOptions());
 
-const readLatestDemoVoiceProofPack = async () => {
+const readLatestDemoVoiceProofPackFile = async () => {
   const file = Bun.file(latestProofPackJsonPath);
-  if (await file.exists()) {
-    const proofPack = (await file.json()) as Record<string, unknown>;
-    const generatedAt =
-      typeof proofPack.generatedAt === "string"
-        ? Date.parse(proofPack.generatedAt)
-        : 0;
-    const maxProofPackAgeMs = 5 * 60_000;
-    const needsRefresh =
-      !Number.isFinite(generatedAt) ||
-      Date.now() - generatedAt > maxProofPackAgeMs;
-
-    if (!needsRefresh) {
-      return proofPack;
-    }
+  if (!(await file.exists())) {
+    throw new Error(`Missing ${latestProofPackJsonPath}`);
   }
 
-  await refreshProductionReadinessProof();
-  return (await Bun.file(latestProofPackJsonPath).json()) as Record<
-    string,
-    unknown
-  >;
+  return (await file.json()) as Record<string, unknown>;
 };
 
 const productionReadinessAuditStore = {
@@ -9518,6 +9503,19 @@ const refreshProductionReadinessProof = () =>
         ].join("\n"),
       ),
     ]);
+  });
+
+const readLatestDemoVoiceProofPack =
+  createVoiceProofPackStaleWhileRefreshSource({
+    maxAgeMs: 5 * 60_000,
+    onRefreshError: (error) => {
+      console.warn("Failed to refresh demo voice proof pack", error);
+    },
+    read: readLatestDemoVoiceProofPackFile,
+    refresh: async () => {
+      await refreshProductionReadinessProof();
+      return readLatestDemoVoiceProofPackFile();
+    },
   });
 
 const buildFreshDemoObservabilityExport = async () => {
