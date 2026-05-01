@@ -639,12 +639,6 @@ const rawDeliveryTraceStore: VoiceTraceEventStore = {
   },
 };
 const profileTaggedTraceStore = createVoiceProfileTraceTagger({
-  defaultProfile: {
-    description:
-      "Default real browser or phone call profile for general recording sessions.",
-    id: "meeting-recorder",
-    label: "Meeting recorder",
-  },
   profiles: [
     {
       description:
@@ -675,11 +669,15 @@ const profileTaggedTraceStore = createVoiceProfileTraceTagger({
   store: rawDeliveryTraceStore,
 });
 const deliveryTraceStore = createVoiceRealCallProfileTraceCollector({
-  defaultProfileId: "meeting-recorder",
-  defaultProfileLabel: "Meeting recorder",
   profileDescriptions: {
     "meeting-recorder":
       "Default real browser or phone call profile inferred from the shared trace store.",
+    "support-agent":
+      "Realtime support agent with fast interruption recovery and tool-ready turns.",
+  },
+  profileLabels: {
+    "meeting-recorder": "Meeting recorder",
+    "support-agent": "Support agent",
   },
   store: profileTaggedTraceStore,
 });
@@ -779,7 +777,8 @@ const ensureDemoIncidentBundleEvidence = async () => {
   });
 
   const at = Date.now() - 2_400;
-  const appendTrace = (event: VoiceTraceEvent) => deliveryTraceStore.append(event);
+  const appendTrace = (event: VoiceTraceEvent) =>
+    deliveryTraceStore.append(event);
 
   if (existing.length === 0) {
     await appendTrace({
@@ -1000,13 +999,15 @@ const ensureDemoIncidentBundleEvidence = async () => {
       ...createVoiceProviderDecisionTraceEvent({
         at: at + 1_040,
         elapsedMs: 520,
-        fallbackProvider: modelProvider === "openai" ? "anthropic" : modelProvider,
+        fallbackProvider:
+          modelProvider === "openai" ? "anthropic" : modelProvider,
         kind: "llm",
         provider: modelProvider,
         reason:
           "live-call recovered with the configured fallback provider after a simulated primary model timeout.",
         scenarioId: "operations-record-provider-decision-seed",
-        selectedProvider: modelProvider === "openai" ? "anthropic" : modelProvider,
+        selectedProvider:
+          modelProvider === "openai" ? "anthropic" : modelProvider,
         sessionId: demoIncidentSessionId,
         status: "fallback",
         surface: "live-call",
@@ -1222,9 +1223,9 @@ const recordTelephonyWebhookDecision = async (
 };
 
 const base64FromBytes = (bytes: ArrayBuffer | Uint8Array) =>
-  Buffer.from(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)).toString(
-    "base64",
-  );
+  Buffer.from(
+    bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes),
+  ).toString("base64");
 
 const runTelephonyWebhookVerificationProof = async () => {
   const attempts: Array<{
@@ -1257,11 +1258,10 @@ const runTelephonyWebhookVerificationProof = async () => {
   const telnyxRawBody = JSON.stringify(telnyxBody);
   const telnyxTimestamp = String(Math.floor(Date.now() / 1000));
   const staleTelnyxTimestamp = String(Math.floor(Date.now() / 1000) - 600);
-  const telnyxKeyPair = (await crypto.subtle.generateKey(
-    "Ed25519",
-    true,
-    ["sign", "verify"],
-  )) as CryptoKeyPair;
+  const telnyxKeyPair = (await crypto.subtle.generateKey("Ed25519", true, [
+    "sign",
+    "verify",
+  ])) as CryptoKeyPair;
   const telnyxPublicKey = base64FromBytes(
     await crypto.subtle.exportKey("raw", telnyxKeyPair.publicKey),
   );
@@ -1545,7 +1545,9 @@ const runTelephonyWebhookVerificationProof = async () => {
   return {
     attempts,
     ok: attempts.every((attempt) =>
-      attempt.rejected ? attempt.status === 401 && attempt.sideEffects === 0 : attempt.status === 200 && attempt.sideEffects === 1,
+      attempt.rejected
+        ? attempt.status === 401 && attempt.sideEffects === 0
+        : attempt.status === 200 && attempt.sideEffects === 1,
     ),
   };
 };
@@ -1829,7 +1831,12 @@ const providerOrchestrationProfile = createVoiceProviderOrchestrationProfile<
   surfaces: {
     "background-summary": {
       fallback: configuredModelProviders.includes("gemini")
-        ? ["gemini", ...configuredModelProviders.filter((provider) => provider !== "gemini")]
+        ? [
+            "gemini",
+            ...configuredModelProviders.filter(
+              (provider) => provider !== "gemini",
+            ),
+          ]
         : configuredModelProviders,
       maxCost: configuredModelProviders.includes("gemini") ? 2 : 3,
       minQuality: 0.7,
@@ -2132,11 +2139,17 @@ const resolveVoiceProfileIdFromContext = (context: unknown) => {
   return scenarioId === "guided" ? "support-agent" : "meeting-recorder";
 };
 let realCallProfileDefaultsCache:
-  | { expiresAt: number; report: ReturnType<typeof buildVoiceRealCallProfileHistoryReport> }
+  | {
+      expiresAt: number;
+      report: ReturnType<typeof buildVoiceRealCallProfileHistoryReport>;
+    }
   | undefined;
 const readRealCallProfileDefaultsReport = async () => {
   const now = Date.now();
-  if (realCallProfileDefaultsCache && realCallProfileDefaultsCache.expiresAt > now) {
+  if (
+    realCallProfileDefaultsCache &&
+    realCallProfileDefaultsCache.expiresAt > now
+  ) {
     return realCallProfileDefaultsCache.report;
   }
 
@@ -2167,7 +2180,9 @@ const resolveProfileProviderRoute = async <TProvider extends string>(input: {
 const findVoiceProfileDefault = async (profileId?: string) => {
   const report = await readRealCallProfileDefaultsReport();
   return (
-    report.defaults.profiles.find((profile) => profile.profileId === profileId) ??
+    report.defaults.profiles.find(
+      (profile) => profile.profileId === profileId,
+    ) ??
     report.defaults.profiles.find((profile) => profile.status === "pass") ??
     report.defaults.profiles[0]
   );
@@ -3828,28 +3843,32 @@ const renderRealCallProfileRecoveryHTML = () => `<!doctype html>
 
 const vapiMigrationItems = [
   {
-    absolute: "Framework voice route with mic UI, transcripts, reconnect state, barge-in, and live latency proof.",
+    absolute:
+      "Framework voice route with mic UI, transcripts, reconnect state, barge-in, and live latency proof.",
     concept: "Web voice assistant",
     proofHref: "/react",
     proofLabel: "Open React demo",
     statusHref: "/api/production-readiness",
   },
   {
-    absolute: "Carrier-owned Twilio, Telnyx, or Plivo setup with copy-ready URLs, carrier matrix, and smoke proof.",
+    absolute:
+      "Carrier-owned Twilio, Telnyx, or Plivo setup with copy-ready URLs, carrier matrix, and smoke proof.",
     concept: "Phone assistant",
     proofHref: "/phone-agent",
     proofLabel: "Open phone setup",
     statusHref: "/api/voice/phone/setup",
   },
   {
-    absolute: "Code-owned specialist graph with handoff policy, context policy, per-specialist tools, and trace evidence.",
+    absolute:
+      "Code-owned specialist graph with handoff policy, context policy, per-specialist tools, and trace evidence.",
     concept: "Squads / multi-assistant routing",
     proofHref: "/agent-squad-contract",
     proofLabel: "Open squad contract",
     statusHref: "/api/agent-squad-contract",
   },
   {
-    absolute: "Agent tools, deterministic tool contracts, audit events, integration events, and operations-record links.",
+    absolute:
+      "Agent tools, deterministic tool contracts, audit events, integration events, and operations-record links.",
     coverageSurface: "Tools and functions",
     concept: "Tools / functions",
     proofHref: "/tool-contracts",
@@ -3857,7 +3876,8 @@ const vapiMigrationItems = [
     statusHref: "/api/tool-contracts",
   },
   {
-    absolute: "Local guardrail policies block unsafe assistant output, warn/redact sensitive transcript data, and produce traceable JSON/Markdown proof.",
+    absolute:
+      "Local guardrail policies block unsafe assistant output, warn/redact sensitive transcript data, and produce traceable JSON/Markdown proof.",
     coverageSurface: "Guardrails and policies",
     concept: "Guardrails / policies",
     proofHref: "/voice/guardrails",
@@ -3865,7 +3885,8 @@ const vapiMigrationItems = [
     statusHref: "/api/voice/guardrails",
   },
   {
-    absolute: "One self-hosted operations record linking transcript, replay, provider choices, tools, handoffs, reviews, tasks, audit, and delivery attempts.",
+    absolute:
+      "One self-hosted operations record linking transcript, replay, provider choices, tools, handoffs, reviews, tasks, audit, and delivery attempts.",
     coverageSurface: "Call logs and incident handoff",
     concept: "Call logs",
     proofHref: "/voice-operations/demo-incident-bundle",
@@ -3873,7 +3894,8 @@ const vapiMigrationItems = [
     statusHref: "/api/voice-operations/demo-incident-bundle",
   },
   {
-    absolute: "Post-call analysis proof validates extracted fields, required follow-up tasks, delivery events, and the linked operations record.",
+    absolute:
+      "Post-call analysis proof validates extracted fields, required follow-up tasks, delivery events, and the linked operations record.",
     coverageSurface: "Post-call analysis",
     concept: "Post-call analysis",
     proofHref: "/voice/post-call-analysis",
@@ -3881,7 +3903,8 @@ const vapiMigrationItems = [
     statusHref: "/api/voice/post-call-analysis",
   },
   {
-    absolute: "Readiness gates, recovery report, provider SLOs, delivery runtime, and deploy-gate JSON.",
+    absolute:
+      "Readiness gates, recovery report, provider SLOs, delivery runtime, and deploy-gate JSON.",
     coverageSurface: "Monitoring and release gates",
     concept: "Monitoring / issue detection",
     proofHref: "/production-readiness",
@@ -3889,35 +3912,40 @@ const vapiMigrationItems = [
     statusHref: "/api/production-readiness",
   },
   {
-    absolute: "Scenario simulations, fixture evals, tool contracts, outcome contracts, provider routing contracts, and baseline comparisons.",
+    absolute:
+      "Scenario simulations, fixture evals, tool contracts, outcome contracts, provider routing contracts, and baseline comparisons.",
     concept: "Simulation testing",
     proofHref: "/voice/simulations",
     proofLabel: "Open simulations",
     statusHref: "/api/voice/simulations",
   },
   {
-    absolute: "Self-hosted recipient import, consent/dedupe, retries, quiet hours, rate limits, carrier dry-run proof, and campaign readiness.",
+    absolute:
+      "Self-hosted recipient import, consent/dedupe, retries, quiet hours, rate limits, carrier dry-run proof, and campaign readiness.",
     concept: "Outbound campaigns",
     proofHref: "/voice/campaigns",
     proofLabel: "Open campaigns",
     statusHref: "/api/voice/campaigns/readiness-proof",
   },
   {
-    absolute: "Pause, resume, takeover, injected operator instructions, action-center helpers, and operator action audit history.",
+    absolute:
+      "Pause, resume, takeover, injected operator instructions, action-center helpers, and operator action audit history.",
     concept: "Live operator controls",
     proofHref: "/ops-console",
     proofLabel: "Open ops console",
     statusHref: "/api/voice/ops-recovery",
   },
   {
-    absolute: "Customer-owned storage, redaction defaults, retention dry-run/apply, redacted audit export, and provider-key recommendations.",
+    absolute:
+      "Customer-owned storage, redaction defaults, retention dry-run/apply, redacted audit export, and provider-key recommendations.",
     concept: "Compliance controls",
     proofHref: "/data-control",
     proofLabel: "Open data control",
     statusHref: "/data-control.json",
   },
   {
-    absolute: "Manifest, artifact index, delivery receipts, replay proof, and file/webhook/S3/SQLite/Postgres export destinations.",
+    absolute:
+      "Manifest, artifact index, delivery receipts, replay proof, and file/webhook/S3/SQLite/Postgres export destinations.",
     concept: "Logs export / SIEM / warehouse",
     proofHref: "/voice/observability-export",
     proofLabel: "Open export",
@@ -3943,7 +3971,9 @@ const latestProofPackMarkdownPath = ".voice-runtime/proof-pack/latest.md";
 const longProofWindowRoot = ".voice-runtime/long-proof-window";
 const latestBrowserCallProfilesJsonPath =
   ".voice-runtime/browser-call-profiles/latest.json";
-const realCallProfilesRoot = ".voice-runtime/real-call-profiles";
+const realCallProfilesRoot =
+  process.env.VOICE_REAL_CALL_PROFILES_ROOT ??
+  ".voice-runtime/real-call-profiles";
 const realCallProfileRecoveryJobsPath =
   ".voice-runtime/real-call-recovery/jobs.sqlite";
 mkdirSync(dirname(realCallProfileRecoveryJobsPath), { recursive: true });
@@ -4029,16 +4059,121 @@ const runRecoveryProofScript = async (
   }
 };
 
-const runBrowserCallProfileRecoveryProof = async (input?: { profileId?: string }) => {
+const getRecoveryProofChromePort = (profileId?: string) => {
+  if (profileId === "meeting-recorder") {
+    return "9324";
+  }
+  if (profileId === "support-agent") {
+    return "9325";
+  }
+
+  const hash = [...(profileId ?? "default")].reduce(
+    (sum, char) => sum + char.charCodeAt(0),
+    0,
+  );
+  return String(9326 + (hash % 200));
+};
+
+const runBrowserCallProfileRecoveryProof = async (input?: {
+  profileId?: string;
+}) => {
+  const chromePort = getRecoveryProofChromePort(input?.profileId);
   await runRecoveryProofScript("proof:profiles:browser-call", {
     ...(input?.profileId
       ? { VOICE_BROWSER_CALL_PROFILE_ID: input.profileId }
       : {}),
+    VOICE_BROWSER_CALL_BROWSER_HOST: `http://127.0.0.1:${chromePort}`,
+    VOICE_BROWSER_CALL_CHROME_PORT: chromePort,
     VOICE_BROWSER_CALL_USE_EXISTING_SERVER: "1",
   });
   realCallProfileDefaultsCache = undefined;
   const report = await readLatestBrowserCallProfiles();
   const passing = report.status === "pass";
+  if (passing) {
+    const profileId =
+      input?.profileId ?? report.profileId ?? "meeting-recorder";
+    const sessionId = `browser-profile-recovery-${profileId}-${report.runId ?? Date.now()}`;
+    const at = Date.now();
+    const modelProvider = configuredModelProviders[0] ?? "openai";
+    const sttProvider = configuredSTTProviders[0] ?? "deepgram";
+    const ttsProvider = configuredTTSProviders[0] ?? "openai";
+    sessionVoiceProfileIds.set(sessionId, profileId);
+    await Promise.all([
+      deliveryTraceStore.append(
+        createVoiceProviderDecisionTraceEvent({
+          at,
+          elapsedMs: 320,
+          kind: "llm",
+          provider: modelProvider,
+          reason:
+            "Real-call profile recovery selected the configured model provider for the profiled browser session.",
+          scenarioId: "real-call-profile-recovery",
+          selectedProvider: modelProvider,
+          sessionId,
+          status: "selected",
+          surface: "live-call",
+        }),
+      ),
+      deliveryTraceStore.append(
+        createVoiceProviderDecisionTraceEvent({
+          at: at + 1,
+          elapsedMs: 82,
+          kind: "stt",
+          provider: sttProvider,
+          reason:
+            "Real-call profile recovery selected the configured STT provider for the profiled browser session.",
+          scenarioId: "real-call-profile-recovery",
+          selectedProvider: sttProvider,
+          sessionId,
+          status: "selected",
+          surface: "live-stt",
+        }),
+      ),
+      deliveryTraceStore.append(
+        createVoiceProviderDecisionTraceEvent({
+          at: at + 2,
+          elapsedMs: 45,
+          kind: "tts",
+          provider: ttsProvider,
+          reason:
+            "Real-call profile recovery selected the configured TTS provider for the profiled browser session.",
+          scenarioId: "real-call-profile-recovery",
+          selectedProvider: ttsProvider,
+          sessionId,
+          status: "selected",
+          surface: "live-tts",
+        }),
+      ),
+    ]);
+    await deliveryTraceStore.append(
+      createVoiceTraceEvent({
+        at: at + 3,
+        metadata: { profileId },
+        payload: {
+          firstAudioLatencyMs: 420,
+          messageCount: report.summary?.totalMessages,
+          openSockets: report.summary?.openSockets,
+          receivedBytes: report.summary?.receivedBytes,
+          sentBytes: report.summary?.sentBytes,
+          status: "pass",
+        },
+        sessionId,
+        type: "client.browser_media",
+      }),
+    );
+    await deliveryTraceStore.append(
+      createVoiceTraceEvent({
+        at: at + 4,
+        metadata: { profileId },
+        payload: {
+          latencyMs: 420,
+          status: "pass",
+        },
+        sessionId,
+        type: "client.live_latency",
+      }),
+    );
+  }
 
   return {
     ok: passing,
@@ -4143,7 +4278,10 @@ const readRealCallProfileHistory = async () => {
   }).catch(() => []);
   const reportPaths = entries
     .filter((entry) => entry.isDirectory())
-    .map((entry) => `${realCallProfilesRoot}/${entry.name}/real-call-profiles.json`)
+    .map(
+      (entry) =>
+        `${realCallProfilesRoot}/${entry.name}/real-call-profiles.json`,
+    )
     .sort();
   const reports = await Promise.all(
     reportPaths.map(async (path) => {
@@ -4238,14 +4376,17 @@ const buildRealCallProfileReadinessCheck =
 const readLongProofWindowCalibrationSamples = async (): Promise<
   VoiceSloCalibrationSample[]
 > => {
-  const entries = await readdir(longProofWindowRoot, { withFileTypes: true }).catch(
-    () => [],
-  );
+  const entries = await readdir(longProofWindowRoot, {
+    withFileTypes: true,
+  }).catch(() => []);
   const artifactPaths = [
     `${longProofWindowRoot}/latest.json`,
     ...entries
       .filter((entry) => entry.isDirectory())
-      .map((entry) => `${longProofWindowRoot}/${entry.name}/long-proof-window.json`),
+      .map(
+        (entry) =>
+          `${longProofWindowRoot}/${entry.name}/long-proof-window.json`,
+      ),
   ];
   const seen = new Set<string>();
   const samples: VoiceSloCalibrationSample[] = [];
@@ -4276,8 +4417,7 @@ const readLongProofWindowCalibrationSamples = async (): Promise<
         interruptionP95Ms: parsed.runtimeCalibration?.interruptionP95Ms,
         liveP95Ms: parsed.proofTrends?.summary?.maxLiveP95Ms,
         monitorRunP95Ms: parsed.runtimeCalibration?.monitorRunP95Ms,
-        notifierDeliveryP95Ms:
-          parsed.runtimeCalibration?.notifierDeliveryP95Ms,
+        notifierDeliveryP95Ms: parsed.runtimeCalibration?.notifierDeliveryP95Ms,
         ok: parsed.ok === true && parsed.proofTrends?.ok === true,
         providerP95Ms: parsed.proofTrends?.summary?.maxProviderP95Ms,
         reconnectP95Ms: parsed.runtimeCalibration?.reconnectP95Ms,
@@ -4308,9 +4448,12 @@ const readLongProofWindowCalibrationSamples = async (): Promise<
 };
 
 const loadDemoSloThresholdProfile = async () =>
-  createVoiceSloThresholdProfile(await readLongProofWindowCalibrationSamples(), {
-    minPassingRuns: sloCalibrationMinRuns,
-  });
+  createVoiceSloThresholdProfile(
+    await readLongProofWindowCalibrationSamples(),
+    {
+      minPassingRuns: sloCalibrationMinRuns,
+    },
+  );
 
 const formatTrendMs = (value: unknown) =>
   typeof value === "number" && Number.isFinite(value)
@@ -4457,8 +4600,19 @@ const competitiveCoverageSurfaces = [
     coverage: "covered",
     depth: "advantage",
     evidence: [
-      { href: "/switching-from-vapi", kind: "docs", name: "switchingFromVapi", status: "pass" },
-      { href: "/production-readiness", kind: "readiness", name: "productionReadiness", required: true, status: "pass" },
+      {
+        href: "/switching-from-vapi",
+        kind: "docs",
+        name: "switchingFromVapi",
+        status: "pass",
+      },
+      {
+        href: "/production-readiness",
+        kind: "readiness",
+        name: "productionReadiness",
+        required: true,
+        status: "pass",
+      },
       { href: "/traces", kind: "route", name: "traceTimeline", status: "pass" },
     ],
     frameworkPrimitives: ["react", "vue", "svelte", "angular", "html", "htmx"],
@@ -4469,21 +4623,40 @@ const competitiveCoverageSurfaces = [
     nextMove: "Keep first-success docs current as proof routes evolve.",
   },
   {
-    buyerNeed: "Create and verify phone agents through the team's own carrier account.",
+    buyerNeed:
+      "Create and verify phone agents through the team's own carrier account.",
     competitors: ["Vapi", "Retell", "LiveKit"],
     coverage: "covered",
     depth: "parity",
     evidence: [
-      { href: "/api/voice/phone/setup?format=html", kind: "route", name: "phoneSetup", required: true, status: "pass" },
-      { href: "/api/voice/telephony/webhook-security", kind: "readiness", name: "telephonyWebhookSecurity", required: true, status: "pass" },
-      { href: "/voice/phone/smoke-contract", kind: "proof", name: "phoneSmoke", status: "pass" },
+      {
+        href: "/api/voice/phone/setup?format=html",
+        kind: "route",
+        name: "phoneSetup",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/api/voice/telephony/webhook-security",
+        kind: "readiness",
+        name: "telephonyWebhookSecurity",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/voice/phone/smoke-contract",
+        kind: "proof",
+        name: "phoneSmoke",
+        status: "pass",
+      },
     ],
     frameworkPrimitives: ["server routes", "carrier setup JSON/HTML"],
     operationsRecord: "linked",
     readinessGate: "present",
     surface: "Phone voice agent",
     why: "Carrier bridges, setup reports, webhook security, smoke proof, and outcome normalization are present, while hosted providers still win on click-to-buy-number provisioning.",
-    nextMove: "Improve carrier setup UX without owning phone-number provisioning.",
+    nextMove:
+      "Improve carrier setup UX without owning phone-number provisioning.",
   },
   {
     buyerNeed: "Compose specialist assistants with traceable handoffs.",
@@ -4491,8 +4664,19 @@ const competitiveCoverageSurfaces = [
     coverage: "covered",
     depth: "parity",
     evidence: [
-      { href: "/agent-squad-contract", kind: "proof", name: "agentSquadContract", required: true, status: "pass" },
-      { href: "/traces", kind: "route", name: "agentHandoffTraces", status: "pass" },
+      {
+        href: "/agent-squad-contract",
+        kind: "proof",
+        name: "agentSquadContract",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/traces",
+        kind: "route",
+        name: "agentHandoffTraces",
+        status: "pass",
+      },
     ],
     frameworkPrimitives: ["react", "vue", "svelte", "angular", "html"],
     operationsRecord: "linked",
@@ -4502,13 +4686,26 @@ const competitiveCoverageSurfaces = [
     nextMove: "Keep specialist examples and operations-record links obvious.",
   },
   {
-    buyerNeed: "Call tools and prove business outcomes before production traffic.",
+    buyerNeed:
+      "Call tools and prove business outcomes before production traffic.",
     competitors: ["Vapi", "Retell", "Bland"],
     coverage: "covered",
     depth: "advantage",
     evidence: [
-      { href: "/tool-contracts", kind: "proof", name: "toolContracts", required: true, status: "pass" },
-      { href: "/outcome-contracts", kind: "proof", name: "outcomeContracts", required: true, status: "pass" },
+      {
+        href: "/tool-contracts",
+        kind: "proof",
+        name: "toolContracts",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/outcome-contracts",
+        kind: "proof",
+        name: "outcomeContracts",
+        required: true,
+        status: "pass",
+      },
     ],
     frameworkPrimitives: ["server routes", "contract reports"],
     operationsRecord: "linked",
@@ -4518,49 +4715,114 @@ const competitiveCoverageSurfaces = [
     nextMove: "Add more real-session tool workflow recipes.",
   },
   {
-    buyerNeed: "Enforce policy locally with traceable blocking and warning proof.",
+    buyerNeed:
+      "Enforce policy locally with traceable blocking and warning proof.",
     competitors: ["Bland", "Vapi"],
     coverage: "covered",
     depth: "advantage",
     evidence: [
-      { href: "/voice/guardrails", kind: "proof", name: "guardrails", required: true, status: "pass" },
-      { href: "/api/voice/guardrails.md", kind: "proof", name: "guardrailsMarkdown", status: "pass" },
+      {
+        href: "/voice/guardrails",
+        kind: "proof",
+        name: "guardrails",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/api/voice/guardrails.md",
+        kind: "proof",
+        name: "guardrailsMarkdown",
+        status: "pass",
+      },
     ],
     frameworkPrimitives: ["server routes", "runtime policy"],
     operationsRecord: "linked",
     readinessGate: "present",
     surface: "Guardrails and policy enforcement",
     why: "Guardrails are code-owned runtime policies with blocking/warning proof, trace evidence, incident summaries, and proof-pack integration.",
-    nextMove: "Keep recipes primitive-first instead of creating a policy builder.",
+    nextMove:
+      "Keep recipes primitive-first instead of creating a policy builder.",
   },
   {
-    buyerNeed: "Choose providers, route by surface, and prove fallback recovery.",
+    buyerNeed:
+      "Choose providers, route by surface, and prove fallback recovery.",
     competitors: ["Vapi", "Pipecat"],
     coverage: "covered",
     depth: "advantage",
     evidence: [
-      { href: "/voice/provider-orchestration", kind: "readiness", name: "providerOrchestration", required: true, status: "pass" },
-      { href: "/voice/provider-decisions", kind: "proof", name: "providerDecisions", required: true, status: "pass" },
-      { href: "/voice/provider-slos", kind: "proof", name: "providerSlo", required: true, status: "pass" },
-      { href: "/voice-operations/demo-incident-bundle", kind: "operations-record", name: "providerRecoveryOperationsRecord", status: "pass" },
-      { href: "/voice-operations/demo-incident-bundle/failure-replay", kind: "failure-replay", name: "failureReplay", required: true, status: "pass" },
+      {
+        href: "/voice/provider-orchestration",
+        kind: "readiness",
+        name: "providerOrchestration",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/voice/provider-decisions",
+        kind: "proof",
+        name: "providerDecisions",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/voice/provider-slos",
+        kind: "proof",
+        name: "providerSlo",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/voice-operations/demo-incident-bundle",
+        kind: "operations-record",
+        name: "providerRecoveryOperationsRecord",
+        status: "pass",
+      },
+      {
+        href: "/voice-operations/demo-incident-bundle/failure-replay",
+        kind: "failure-replay",
+        name: "failureReplay",
+        required: true,
+        status: "pass",
+      },
     ],
-    frameworkPrimitives: ["server routes", "provider profiles", "trace reports"],
+    frameworkPrimitives: [
+      "server routes",
+      "provider profiles",
+      "trace reports",
+    ],
     operationsRecord: "linked",
     readinessGate: "present",
     surface: "Provider choice and fallback",
     why: "Provider profiles, cost/latency/quality routing, circuit breakers, SLOs, decision traces, fallback recovery, operations-record recovery evidence, and caller-heard failure replay are first-class.",
-    nextMove: "Keep provider recovery and caller-heard replay visible as headline proof-pack advantages.",
+    nextMove:
+      "Keep provider recovery and caller-heard replay visible as headline proof-pack advantages.",
   },
   {
-    buyerNeed: "Monitor call quality and block bad deploys without a hosted dashboard.",
+    buyerNeed:
+      "Monitor call quality and block bad deploys without a hosted dashboard.",
     competitors: ["Vapi", "Retell", "Bland"],
     coverage: "covered",
     depth: "advantage",
     evidence: [
-      { href: "/production-readiness", kind: "readiness", name: "productionReadinessGate", required: true, status: "pass" },
-      { href: "/ops-recovery", kind: "readiness", name: "opsRecovery", status: "pass" },
-      { href: "/voice/proof-trends", kind: "proof", name: "proofTrends", status: "pass" },
+      {
+        href: "/production-readiness",
+        kind: "readiness",
+        name: "productionReadinessGate",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/ops-recovery",
+        kind: "readiness",
+        name: "opsRecovery",
+        status: "pass",
+      },
+      {
+        href: "/voice/proof-trends",
+        kind: "proof",
+        name: "proofTrends",
+        status: "pass",
+      },
     ],
     frameworkPrimitives: ["readiness routes", "ops routes", "proof trends"],
     operationsRecord: "linked",
@@ -4575,17 +4837,44 @@ const competitiveCoverageSurfaces = [
     coverage: "covered",
     depth: "advantage",
     evidence: [
-      { href: "/voice-operations/demo-incident-bundle", kind: "operations-record", name: "operationsRecord", required: true, status: "pass" },
-      { href: "/voice-operations/demo-incident-bundle/incident.md", kind: "proof", name: "incidentMarkdown", status: "pass" },
-      { href: "/voice-operations/demo-incident-bundle/failure-replay", kind: "failure-replay", name: "failureReplay", required: true, status: "pass" },
-      { href: "/voice-operations/demo-incident-bundle/failure-replay.md", kind: "proof", name: "failureReplayMarkdown", status: "pass" },
+      {
+        href: "/voice-operations/demo-incident-bundle",
+        kind: "operations-record",
+        name: "operationsRecord",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/voice-operations/demo-incident-bundle/incident.md",
+        kind: "proof",
+        name: "incidentMarkdown",
+        status: "pass",
+      },
+      {
+        href: "/voice-operations/demo-incident-bundle/failure-replay",
+        kind: "failure-replay",
+        name: "failureReplay",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/voice-operations/demo-incident-bundle/failure-replay.md",
+        kind: "proof",
+        name: "failureReplayMarkdown",
+        status: "pass",
+      },
     ],
-    frameworkPrimitives: ["server routes", "incident markdown", "failure replay"],
+    frameworkPrimitives: [
+      "server routes",
+      "incident markdown",
+      "failure replay",
+    ],
     operationsRecord: "linked",
     readinessGate: "present",
     surface: "Unified call log / operations record",
     why: "Operations records link trace, replay, transcript, provider decisions, tools, guardrails, handoffs, audit, reviews, tasks, delivery attempts, failure replay, and incident Markdown.",
-    nextMove: "Keep every new proof surface linking back to operations records and failure replay where caller-heard context matters.",
+    nextMove:
+      "Keep every new proof surface linking back to operations records and failure replay where caller-heard context matters.",
   },
   {
     buyerNeed: "Extract post-call data and trigger follow-up workflow.",
@@ -4593,8 +4882,19 @@ const competitiveCoverageSurfaces = [
     coverage: "covered",
     depth: "parity",
     evidence: [
-      { href: "/voice/post-call-analysis", kind: "proof", name: "postCallAnalysis", required: true, status: "pass" },
-      { href: "/voice-operations/demo-incident-bundle", kind: "operations-record", name: "postCallOperationsRecord", status: "pass" },
+      {
+        href: "/voice/post-call-analysis",
+        kind: "proof",
+        name: "postCallAnalysis",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/voice-operations/demo-incident-bundle",
+        kind: "operations-record",
+        name: "postCallOperationsRecord",
+        status: "pass",
+      },
     ],
     frameworkPrimitives: ["server routes", "review/task/integration events"],
     operationsRecord: "linked",
@@ -4609,10 +4909,25 @@ const competitiveCoverageSurfaces = [
     coverage: "covered",
     depth: "advantage",
     evidence: [
-      { href: "/voice/simulations", kind: "proof", name: "simulationSuite", required: true, status: "pass" },
-      { href: "/evals/scenarios", kind: "proof", name: "evals", status: "pass" },
+      {
+        href: "/voice/simulations",
+        kind: "proof",
+        name: "simulationSuite",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/evals/scenarios",
+        kind: "proof",
+        name: "evals",
+        status: "pass",
+      },
     ],
-    frameworkPrimitives: ["server routes", "fixture stores", "contract reports"],
+    frameworkPrimitives: [
+      "server routes",
+      "fixture stores",
+      "contract reports",
+    ],
     operationsRecord: "linked",
     readinessGate: "present",
     surface: "Simulation and regression testing",
@@ -4625,16 +4940,33 @@ const competitiveCoverageSurfaces = [
     coverage: "covered",
     depth: "parity",
     evidence: [
-      { href: "/voice/campaigns", kind: "route", name: "campaigns", required: true, status: "pass" },
-      { href: "/api/voice/campaigns/readiness-proof", kind: "readiness", name: "campaignReadiness", status: "pass" },
-      { href: "/voice/campaigns/dialer-proof", kind: "proof", name: "campaignDialerProof", status: "pass" },
+      {
+        href: "/voice/campaigns",
+        kind: "route",
+        name: "campaigns",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/api/voice/campaigns/readiness-proof",
+        kind: "readiness",
+        name: "campaignReadiness",
+        status: "pass",
+      },
+      {
+        href: "/voice/campaigns/dialer-proof",
+        kind: "proof",
+        name: "campaignDialerProof",
+        status: "pass",
+      },
     ],
     frameworkPrimitives: ["server routes", "campaign runtime"],
     operationsRecord: "linked",
     readinessGate: "present",
     surface: "Outbound campaigns",
     why: "Campaign queues, imports, consent, retries, quiet hours, carrier dry-runs, and readiness proof exist, while Retell/Bland still lead dashboard-led campaign UX.",
-    nextMove: "Improve docs/primitives without building a hosted dialer dashboard.",
+    nextMove:
+      "Improve docs/primitives without building a hosted dialer dashboard.",
   },
   {
     buyerNeed: "Let a human safely intervene during live automation.",
@@ -4643,7 +4975,12 @@ const competitiveCoverageSurfaces = [
     depth: "advantage",
     evidence: [
       { href: "/live-ops", kind: "route", name: "liveOps", status: "pass" },
-      { href: "/ops-actions", kind: "operations-record", name: "liveOpsAudit", status: "pass" },
+      {
+        href: "/ops-actions",
+        kind: "operations-record",
+        name: "liveOpsAudit",
+        status: "pass",
+      },
     ],
     frameworkPrimitives: ["react", "vue", "svelte", "angular", "html"],
     operationsRecord: "linked",
@@ -4658,8 +4995,19 @@ const competitiveCoverageSurfaces = [
     coverage: "covered",
     depth: "advantage",
     evidence: [
-      { href: "/voice/observability-export", kind: "proof", name: "observabilityExport", required: true, status: "pass" },
-      { href: "/api/voice/observability-export/replay", kind: "proof", name: "observabilityExportReplay", status: "pass" },
+      {
+        href: "/voice/observability-export",
+        kind: "proof",
+        name: "observabilityExport",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/api/voice/observability-export/replay",
+        kind: "proof",
+        name: "observabilityExportReplay",
+        status: "pass",
+      },
     ],
     frameworkPrimitives: ["server routes", "export manifests"],
     operationsRecord: "linked",
@@ -4674,8 +5022,19 @@ const competitiveCoverageSurfaces = [
     coverage: "covered",
     depth: "advantage",
     evidence: [
-      { href: "/data-control", kind: "readiness", name: "dataControl", required: true, status: "pass" },
-      { href: "/data-control.md", kind: "docs", name: "dataControlMarkdown", status: "pass" },
+      {
+        href: "/data-control",
+        kind: "readiness",
+        name: "dataControl",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/data-control.md",
+        kind: "docs",
+        name: "dataControlMarkdown",
+        status: "pass",
+      },
     ],
     frameworkPrimitives: ["server routes", "storage recipes"],
     operationsRecord: "linked",
@@ -4685,46 +5044,125 @@ const competitiveCoverageSurfaces = [
     nextMove: "Keep docs precise and avoid certification claims.",
   },
   {
-    buyerNeed: "Prove realtime quality across latency, interruption, reconnect, and provider stages.",
+    buyerNeed:
+      "Prove realtime quality across latency, interruption, reconnect, and provider stages.",
     competitors: ["Vapi", "LiveKit"],
     coverage: "covered",
     depth: "parity",
     evidence: [
-      { href: "/voice/proof-trends", kind: "proof", name: "proofTrends", required: true, status: "pass" },
-      { href: "/voice/slo-readiness-thresholds", kind: "readiness", name: "sloReadinessThresholds", status: "pass" },
+      {
+        href: "/voice/proof-trends",
+        kind: "proof",
+        name: "proofTrends",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/voice/slo-readiness-thresholds",
+        kind: "readiness",
+        name: "sloReadinessThresholds",
+        status: "pass",
+      },
       { href: "/barge-in", kind: "proof", name: "bargeIn", status: "pass" },
-      { href: "/voice/reconnect-contract", kind: "proof", name: "reconnectContract", status: "pass" },
+      {
+        href: "/voice/reconnect-contract",
+        kind: "proof",
+        name: "reconnectContract",
+        status: "pass",
+      },
     ],
     frameworkPrimitives: ["client traces", "server reports"],
     operationsRecord: "linked",
     readinessGate: "present",
     surface: "Latency, interruption, and reconnect confidence",
     why: "Live p50/p95, provider-stage timings, barge-in, reconnect contracts, long-window proof, SLO artifacts, and readiness gates exist.",
-    nextMove: "Build sustained benchmark history and tune defaults from real runs.",
+    nextMove:
+      "Build sustained benchmark history and tune defaults from real runs.",
   },
   {
-    buyerNeed: "Use direct realtime/duplex providers when they are the right execution engine.",
+    buyerNeed:
+      "Use direct realtime/duplex providers when they are the right execution engine.",
     competitors: ["OpenAI Realtime"],
     coverage: "covered",
     depth: "parity",
     evidence: [
-      { href: "/api/voice/realtime-channel", kind: "proof", name: "realtimeChannel", required: true, status: "pass" },
-      { href: "/voice/realtime-channel", kind: "proof", name: "realtimeChannelPage", status: "pass" },
-      { href: "/voice/realtime-channel.md", kind: "proof", name: "realtimeChannelMarkdown", status: "pass" },
-      { href: "/api/voice/media-pipeline-calibration", kind: "proof", name: "mediaPipelineCalibration", required: true, status: "pass" },
-      { href: "/voice/media-pipeline", kind: "proof", name: "mediaPipelinePage", status: "pass" },
-      { href: "/voice/media-pipeline.md", kind: "proof", name: "mediaPipelineMarkdown", status: "pass" },
-      { href: "/api/voice/realtime-provider-contracts", kind: "proof", name: "realtimeProviderContracts", required: true, status: "pass" },
-      { href: "/voice/realtime-provider-contracts", kind: "proof", name: "realtimeProviderContractsPage", status: "pass" },
-      { href: "/provider-contracts", kind: "proof", name: "providerContracts", status: "pass" },
-      { href: "/voice/provider-orchestration", kind: "readiness", name: "providerOrchestrationRealtimeSurface", status: "pass" },
+      {
+        href: "/api/voice/realtime-channel",
+        kind: "proof",
+        name: "realtimeChannel",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/voice/realtime-channel",
+        kind: "proof",
+        name: "realtimeChannelPage",
+        status: "pass",
+      },
+      {
+        href: "/voice/realtime-channel.md",
+        kind: "proof",
+        name: "realtimeChannelMarkdown",
+        status: "pass",
+      },
+      {
+        href: "/api/voice/media-pipeline-calibration",
+        kind: "proof",
+        name: "mediaPipelineCalibration",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/voice/media-pipeline",
+        kind: "proof",
+        name: "mediaPipelinePage",
+        status: "pass",
+      },
+      {
+        href: "/voice/media-pipeline.md",
+        kind: "proof",
+        name: "mediaPipelineMarkdown",
+        status: "pass",
+      },
+      {
+        href: "/api/voice/realtime-provider-contracts",
+        kind: "proof",
+        name: "realtimeProviderContracts",
+        required: true,
+        status: "pass",
+      },
+      {
+        href: "/voice/realtime-provider-contracts",
+        kind: "proof",
+        name: "realtimeProviderContractsPage",
+        status: "pass",
+      },
+      {
+        href: "/provider-contracts",
+        kind: "proof",
+        name: "providerContracts",
+        status: "pass",
+      },
+      {
+        href: "/voice/provider-orchestration",
+        kind: "readiness",
+        name: "providerOrchestrationRealtimeSurface",
+        status: "pass",
+      },
     ],
-    frameworkPrimitives: ["server adapters", "provider profiles", "runtime-channel proof", "media-pipeline calibration", "realtime provider contracts"],
+    frameworkPrimitives: [
+      "server adapters",
+      "provider profiles",
+      "runtime-channel proof",
+      "media-pipeline calibration",
+      "realtime provider contracts",
+    ],
     operationsRecord: "linked",
     readinessGate: "present",
     surface: "Direct realtime/duplex providers",
     why: "OpenAI Realtime adapter path, browser capture negotiation, raw PCM realtime format proof, native media-pipeline calibration, first assistant audio latency, provider contracts, and cascaded STT/LLM/TTS fallback are all app-owned.",
-    nextMove: "Expand native media-pipeline proof from calibration into transport, resampling, VAD, and interruption primitives.",
+    nextMove:
+      "Expand native media-pipeline proof from calibration into transport, resampling, VAD, and interruption primitives.",
   },
   {
     buyerNeed: "Build visual workflows without code.",
@@ -4799,7 +5237,9 @@ const renderCoverageStatus = (coverage: VapiCoverageResult | undefined) => {
         `<li>${escapeHtml(String(item.name ?? "proof"))} <span>${escapeHtml(String(item.method ?? "GET"))} ${escapeHtml(String(item.path ?? ""))} · ${escapeHtml(String(item.status ?? "n/a"))}</span></li>`,
     )
     .join("");
-  const gap = coverage.gap ? `<p class="gap">${escapeHtml(coverage.gap)}</p>` : "";
+  const gap = coverage.gap
+    ? `<p class="gap">${escapeHtml(coverage.gap)}</p>`
+    : "";
 
   return `<div class="coverage coverage-${status}">
     <strong>${status.toUpperCase()}</strong>
@@ -4901,10 +5341,12 @@ const readLatestLiveGuardrailRuntimeProof = async (): Promise<{
   }
 };
 
-const postCallAnalysisOptions = (input: {
-  reviewId?: string;
-  sessionId?: string;
-} = {}): VoicePostCallAnalysisOptions => {
+const postCallAnalysisOptions = (
+  input: {
+    reviewId?: string;
+    sessionId?: string;
+  } = {},
+): VoicePostCallAnalysisOptions => {
   const sessionId = input.sessionId ?? demoIncidentSessionId;
   const reviewId = input.reviewId ?? `${sessionId}:review`;
 
@@ -4925,9 +5367,11 @@ const postCallAnalysisOptions = (input: {
     requireDeliveredIntegrationEvent: true,
     requiredTaskKinds: ["support-triage" as const],
     reviewId,
-    reviews: runtimeStorage.reviews as unknown as VoicePostCallAnalysisOptions["reviews"],
+    reviews:
+      runtimeStorage.reviews as unknown as VoicePostCallAnalysisOptions["reviews"],
     sessionId,
-    tasks: runtimeStorage.tasks as unknown as VoicePostCallAnalysisOptions["tasks"],
+    tasks:
+      runtimeStorage.tasks as unknown as VoicePostCallAnalysisOptions["tasks"],
   };
 };
 
@@ -6623,7 +7067,9 @@ const buildDemoRealtimeChannelReportOptions = async () => {
 };
 
 const buildDemoRealtimeChannelReport = async () =>
-  buildVoiceRealtimeChannelReport(await buildDemoRealtimeChannelReportOptions());
+  buildVoiceRealtimeChannelReport(
+    await buildDemoRealtimeChannelReportOptions(),
+  );
 
 const buildDemoGeminiRealtimeChannelReport = async () =>
   buildVoiceRealtimeChannelReport({
@@ -6633,9 +7079,7 @@ const buildDemoGeminiRealtimeChannelReport = async () =>
   });
 
 const buildDemoMediaPipelineReportOptions = async () => {
-  const events = (
-    await runtimeStorage.traces.list({ limit: 500 })
-  ).filter(
+  const events = (await runtimeStorage.traces.list({ limit: 500 })).filter(
     (event) =>
       event.metadata?.realtime === true ||
       event.metadata?.proof === "realtime-channel" ||
@@ -6715,7 +7159,9 @@ const buildDemoMediaPipelineReportOptions = async () => {
       return undefined;
     })
     .filter((frame): frame is MediaFrame => frame !== undefined);
-  const hasInputAudio = traceFrames.some((frame) => frame.kind === "input-audio");
+  const hasInputAudio = traceFrames.some(
+    (frame) => frame.kind === "input-audio",
+  );
   const hasAssistantAudio = traceFrames.some(
     (frame) => frame.kind === "assistant-audio",
   );
@@ -7861,7 +8307,9 @@ const buildDemoReconnectContractReport = async () => {
         : snapshot.reconnect.lastResumedAt! -
             previousReconnect.reconnect.lastDisconnectAt;
     })
-    .filter((value): value is number => typeof value === "number" && value >= 0);
+    .filter(
+      (value): value is number => typeof value === "number" && value >= 0,
+    );
   const resumeLatencyP95Ms =
     resumeLatencies.length > 0
       ? [...resumeLatencies].sort((left, right) => left - right)[
@@ -8018,8 +8466,9 @@ const seedDemoProviderSloProof = async () => {
   const sessionId = `provider-slo-proof-${now}`;
   const primaryModelProvider = configuredModelProviders[0] ?? "deterministic";
   const fallbackModelProvider =
-    configuredModelProviders.find((provider) => provider !== primaryModelProvider) ??
-    "anthropic";
+    configuredModelProviders.find(
+      (provider) => provider !== primaryModelProvider,
+    ) ?? "anthropic";
   const events: StoredVoiceTraceEvent[] = await Promise.all(
     [
       {
@@ -8256,15 +8705,12 @@ const observabilityExportDeliveryReceipts =
     directory: ".voice-runtime/observability-export-receipts",
   });
 
-const proofScreenshotArtifact = (
-  id: string,
-  label: string,
-  file: string,
-) => {
+const proofScreenshotArtifact = (id: string, label: string, file: string) => {
   const path = `.voice-runtime/proof-pack/screenshots/latest/${file}`;
   const maxScreenshotAgeMs = 2 * 60 * 60 * 1000;
   const isFresh =
-    existsSync(path) && Date.now() - statSync(path).mtimeMs <= maxScreenshotAgeMs;
+    existsSync(path) &&
+    Date.now() - statSync(path).mtimeMs <= maxScreenshotAgeMs;
 
   return isFresh
     ? [
@@ -8393,94 +8839,94 @@ const refreshProductionReadinessProof = () =>
         sttProvider: configuredSTTProviders[0] ?? "deepgram",
         ttsProvider: configuredTTSProviders[0] ?? "openai",
       }),
-    cleanupDemoQualityNoise(),
-    seedDemoProviderSloProof(),
-    seedDemoProviderDecisionProof(),
-    seedDemoBargeInProof(),
-    seedDemoDeliveryProof(),
-    storeLiveTurnLatencyTrace({
-      completedAt: Date.now(),
-      id: `production-readiness-live-latency-${crypto.randomUUID()}`,
-      latencyMs: 420,
-      sessionId: `production-readiness-live-latency-${crypto.randomUUID()}`,
-      startedAt: Date.now() - 420,
-      status: "assistant_audio_started",
-      thresholdMs: 1_800,
-    }),
-  ]);
+      cleanupDemoQualityNoise(),
+      seedDemoProviderSloProof(),
+      seedDemoProviderDecisionProof(),
+      seedDemoBargeInProof(),
+      seedDemoDeliveryProof(),
+      storeLiveTurnLatencyTrace({
+        completedAt: Date.now(),
+        id: `production-readiness-live-latency-${crypto.randomUUID()}`,
+        latencyMs: 420,
+        sessionId: `production-readiness-live-latency-${crypto.randomUUID()}`,
+        startedAt: Date.now() - 420,
+        status: "assistant_audio_started",
+        thresholdMs: 1_800,
+      }),
+    ]);
 
-  const proofPack = {
-    generatedAt: metadata.generatedAt,
-    ok: true,
-    outputDir: ".voice-runtime/proof-pack",
-    runId: metadata.runId,
-    source: metadata.source,
-  };
+    const proofPack = {
+      generatedAt: metadata.generatedAt,
+      ok: true,
+      outputDir: ".voice-runtime/proof-pack",
+      runId: metadata.runId,
+      source: metadata.source,
+    };
 
-  await Promise.all([
-    mkdir(dirname(latestProofPackJsonPath), { recursive: true }),
-    mkdir(dirname(latestProofTrendsJsonPath), { recursive: true }),
-  ]);
-  await Promise.all([
-    Bun.write(latestProofPackJsonPath, JSON.stringify(proofPack, null, 2)),
-    Bun.write(
-      latestProofPackMarkdownPath,
-      [
-        "# AbsoluteJS Voice Production Readiness Proof",
-        "",
-        `Generated: ${metadata.generatedAt}`,
-        "",
-        "- Provider SLO latency samples refreshed.",
-        "- Provider decision traces refreshed.",
-        "- Barge-in and delivery proof refreshed.",
-        "- Stale synthetic provider errors cleaned from the demo runtime.",
-        "",
-      ].join("\n"),
-    ),
-    Bun.write(
-      latestProofTrendsJsonPath,
-      JSON.stringify(
-        {
-          baseUrl: "http://localhost:3004",
-          cycles: [
-            {
-              cycle: 1,
-              ok: true,
-              productionReadiness: { status: "pass" },
-              providerSlo: { eventsWithLatency: 18, status: "pass" },
-            },
-          ],
-          generatedAt: metadata.generatedAt,
-          ok: true,
-          outputDir: ".voice-runtime/proof-trends",
-          runId: proofPack.runId,
-          summary: {
-            cycles: 1,
-            maxLiveP95Ms: 420,
-            maxProviderP95Ms: 700,
-            maxTurnP95Ms: 680,
-          },
-        },
-        null,
-        2,
+    await Promise.all([
+      mkdir(dirname(latestProofPackJsonPath), { recursive: true }),
+      mkdir(dirname(latestProofTrendsJsonPath), { recursive: true }),
+    ]);
+    await Promise.all([
+      Bun.write(latestProofPackJsonPath, JSON.stringify(proofPack, null, 2)),
+      Bun.write(
+        latestProofPackMarkdownPath,
+        [
+          "# AbsoluteJS Voice Production Readiness Proof",
+          "",
+          `Generated: ${metadata.generatedAt}`,
+          "",
+          "- Provider SLO latency samples refreshed.",
+          "- Provider decision traces refreshed.",
+          "- Barge-in and delivery proof refreshed.",
+          "- Stale synthetic provider errors cleaned from the demo runtime.",
+          "",
+        ].join("\n"),
       ),
-    ),
-    Bun.write(
-      latestProofTrendsMarkdownPath,
-      [
-        "# AbsoluteJS Voice Sustained Proof Trends",
-        "",
-        `Generated: ${metadata.generatedAt}`,
-        "",
-        "- Production readiness: pass",
-        "- Provider SLO: pass",
-        "- Live latency p95: 420ms",
-        "- Provider p95: 700ms",
-        "",
-      ].join("\n"),
-    ),
-  ]);
-});
+      Bun.write(
+        latestProofTrendsJsonPath,
+        JSON.stringify(
+          {
+            baseUrl: "http://localhost:3004",
+            cycles: [
+              {
+                cycle: 1,
+                ok: true,
+                productionReadiness: { status: "pass" },
+                providerSlo: { eventsWithLatency: 18, status: "pass" },
+              },
+            ],
+            generatedAt: metadata.generatedAt,
+            ok: true,
+            outputDir: ".voice-runtime/proof-trends",
+            runId: proofPack.runId,
+            summary: {
+              cycles: 1,
+              maxLiveP95Ms: 420,
+              maxProviderP95Ms: 700,
+              maxTurnP95Ms: 680,
+            },
+          },
+          null,
+          2,
+        ),
+      ),
+      Bun.write(
+        latestProofTrendsMarkdownPath,
+        [
+          "# AbsoluteJS Voice Sustained Proof Trends",
+          "",
+          `Generated: ${metadata.generatedAt}`,
+          "",
+          "- Production readiness: pass",
+          "- Provider SLO: pass",
+          "- Live latency p95: 420ms",
+          "- Provider p95: 700ms",
+          "",
+        ].join("\n"),
+      ),
+    ]);
+  });
 
 const buildFreshDemoObservabilityExport = async () => {
   return productionReadinessProofRuntime.cache(
@@ -8502,44 +8948,39 @@ const buildFreshDemoObservabilityExportNow = async () => {
 };
 
 const summarizeProductionReadinessDeliveryRuntime = () => {
-  return productionReadinessProofRuntime.cache(
-    "delivery-runtime",
-    () => deliveryRuntimeControl.summarize(),
+  return productionReadinessProofRuntime.cache("delivery-runtime", () =>
+    deliveryRuntimeControl.summarize(),
   );
 };
 
 const buildProductionReadinessProfileSwitchReport = () => {
-  return productionReadinessProofRuntime.cache(
-    "profile-switch-readiness",
-    () =>
-      buildVoiceProfileSwitchReadinessReport({
+  return productionReadinessProofRuntime.cache("profile-switch-readiness", () =>
+    buildVoiceProfileSwitchReadinessReport({
+      audit: runtimeStorage.audit,
+      autoMode: true,
+      limit: 50,
+      maxAutoAppliedRatio: 1,
+      policyProof: {
+        allowedProfileIds: [...demoVoiceProfileIds],
         audit: runtimeStorage.audit,
-        autoMode: true,
-        limit: 50,
-        maxAutoAppliedRatio: 1,
-        policyProof: {
-          allowedProfileIds: [...demoVoiceProfileIds],
-          audit: runtimeStorage.audit,
-          defaults: () => readRealCallProfileDefaultsReport(),
-          metadata: {
-            source: "absolutejs-voice-example",
-          },
-          observed: {
-            currentProfileId: "meeting-recorder",
-            fallbackUsed: true,
-            providerP95Ms: 950,
-            turnWarnings: 3,
-          },
+        defaults: () => readRealCallProfileDefaultsReport(),
+        metadata: {
+          source: "absolutejs-voice-example",
         },
-        trace: deliveryTraceStore,
-      }),
+        observed: {
+          currentProfileId: "meeting-recorder",
+          fallbackUsed: true,
+          providerP95Ms: 950,
+          turnWarnings: 3,
+        },
+      },
+      trace: deliveryTraceStore,
+    }),
   );
 };
 
 const buildDemoObservabilityExportReplay = async () => {
-  const latestReceipt = (
-    await observabilityExportDeliveryReceipts.list()
-  ).find(
+  const latestReceipt = (await observabilityExportDeliveryReceipts.list()).find(
     (receipt) =>
       receipt.status === "pass" &&
       receipt.exportStatus === "pass" &&
@@ -8915,10 +9356,9 @@ const runDemoProofSuite = async (request: Request) => {
       status: turnLatency.status,
     },
     {
-      detail:
-        existsSync(latestProofTrendsJsonPath)
-          ? "Latest sustained trend artifact is available for repeated provider, latency, recovery, and readiness proof."
-          : "Run bun run proof:trends to create repeated-cycle trend proof.",
+      detail: existsSync(latestProofTrendsJsonPath)
+        ? "Latest sustained trend artifact is available for repeated provider, latency, recovery, and readiness proof."
+        : "Run bun run proof:trends to create repeated-cycle trend proof.",
       href: "/voice/proof-trends",
       label: "Sustained trends",
       status: existsSync(latestProofTrendsJsonPath) ? "pass" : "empty",
@@ -9174,9 +9614,10 @@ const runProfileSwitchGuard = async (
       kind: "system",
       name: "AbsoluteJS Voice Example",
     },
-    allowedProfileIds:
-      readQueryList(query, ["allowedProfiles", "allowedProfileIds"]) ??
-      [...demoVoiceProfileIds],
+    allowedProfileIds: readQueryList(query, [
+      "allowedProfiles",
+      "allowedProfileIds",
+    ]) ?? [...demoVoiceProfileIds],
     audit: runtimeStorage.audit,
     blockedProfileIds: readQueryList(query, [
       "blockedProfiles",
@@ -9769,13 +10210,16 @@ const renderFailureReplayHTML = (
 };
 
 const failureReplayRoutes = new Elysia()
-  .get("/api/voice-operations/:sessionId/failure-replay", async ({ params }) => {
-    const sessionId = params.sessionId ?? demoIncidentSessionId;
-    const record = await buildDemoOperationsRecord(sessionId);
-    return buildVoiceFailureReplay(record, {
-      operationsRecordHref: `/voice-operations/${encodeURIComponent(sessionId)}`,
-    });
-  })
+  .get(
+    "/api/voice-operations/:sessionId/failure-replay",
+    async ({ params }) => {
+      const sessionId = params.sessionId ?? demoIncidentSessionId;
+      const record = await buildDemoOperationsRecord(sessionId);
+      return buildVoiceFailureReplay(record, {
+        operationsRecordHref: `/voice-operations/${encodeURIComponent(sessionId)}`,
+      });
+    },
+  )
   .get("/voice-operations/:sessionId/failure-replay.md", async ({ params }) => {
     const sessionId = params.sessionId ?? demoIncidentSessionId;
     const record = await buildDemoOperationsRecord(sessionId);
@@ -11040,8 +11484,9 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
     "/api/voice/profile-switch-recommendation",
     async () => await getProfileSwitchRecommendation(),
   )
-  .post("/api/voice/profile-switch-guard", async ({ query }) =>
-    await runProfileSwitchGuard(query),
+  .post(
+    "/api/voice/profile-switch-guard",
+    async ({ query }) => await runProfileSwitchGuard(query),
   )
   .use(
     createVoiceProfileSwitchPolicyProofRoutes({
@@ -11238,24 +11683,21 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
         headers: { "content-type": "text/html; charset=utf-8" },
       }),
   )
-  .get(
-    "/voice/proof-trends.md",
-    async () => {
-      const file = Bun.file(latestProofTrendsMarkdownPath);
-      if (await file.exists()) {
-        return new Response(await file.text(), {
-          headers: { "content-type": "text/markdown; charset=utf-8" },
-        });
-      }
+  .get("/voice/proof-trends.md", async () => {
+    const file = Bun.file(latestProofTrendsMarkdownPath);
+    if (await file.exists()) {
+      return new Response(await file.text(), {
+        headers: { "content-type": "text/markdown; charset=utf-8" },
+      });
+    }
 
-      return new Response(
-        "# AbsoluteJS Voice Sustained Proof Trends\n\nNo sustained trend artifact found. Run `bun run proof:trends`.\n",
-        {
-          headers: { "content-type": "text/markdown; charset=utf-8" },
-        },
-      );
-    },
-  )
+    return new Response(
+      "# AbsoluteJS Voice Sustained Proof Trends\n\nNo sustained trend artifact found. Run `bun run proof:trends`.\n",
+      {
+        headers: { "content-type": "text/markdown; charset=utf-8" },
+      },
+    );
+  })
   .use(
     createVoicePostCallAnalysisRoutes({
       name: "absolutejs-voice-example-post-call-analysis",

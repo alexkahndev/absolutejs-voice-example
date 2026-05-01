@@ -12,6 +12,7 @@
     "proof:pack:server": "bun run ./scripts/run-proof-pack-server.ts",
     "proof:profiles:browser-call": "bun run ./scripts/capture-real-browser-call-profile.ts",
     "proof:profiles:real-calls": "bun run ./scripts/collect-real-call-proof-profiles.ts",
+    "proof:recovery-loop": "bun run ./scripts/run-real-call-profile-recovery-loop.ts",
     "proof:long-window": "bun run ./scripts/run-long-proof-window.ts",
     "proof:screenshots": "bun run ./scripts/run-proof-pack-screenshots.ts",
     "proof:trends": "bun run ./scripts/run-sustained-proof-trends.ts",
@@ -31,7 +32,7 @@
   "dependencies": {
     "@absolutejs/absolute": "0.19.0-beta.739",
     "@absolutejs/media": "0.0.1-beta.7",
-    "@absolutejs/voice": "0.0.22-beta.383",
+    "@absolutejs/voice": "0.0.22-beta.384",
     "@absolutejs/voice-assemblyai": "0.0.19-beta.123",
     "@absolutejs/voice-deepgram": "0.0.20-beta.93",
     "@absolutejs/voice-gemini": "0.0.1-beta.40",
