@@ -65,6 +65,7 @@ import {
   createVoiceProofTrendRecommendationRoutes,
   createVoiceProofTrendRoutes,
   createVoiceRealCallEvidenceRuntime,
+  createVoiceRealCallEvidenceRuntimeWorkerLoop,
   createVoiceRealCallEvidenceRuntimeRoutes,
   createVoiceRealCallProfileHistoryRoutes,
   createVoiceRealCallProfileRecoveryActionRoutes,
@@ -4002,6 +4003,28 @@ const realCallEvidenceRuntime = createVoiceRealCallEvidenceRuntime({
   },
   traceStore: deliveryTraceStore,
 });
+const configuredRealCallEvidenceRuntimeAutocollectIntervalMs = Number(
+  process.env.VOICE_REAL_CALL_EVIDENCE_AUTOCOLLECT_INTERVAL_MS ?? 30_000,
+);
+const realCallEvidenceRuntimeAutocollectIntervalMs =
+  Number.isFinite(configuredRealCallEvidenceRuntimeAutocollectIntervalMs) &&
+  configuredRealCallEvidenceRuntimeAutocollectIntervalMs > 0
+    ? configuredRealCallEvidenceRuntimeAutocollectIntervalMs
+    : 30_000;
+const realCallEvidenceRuntimeWorkerLoop =
+  createVoiceRealCallEvidenceRuntimeWorkerLoop({
+    onError: (error) => {
+      console.error("Real-call evidence auto-collector failed:", error);
+    },
+    pollIntervalMs: realCallEvidenceRuntimeAutocollectIntervalMs,
+    runtime: realCallEvidenceRuntime,
+  });
+if (process.env.VOICE_REAL_CALL_EVIDENCE_AUTOCOLLECT === "1") {
+  realCallEvidenceRuntimeWorkerLoop.start();
+  console.log(
+    `Real-call evidence auto-collector started every ${realCallEvidenceRuntimeAutocollectIntervalMs}ms.`,
+  );
+}
 const realCallEvidenceRuntimeRoutes = createVoiceRealCallEvidenceRuntimeRoutes({
   evidenceStore: realCallProfileEvidenceStore,
   name: "absolutejs-voice-example-real-call-evidence-runtime",
@@ -13111,6 +13134,9 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
     }),
   )
   .use(realCallEvidenceRuntimeRoutes)
+  .get("/api/voice/real-call-evidence-runtime/worker", () =>
+    realCallEvidenceRuntimeWorkerLoop.health(),
+  )
   .use(
     createVoiceRealCallProfileRecoveryActionRoutes({
       asyncActionIds: ["collect-browser-proof", "collect-phone-proof"],
