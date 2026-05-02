@@ -67,7 +67,9 @@ import {
   createVoiceRealCallProfileHistoryRoutes,
   createVoiceRealCallProfileRecoveryActionRoutes,
   createVoiceRealCallProfileTraceCollector,
+  createVoiceSQLiteRealCallProfileEvidenceStore,
   createVoiceSQLiteRealCallProfileRecoveryJobStore,
+  buildVoiceRealCallProfileEvidenceFromReconnectProofReports,
   buildVoiceRealCallProfileHistoryReport,
   buildVoiceRealCallProfileReadinessCheck,
   buildVoiceRealCallProfileRecoveryJobHistoryCheck,
@@ -3962,11 +3964,19 @@ const realCallProfilesRoot =
   ".voice-runtime/real-call-profiles";
 const realCallProfileRecoveryJobsPath =
   ".voice-runtime/real-call-recovery/jobs.sqlite";
+const realCallProfileEvidencePath =
+  ".voice-runtime/real-call-profile-evidence.sqlite";
 mkdirSync(dirname(realCallProfileRecoveryJobsPath), { recursive: true });
+mkdirSync(dirname(realCallProfileEvidencePath), { recursive: true });
 const realCallProfileRecoveryJobStore =
   createVoiceSQLiteRealCallProfileRecoveryJobStore({
     idPrefix: "voice-profile-recovery",
     path: realCallProfileRecoveryJobsPath,
+  });
+const realCallProfileEvidenceStore =
+  createVoiceSQLiteRealCallProfileEvidenceStore({
+    idPrefix: "voice-profile-evidence",
+    path: realCallProfileEvidencePath,
   });
 const latestProofTrendsJsonPath = ".voice-runtime/proof-trends/latest.json";
 const latestProofTrendsMarkdownPath = ".voice-runtime/proof-trends/latest.md";
@@ -4257,7 +4267,10 @@ const readRealCallProfileHistory = async () => {
   );
 
   return {
-    evidence: await deliveryTraceStore.listEvidence({ limit: 5000 }),
+    evidence: [
+      ...(await realCallProfileEvidenceStore.list({ limit: 5000 })),
+      ...(await deliveryTraceStore.listEvidence({ limit: 5000 })),
+    ],
     generatedAt: new Date().toISOString(),
     maxAgeMs: proofTrendsMaxAgeMs,
     reports: reports.filter(
@@ -8856,6 +8869,13 @@ const storeReconnectTrace = async (body: unknown) => {
     type: "client.reconnect",
   };
   await deliveryTraceStore.append(event);
+  if (status === "resumed") {
+    const events = await runtimeStorage.traces.list({ limit: 500 });
+    await persistReconnectRealCallProfileEvidence({
+      report: await buildDemoReconnectContractReport({ events }),
+      sessionId,
+    });
+  }
 
   return { ok: true, sessionId };
 };
@@ -8940,6 +8960,37 @@ const buildDemoReconnectContractReport = async (input: {
         ? "Live captured browser traces"
         : "Demo fallback snapshots",
   };
+};
+
+const persistReconnectRealCallProfileEvidence = async (input: {
+  report: Awaited<ReturnType<typeof buildDemoReconnectContractReport>>;
+  sessionId: string;
+}) => {
+  if (input.report.pass !== true) {
+    return;
+  }
+
+  const evidence = buildVoiceRealCallProfileEvidenceFromReconnectProofReports(
+    input.report,
+    {
+      operationsRecordHref: "/voice/reconnect-contract",
+      profileDescription:
+        "Real browser reconnect/resume traces captured by the demo UI.",
+      profileId: "reconnect-resume",
+      profileLabel: "Reconnect resume",
+      sessionId: `reconnect-resume-${input.sessionId}-${String(input.report.checkedAt)}`,
+      surfaces: ["browser", "reconnect"],
+    },
+  );
+
+  await Promise.all(
+    evidence.map((entry) =>
+      realCallProfileEvidenceStore.append({
+        ...entry,
+        id: `reconnect-resume:${input.sessionId}:${String(input.report.checkedAt)}:${String(input.report.snapshotCount)}`,
+      }),
+    ),
+  );
 };
 
 const renderDemoReconnectContractHTML = async (

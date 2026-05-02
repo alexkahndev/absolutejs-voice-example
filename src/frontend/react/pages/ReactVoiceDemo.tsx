@@ -123,6 +123,7 @@ const EMPTY_VOICE: ReactVoiceDemoStream = {
   sendAudio: (_audio: Uint8Array | ArrayBuffer) => {},
   sessionMetadata: null,
   sessionId: "",
+  simulateDisconnect: () => {},
   status: "idle" as const,
   turns: [] as VoiceTurnRecord<SavedIntake>[],
 };
