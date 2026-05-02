@@ -74,6 +74,7 @@ import {
   createVoiceSQLiteRealCallProfileRecoveryJobStore,
   buildVoiceRealCallProfileEvidenceFromReconnectProofReports,
   buildVoiceRealCallEvidenceRuntimeReadinessCheck,
+  buildVoiceRealCallEvidenceRuntimeWorkerReadinessCheck,
   buildVoiceRealCallProfileHistoryReport,
   buildVoiceRealCallProfileReadinessCheck,
   buildVoiceRealCallProfileRecoveryJobHistoryCheck,
@@ -4042,6 +4043,17 @@ const buildRealCallEvidenceRuntimeReadinessCheck =
         minSessions: 2,
         minStoredEvidence: 2,
         sourceHref: "/api/voice/real-call-evidence-runtime",
+      },
+    );
+const buildRealCallEvidenceRuntimeWorkerReadinessCheck =
+  async (): Promise<VoiceProductionReadinessCheck> =>
+    buildVoiceRealCallEvidenceRuntimeWorkerReadinessCheck(
+      realCallEvidenceRuntimeWorkerLoop.health(),
+      {
+        collectHref: "/api/voice/real-call-evidence-runtime/collect",
+        href: "/voice/real-call-evidence-runtime",
+        maxLastCollectedAgeMs: realCallEvidenceRuntimeAutocollectIntervalMs * 3,
+        sourceHref: "/api/voice/real-call-evidence-runtime/worker",
       },
     );
 const configuredSloCalibrationMinRuns = Number(
@@ -9856,6 +9868,14 @@ const buildDemoVoiceProofPack = async (input: {
         buildRealCallEvidenceRuntimeReadinessCheck,
       ),
   );
+  const realCallEvidenceRuntimeWorkerReadiness = context.cache(
+    "realCallEvidenceRuntimeWorkerReadiness",
+    () =>
+      context.time(
+        "additionalChecks:realCallEvidenceRuntimeWorker",
+        buildRealCallEvidenceRuntimeWorkerReadinessCheck,
+      ),
+  );
   const realCallProfileRecoveryReadiness = context.cache(
     "realCallProfileRecoveryReadiness",
     () =>
@@ -9937,6 +9957,7 @@ const buildDemoVoiceProofPack = async (input: {
           browserCallProfileReadiness,
           deliveryRuntimeSummary,
           realCallEvidenceRuntimeReadiness,
+          realCallEvidenceRuntimeWorkerReadiness,
           realCallProfileReadiness,
           realCallProfileRecoveryReadiness,
           proofPackContext: context,
@@ -10278,6 +10299,7 @@ const productionReadinessOptions = (
     includeObservabilityExport?: boolean;
     onTiming?: (timing: VoiceProductionReadinessTiming) => void;
     realCallEvidenceRuntimeReadiness?: Promise<VoiceProductionReadinessCheck>;
+    realCallEvidenceRuntimeWorkerReadiness?: Promise<VoiceProductionReadinessCheck>;
     realCallProfileReadiness?: Promise<VoiceProductionReadinessCheck>;
     realCallProfileRecoveryReadiness?: Promise<VoiceProductionReadinessCheck>;
     proofPackContext?: ReturnType<typeof createVoiceProofPackBuildContext>;
@@ -10325,6 +10347,8 @@ const productionReadinessOptions = (
         buildRealCallProfileReadinessCheck()),
       await (input.realCallEvidenceRuntimeReadiness ??
         buildRealCallEvidenceRuntimeReadinessCheck()),
+      await (input.realCallEvidenceRuntimeWorkerReadiness ??
+        buildRealCallEvidenceRuntimeWorkerReadinessCheck()),
       await (input.realCallProfileRecoveryReadiness ??
         buildVoiceRealCallProfileRecoveryJobHistoryCheck(
           realCallProfileRecoveryJobStore,
