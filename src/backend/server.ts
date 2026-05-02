@@ -78,6 +78,8 @@ import {
   buildVoiceOpsRecoveryReport,
   buildVoiceObservabilityExport,
   buildVoiceObservabilityExportReplayReport,
+  createVoiceIncidentTimelineRoutes,
+  buildVoiceOperationalStatusReport,
   createVoiceOperationalStatusRoutes,
   createVoiceObservabilityExportSchema,
   buildVoiceProofPackInput,
@@ -9040,6 +9042,26 @@ const opsRecoveryOptions = () => ({
 const buildDemoOpsRecoveryReport = () =>
   buildVoiceOpsRecoveryReport(opsRecoveryOptions());
 
+const buildDemoIncidentTimelineOperationsRecord = () =>
+  buildVoiceOperationsRecord({
+    audit: runtimeStorage.audit,
+    integrationEvents: runtimeStorage.events,
+    redact: voiceSupportArtifactRedaction,
+    reviews: runtimeStorage.reviews as unknown as VoiceCallReviewStore,
+    sessionId: demoIncidentSessionId,
+    store: deliveryTraceStore,
+    tasks: runtimeStorage.tasks as unknown as VoiceOpsTaskStore,
+  });
+
+const buildDemoIncidentTimelineFailureReplay = async () => {
+  const record = await buildDemoIncidentTimelineOperationsRecord();
+
+  return buildVoiceFailureReplay(record, {
+    operationsRecordHref: ({ sessionId }) =>
+      `/voice-operations/${encodeURIComponent(sessionId)}`,
+  });
+};
+
 const buildProductionReadinessOpsRecoveryReport = () =>
   buildVoiceOpsRecoveryReport({
     ...opsRecoveryOptions(),
@@ -12344,6 +12366,48 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
         ),
       proofPack: () => readLatestDemoVoiceProofPack.getStatus(),
       title: "AbsoluteJS Voice Demo Operational Status",
+    }),
+  )
+  .use(
+    createVoiceIncidentTimelineRoutes({
+      failureReplays: async () => [await buildDemoIncidentTimelineFailureReplay()],
+      links: {
+        callDebugger: (sessionId) =>
+          `/voice-call-debugger/${encodeURIComponent(sessionId)}`,
+        deliveryRuntime: "/delivery-runtime",
+        failureReplay: (sessionId) =>
+          `/voice-operations/${encodeURIComponent(sessionId)}/failure-replay`,
+        operationalStatus: "/voice/operational-status",
+        operationsRecords: (sessionId) =>
+          `/voice-operations/${encodeURIComponent(sessionId)}`,
+        productionReadiness: "/production-readiness",
+        proofPack: "/voice/proof-pack",
+        supportBundle: (sessionId) =>
+          `/voice-incidents/${encodeURIComponent(sessionId)}/markdown`,
+      },
+      operationalStatus: () =>
+        buildVoiceOperationalStatusReport({
+          deliveryRuntime: deliveryRuntimeControl,
+          links: {
+            deliveryRuntime: "/delivery-runtime",
+            productionReadiness: "/production-readiness",
+            proofPack: "/voice/proof-pack",
+          },
+          productionReadiness: () =>
+            buildVoiceProductionReadinessReport(
+              productionReadinessOptions({
+                fast: true,
+                includeObservabilityExport: false,
+                refresh: false,
+              }),
+            ),
+          proofPack: () => readLatestDemoVoiceProofPack.getStatus(),
+        }),
+      operationsRecords: async () => [
+        await buildDemoIncidentTimelineOperationsRecord(),
+      ],
+      opsRecovery: buildDemoOpsRecoveryReport,
+      title: "AbsoluteJS Voice Demo Incident Timeline",
     }),
   )
   .use(
