@@ -422,6 +422,36 @@ const proofTargets: ProofTarget[] = [
   },
   {
     kind: "json",
+    name: "sessionObservability",
+    path: "/api/voice/session-observability/demo-incident-bundle",
+  },
+  {
+    accept: "text/html,text/plain,*/*",
+    kind: "text",
+    name: "sessionObservabilityPage",
+    path: "/voice-observability/demo-incident-bundle",
+    requiredText: [
+      "Session Observability",
+      "Turn Waterfalls",
+      "Open operations record",
+      "Download incident Markdown",
+      "Open trace timeline",
+    ],
+  },
+  {
+    accept: "text/markdown,text/plain,*/*",
+    kind: "text",
+    name: "sessionObservabilityIncidentMarkdown",
+    path: "/voice-observability/demo-incident-bundle/incident.md",
+    requiredText: [
+      "Voice session observability",
+      "demo-incident-bundle",
+      "Provider recovery",
+      "Turn Waterfalls",
+    ],
+  },
+  {
+    kind: "json",
     name: "postCallAnalysis",
     path: "/api/voice/post-call-analysis",
   },
@@ -723,7 +753,10 @@ const proofTargets: ProofTarget[] = [
     kind: "text",
     name: "proofTrendsMarkdown",
     path: "/voice/proof-trends.md",
-    requiredText: ["AbsoluteJS Voice Sustained Proof Trends", "Runtime channel"],
+    requiredText: [
+      "AbsoluteJS Voice Sustained Proof Trends",
+      "Runtime channel",
+    ],
   },
   {
     kind: "json",
@@ -861,6 +894,7 @@ const proofTargets: ProofTarget[] = [
       "Web voice assistant",
       "Post-call analysis",
       "Guardrails",
+      "session-observability",
       "Logs export / SIEM / warehouse",
     ],
   },
@@ -883,11 +917,7 @@ const proofTargets: ProofTarget[] = [
     kind: "text",
     name: "providerDecisionsMarkdown",
     path: "/voice/provider-decisions.md",
-    requiredText: [
-      "Voice Provider Decision Traces",
-      "live-call",
-      "Degraded:",
-    ],
+    requiredText: ["Voice Provider Decision Traces", "live-call", "Degraded:"],
   },
   {
     kind: "json",
@@ -1215,12 +1245,15 @@ const vapiCoverageSurfaces: VapiCoverageSurface[] = [
     evidence: [
       "operationsRecord",
       "operationsRecordPage",
+      "sessionObservability",
+      "sessionObservabilityPage",
+      "sessionObservabilityIncidentMarkdown",
       "incidentMarkdown",
       "incidentBundleMarkdown",
       "opsRecovery",
     ],
     replacement:
-      "Operations records, incident handoff markdown, and recovery evidence.",
+      "Operations records, per-session turn waterfalls, incident handoff markdown, and recovery evidence.",
     surface: "Call logs and incident handoff",
   },
   {
@@ -1332,7 +1365,9 @@ const buildVapiCoverage = (results: AnyProofResult[]): VapiCoverageResult[] => {
         method: isHttpProofResult(result) ? result.method : "POST",
         name: result.name,
         ok: result.ok,
-        path: isHttpProofResult(result) ? result.path : result.command.join(" "),
+        path: isHttpProofResult(result)
+          ? result.path
+          : result.command.join(" "),
         status: result.status,
         url: isHttpProofResult(result) ? result.url : `command:${result.name}`,
       })),
@@ -1581,9 +1616,7 @@ const runTargets = (targets: ProofTarget[], targetConcurrency = concurrency) =>
   });
 
 const seedResults = await runTargets(parallelSeedTargets);
-seedResults.push(
-  ...(await runTargets(orderedSeedTargets, 1)),
-);
+seedResults.push(...(await runTargets(orderedSeedTargets, 1)));
 const proofResults = await runTargets(proofTargets);
 const commandResults = await runVoiceCommandProofTargets(commandProofTargets, {
   execute: async (target) => {
@@ -1867,8 +1900,10 @@ const browserCallProfileEvidenceAssertion: JsonAssertionResult =
         kind: "json-assertion",
         name: "browserCallProfileEvidence",
         ok: browserCallProfileEvidenceReport?.ok === true,
-        summary:
-          browserCallProfileEvidenceReport as unknown as Record<string, unknown>,
+        summary: browserCallProfileEvidenceReport as unknown as Record<
+          string,
+          unknown
+        >,
       }
     : {
         kind: "json-assertion",
@@ -1884,11 +1919,10 @@ const productionReadinessGateExplanationAssertion: JsonAssertionResult = {
   kind: "json-assertion",
   name: "productionReadinessGateExplanations",
   ok: productionReadinessGateExplanationReport.ok,
-  summary:
-    productionReadinessGateExplanationReport as unknown as Record<
-      string,
-      unknown
-    >,
+  summary: productionReadinessGateExplanationReport as unknown as Record<
+    string,
+    unknown
+  >,
 };
 const campaignReadinessReport = proofResults.find(
   (result) => result.name === "campaignReadiness",
@@ -2032,7 +2066,10 @@ const phoneAssistantEvidenceAssertion: JsonAssertionResult = phoneSetupReport
       kind: "json-assertion",
       name: "phoneAssistantEvidence",
       ok: phoneAssistantEvidenceReport?.ok === true,
-      summary: phoneAssistantEvidenceReport as unknown as Record<string, unknown>,
+      summary: phoneAssistantEvidenceReport as unknown as Record<
+        string,
+        unknown
+      >,
     }
   : {
       kind: "json-assertion",
@@ -2050,22 +2087,18 @@ const phoneCallControlSmokeReports = [
 ]
   .map(
     (name) =>
-      proofResults.find((result) => result.name === name)
-        ?.body as VoicePhoneAgentProductionSmokeReport | undefined,
+      proofResults.find((result) => result.name === name)?.body as
+        | VoicePhoneAgentProductionSmokeReport
+        | undefined,
   )
-  .filter(
-    (report): report is VoicePhoneAgentProductionSmokeReport => Boolean(report),
+  .filter((report): report is VoicePhoneAgentProductionSmokeReport =>
+    Boolean(report),
   );
 const phoneCallControlEvidenceReport = evaluateVoicePhoneCallControlEvidence({
   maxFailedSmokeReports: 0,
   minPassingSmokeReports: 4,
   productionSmokes: phoneCallControlSmokeReports,
-  requiredLifecycleStages: [
-    "completed",
-    "no-answer",
-    "transfer",
-    "voicemail",
-  ],
+  requiredLifecycleStages: ["completed", "no-answer", "transfer", "voicemail"],
   requiredOutcomes: ["completed", "no-answer", "transfer", "voicemail"],
   requiredProviders: ["twilio"],
   setup: phoneSetupReport,
@@ -2131,7 +2164,8 @@ const telephonyWebhookVerificationEvidenceReport =
     minReplayRejectedVerificationAttempts: 2,
     requiredReplayRejectedVerificationProviders: ["plivo", "telnyx"],
     requiredRejectedVerificationProviders: ["plivo", "telnyx", "twilio"],
-    verificationAttempts: telephonyWebhookVerificationProofReport?.attempts ?? [],
+    verificationAttempts:
+      telephonyWebhookVerificationProofReport?.attempts ?? [],
   });
 const telephonyWebhookVerificationEvidenceAssertion: JsonAssertionResult =
   createVoiceEvidenceAssertion({
@@ -2273,8 +2307,10 @@ const outcomeContractEvidenceAssertion: JsonAssertionResult =
         kind: "json-assertion",
         name: "outcomeContractEvidence",
         ok: outcomeContractEvidenceReport?.ok === true,
-        summary:
-          outcomeContractEvidenceReport as unknown as Record<string, unknown>,
+        summary: outcomeContractEvidenceReport as unknown as Record<
+          string,
+          unknown
+        >,
       }
     : {
         kind: "json-assertion",
@@ -2293,7 +2329,13 @@ const simulationSuiteEvidenceReport = simulationSuiteReport
       maxFailed: 0,
       minPassed: 5,
       minSections: 5,
-      requiredSections: ["fixtures", "outcomes", "scenarios", "sessions", "tools"],
+      requiredSections: [
+        "fixtures",
+        "outcomes",
+        "scenarios",
+        "sessions",
+        "tools",
+      ],
       sectionMinimums: {
         fixtures: 1,
         outcomes: 5,
@@ -2309,8 +2351,10 @@ const simulationSuiteEvidenceAssertion: JsonAssertionResult =
         kind: "json-assertion",
         name: "simulationSuiteEvidence",
         ok: simulationSuiteEvidenceReport?.ok === true,
-        summary:
-          simulationSuiteEvidenceReport as unknown as Record<string, unknown>,
+        summary: simulationSuiteEvidenceReport as unknown as Record<
+          string,
+          unknown
+        >,
       }
     : {
         kind: "json-assertion",
@@ -2344,15 +2388,19 @@ const observabilityExportDeliveryAssertion: JsonAssertionResult =
         kind: "json-assertion",
         name: "observabilityExportDeliveryEvidence",
         ok: observabilityExportDeliveryReport?.ok === true,
-        summary:
-          observabilityExportDeliveryReport as unknown as Record<string, unknown>,
+        summary: observabilityExportDeliveryReport as unknown as Record<
+          string,
+          unknown
+        >,
       }
     : {
         kind: "json-assertion",
         name: "observabilityExportDeliveryEvidence",
         ok: false,
         summary: {
-          issues: ["Missing observabilityExportDeliveryHistory proof result body."],
+          issues: [
+            "Missing observabilityExportDeliveryHistory proof result body.",
+          ],
         },
       };
 const observabilityExportReplay = proofResults.find(
@@ -2375,8 +2423,10 @@ const observabilityExportReplayAssertion: JsonAssertionResult =
         kind: "json-assertion",
         name: "observabilityExportReplayEvidence",
         ok: observabilityExportReplayReport?.ok === true,
-        summary:
-          observabilityExportReplayReport as unknown as Record<string, unknown>,
+        summary: observabilityExportReplayReport as unknown as Record<
+          string,
+          unknown
+        >,
       }
     : {
         kind: "json-assertion",
@@ -2459,7 +2509,12 @@ const proofTrendRecommendationIssues = [
     ? "Expected at least four benchmark-profile recommendations."
     : undefined,
   proofTrendRecommendationReport &&
-  !["meeting-recorder", "support-agent", "appointment-scheduler", "noisy-phone-call"].every(
+  ![
+    "meeting-recorder",
+    "support-agent",
+    "appointment-scheduler",
+    "noisy-phone-call",
+  ].every(
     (profileId) =>
       proofTrendRecommendationReport.profiles?.some(
         (profile) => profile.id === profileId && profile.status === "pass",
@@ -2508,11 +2563,10 @@ const providerContractMatrixEvidenceAssertion: JsonAssertionResult =
         kind: "json-assertion",
         name: "providerContractMatrixEvidence",
         ok: providerContractMatrixEvidenceReport?.ok === true,
-        summary:
-          providerContractMatrixEvidenceReport as unknown as Record<
-            string,
-            unknown
-          >,
+        summary: providerContractMatrixEvidenceReport as unknown as Record<
+          string,
+          unknown
+        >,
       }
     : {
         kind: "json-assertion",
@@ -2522,8 +2576,9 @@ const providerContractMatrixEvidenceAssertion: JsonAssertionResult =
           issues: ["Missing providerContracts proof result body."],
         },
       };
-const providerStackReport = productionReadinessReport?.summary
-  .providerStack as VoiceProviderStackCapabilityGapReport | undefined;
+const providerStackReport = productionReadinessReport?.summary.providerStack as
+  | VoiceProviderStackCapabilityGapReport
+  | undefined;
 const providerStackEvidenceReport = providerStackReport
   ? evaluateVoiceProviderStackEvidence(providerStackReport, {
       maxMissing: 0,
@@ -2542,7 +2597,10 @@ const providerStackEvidenceAssertion: JsonAssertionResult = providerStackReport
       kind: "json-assertion",
       name: "providerStackEvidence",
       ok: providerStackEvidenceReport?.ok === true,
-      summary: providerStackEvidenceReport as unknown as Record<string, unknown>,
+      summary: providerStackEvidenceReport as unknown as Record<
+        string,
+        unknown
+      >,
     }
   : {
       kind: "json-assertion",
@@ -2553,7 +2611,8 @@ const providerStackEvidenceAssertion: JsonAssertionResult = providerStackReport
       },
     };
 const providerRoutingContractReports = [
-  proofResults.find((result) => result.name === "providerRoutingContract")?.body,
+  proofResults.find((result) => result.name === "providerRoutingContract")
+    ?.body,
   proofResults.find((result) => result.name === "sttProviderRoutingContract")
     ?.body,
   proofResults.find((result) => result.name === "ttsProviderRoutingContract")
@@ -2607,8 +2666,10 @@ const agentSquadContractEvidenceAssertion: JsonAssertionResult =
         kind: "json-assertion",
         name: "agentSquadContractEvidence",
         ok: agentSquadContractEvidenceReport.ok,
-        summary:
-          agentSquadContractEvidenceReport as unknown as Record<string, unknown>,
+        summary: agentSquadContractEvidenceReport as unknown as Record<
+          string,
+          unknown
+        >,
       }
     : {
         kind: "json-assertion",
@@ -2720,8 +2781,10 @@ const realtimeChannelEvidenceAssertion: JsonAssertionResult = realtimeChannel
       kind: "json-assertion",
       name: "realtimeChannelEvidence",
       ok: realtimeChannelEvidenceReport?.ok === true,
-      summary:
-        realtimeChannelEvidenceReport as unknown as Record<string, unknown>,
+      summary: realtimeChannelEvidenceReport as unknown as Record<
+        string,
+        unknown
+      >,
     }
   : {
       kind: "json-assertion",
@@ -2802,11 +2865,10 @@ const realtimeProviderContractEvidenceAssertion: JsonAssertionResult =
         kind: "json-assertion",
         name: "realtimeProviderContractEvidence",
         ok: realtimeProviderContractEvidenceReport?.ok === true,
-        summary:
-          realtimeProviderContractEvidenceReport as unknown as Record<
-            string,
-            unknown
-          >,
+        summary: realtimeProviderContractEvidenceReport as unknown as Record<
+          string,
+          unknown
+        >,
       }
     : {
         kind: "json-assertion",

@@ -55,6 +55,7 @@ import {
   createVoiceBrowserCallProfileRoutes,
   evaluateVoiceBrowserCallProfileEvidence,
   buildVoiceCallDebuggerReport,
+  buildVoiceSessionObservabilityReport,
   createVoiceCallDebuggerRoutes,
   createVoiceRealtimeChannelRoutes,
   createVoiceMediaPipelineRoutes,
@@ -256,6 +257,7 @@ import {
   type VoiceTurnRecord,
   type VoiceSessionRecord,
   type VoiceSessionSnapshot,
+  type VoiceSessionObservabilityReport,
   type VoiceSessionSnapshotInput,
   type VoiceObservabilityExportArtifact,
   type VoiceObservabilityExportArtifactIndex,
@@ -3883,12 +3885,12 @@ const vapiMigrationItems = [
   },
   {
     absolute:
-      "One self-hosted operations record linking transcript, replay, provider choices, tools, handoffs, reviews, tasks, audit, and delivery attempts.",
+      "One self-hosted operations record and session-observability page linking transcript, turn waterfalls, replay, provider choices, tools, handoffs, reviews, tasks, audit, and delivery attempts.",
     coverageSurface: "Call logs and incident handoff",
     concept: "Call logs",
-    proofHref: "/voice-operations/demo-incident-bundle",
-    proofLabel: "Open operations record",
-    statusHref: "/api/voice-operations/demo-incident-bundle",
+    proofHref: "/voice-observability/demo-incident-bundle",
+    proofLabel: "Open session observability",
+    statusHref: "/api/voice/session-observability/demo-incident-bundle",
   },
   {
     absolute:
@@ -7893,6 +7895,7 @@ const buildHealthyDemoVoiceSupportBundle = async (
   } = {},
 ): Promise<{
   callDebuggerReport: VoiceCallDebuggerReport;
+  sessionObservabilityReport: VoiceSessionObservabilityReport;
   sessionSnapshot: VoiceSessionSnapshot;
   sessionId: string;
 }> => {
@@ -7970,9 +7973,33 @@ const buildHealthyDemoVoiceSupportBundle = async (
           ? "warning"
           : "healthy",
   };
+  const sessionObservabilityReport = context
+    ? await context.time("supportBundle:sessionObservability", () =>
+        buildVoiceSessionObservabilityReport({
+          audit: input.proofSnapshot?.auditStore,
+          callDebuggerHref: "/voice-call-debugger/:sessionId",
+          incidentMarkdownHref: "/voice-observability/:sessionId/incident.md",
+          operationsRecordHref: "/voice-operations/:sessionId",
+          redact: voiceSupportArtifactRedaction,
+          sessionId,
+          store: supportTraceStore,
+          traceTimelineHref: "/traces/:sessionId",
+        }),
+      )
+    : await buildVoiceSessionObservabilityReport({
+        audit: input.proofSnapshot?.auditStore,
+        callDebuggerHref: "/voice-call-debugger/:sessionId",
+        incidentMarkdownHref: "/voice-observability/:sessionId/incident.md",
+        operationsRecordHref: "/voice-operations/:sessionId",
+        redact: voiceSupportArtifactRedaction,
+        sessionId,
+        store: supportTraceStore,
+        traceTimelineHref: "/traces/:sessionId",
+      });
 
   return {
     callDebuggerReport,
+    sessionObservabilityReport,
     sessionId,
     sessionSnapshot,
   };
@@ -9974,6 +10001,7 @@ const buildDemoVoiceProofPack = async (input: {
 
       return {
         callDebuggerReports: [bundle.callDebuggerReport],
+        sessionObservabilityReports: [bundle.sessionObservabilityReport],
         sessionSnapshots: [bundle.sessionSnapshot],
       };
     },
@@ -9984,12 +10012,15 @@ const buildDemoVoiceProofPack = async (input: {
   const operationsRecord = proofPackInput.operationsRecords?.[0];
   const sessionSnapshot = proofPackInput.sessionSnapshots?.[0];
   const callDebuggerReport = proofPackInput.callDebuggerReports?.[0];
+  const sessionObservabilityReport =
+    proofPackInput.sessionObservabilityReports?.[0];
   if (
     !productionReadiness ||
     !providerSlo ||
     !operationsRecord ||
     !sessionSnapshot ||
-    !callDebuggerReport
+    !callDebuggerReport ||
+    !sessionObservabilityReport
   ) {
     throw new Error("Proof-pack input builder did not produce required proof.");
   }
@@ -10035,6 +10066,23 @@ const buildDemoVoiceProofPack = async (input: {
           status: "healthy" as const,
         }
       : callDebuggerReport;
+  const normalizedSessionObservabilityReport =
+    sessionObservabilityReport.status !== "failed" &&
+    normalizedOperationsRecord.status === "healthy"
+      ? {
+          ...sessionObservabilityReport,
+          record: normalizedOperationsRecord,
+          status: "healthy" as const,
+          summary: {
+            ...sessionObservabilityReport.summary,
+            errors: normalizedOperationsRecord.summary.errorCount,
+            fallbacks:
+              normalizedOperationsRecord.providerDecisionSummary.fallbacks,
+            providerRecoveryStatus:
+              normalizedOperationsRecord.providerDecisionSummary.recoveryStatus,
+          },
+        }
+      : sessionObservabilityReport;
 
   return context.time("writeProofPack", () =>
     writeVoiceProofPack(
@@ -10071,6 +10119,7 @@ const buildDemoVoiceProofPack = async (input: {
             title: "Proof refresh",
           },
         ],
+        sessionObservabilityReports: [normalizedSessionObservabilityReport],
         sessionSnapshots: [normalizedSessionSnapshot],
       },
       {
