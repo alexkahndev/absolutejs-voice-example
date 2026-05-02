@@ -76,6 +76,7 @@ import {
   createDemoLiveTurnLatencyEvidence,
   createDemoMicrophone,
   fetchAgentSquadDemoStatus,
+  fetchVoiceRealCallEvidenceWorkerHealth,
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
@@ -84,6 +85,7 @@ import {
   mountVoiceLiveOpsPanel,
   pushVoiceWaveLevel,
   renderDemoLiveTurnLatencyHTML,
+  renderVoiceRealCallEvidenceWorkerHealthHTML,
 } from "../../shared/browser";
 
 type VueVoiceDemoProps = {
@@ -168,6 +170,29 @@ const profileSwitchHTML = ref(
     profileSwitchWidgetOptions,
   ),
 );
+const realCallWorkerDescription =
+  "Vue renders whether rolling real-call evidence is automatic or manual, backed by the same worker health route used by readiness.";
+const realCallWorkerHTML = ref(
+  renderVoiceRealCallEvidenceWorkerHealthHTML(null, {
+    description: realCallWorkerDescription,
+  }),
+);
+const refreshRealCallWorkerHealth = async () => {
+  try {
+    realCallWorkerHTML.value = renderVoiceRealCallEvidenceWorkerHealthHTML(
+      await fetchVoiceRealCallEvidenceWorkerHealth(),
+      { description: realCallWorkerDescription },
+    );
+  } catch (error) {
+    realCallWorkerHTML.value = renderVoiceRealCallEvidenceWorkerHealthHTML(
+      null,
+      {
+        description: realCallWorkerDescription,
+        error: formatErrorMessage(error),
+      },
+    );
+  }
+};
 type CampaignDialerProofSnapshot = {
   error: string | null;
   isLoading: boolean;
@@ -245,6 +270,7 @@ const liveOpsPanelEl = ref<HTMLElement | null>(null);
 const liveLatencyHTML = ref("");
 let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
+let realCallWorkerTimer: ReturnType<typeof setInterval> | null = null;
 let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
 let opsActionHistory: ReturnType<typeof mountVoiceOpsActionHistory> | null =
   null;
@@ -469,6 +495,7 @@ onMounted(() => {
     );
   });
   void profileSwitchRecommendation.refresh().catch(() => {});
+  void refreshRealCallWorkerHealth();
   if (bargeInProofEl.value) {
     bargeInProof = mountDemoBargeInProof(bargeInProofEl.value);
   }
@@ -518,6 +545,9 @@ onMounted(() => {
     void refreshIntakes();
     void refreshAgentSquadStatus();
   }, 4_000);
+  realCallWorkerTimer = setInterval(() => {
+    void refreshRealCallWorkerHealth();
+  }, 10_000);
   void refreshAgentSquadStatus();
 });
 
@@ -532,6 +562,9 @@ onUnmounted(() => {
   }
   if (refreshTimer) {
     clearInterval(refreshTimer);
+  }
+  if (realCallWorkerTimer) {
+    clearInterval(realCallWorkerTimer);
   }
   bargeInProof?.close();
   opsActionHistory?.close();
@@ -725,6 +758,11 @@ onUnmounted(() => {
             </a>
           </div>
         </article>
+
+        <div
+          class="voice-card voice-provider-health-card"
+          v-html="realCallWorkerHTML"
+        ></div>
 
         <VoicePlatformCoverage
           class="voice-card voice-provider-health-card"

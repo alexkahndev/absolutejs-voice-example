@@ -31,6 +31,7 @@ import {
   formatDateTime,
   formatReconnectState,
   mountDemoBargeInProof,
+  mountVoiceRealCallEvidenceWorkerHealth,
   mountVoiceLiveOpsPanel,
   pushVoiceWaveLevel,
   renderDemoLiveTurnLatencyHTML,
@@ -120,6 +121,7 @@ const voiceMonitorCopy = document.querySelector("#voice-monitor-copy");
 const voiceWaveGlow = document.querySelector("#voice-wave-glow");
 const voiceWavePath = document.querySelector("#voice-wave-path");
 const workflowStatusHost = document.querySelector("#workflow-status-card");
+const realCallWorkerHost = document.querySelector("#real-call-worker-card");
 const platformCoverageHost = document.querySelector("#platform-coverage-card");
 const proofTrendsHost = document.querySelector("#proof-trends-card");
 const profileComparisonHost = document.querySelector(
@@ -336,6 +338,13 @@ const turnQuality = mountVoiceTurnQuality(
   "/api/turn-quality",
   {
     intervalMs: 5_000,
+  },
+);
+const realCallWorkerHealth = mountVoiceRealCallEvidenceWorkerHealth(
+  realCallWorkerHost,
+  "/api/voice/real-call-evidence-runtime/worker",
+  {
+    description: `${framework.toUpperCase()} renders whether rolling real-call evidence is automatic or manual, backed by the same worker health route used by readiness.`,
   },
 );
 const renderPlatformCoverage = () => {
@@ -780,5 +789,6 @@ window.addEventListener("beforeunload", () => {
   providerStatus.close();
   routingStatus.close();
   turnQuality.close();
+  realCallWorkerHealth.close();
   bargeInProof.close();
 });

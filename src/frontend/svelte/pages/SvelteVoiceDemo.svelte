@@ -81,6 +81,7 @@
     createDemoLiveTurnLatencyEvidence,
     createDemoMicrophone,
     fetchAgentSquadDemoStatus,
+    fetchVoiceRealCallEvidenceWorkerHealth,
     fetchSavedIntakes,
     formatErrorMessage,
     formatDateTime,
@@ -89,6 +90,7 @@
     mountVoiceLiveOpsPanel,
     pushVoiceWaveLevel,
     renderDemoLiveTurnLatencyHTML,
+    renderVoiceRealCallEvidenceWorkerHealthHTML,
   } from "../../shared/browser";
 
   const createInitialVoiceState = (): VoiceStreamState<SavedIntake> => ({
@@ -145,6 +147,7 @@
   let opsActionCenterHTML = $state("");
   let opsStatusHTML = $state("");
   let platformCoverageHTML = $state("");
+  let realCallWorkerHTML = $state("");
   let profileComparisonHTML = $state("");
   let reconnectEvidenceHTML = $state("");
   let profileSwitchHTML = $state("");
@@ -186,6 +189,7 @@
   let liveOpsPanel: ReturnType<typeof mountVoiceLiveOpsPanel> | null = null;
   let providerSimulationElement: HTMLElement | null = null;
   let refreshTimer: ReturnType<typeof setInterval> | null = null;
+  let realCallWorkerTimer: ReturnType<typeof setInterval> | null = null;
   let guidedVoice: VoiceStream<SavedIntake> | null = null;
   let generalVoice: VoiceStream<SavedIntake> | null = null;
   const opsStatus = createVoiceOpsStatus("/api/voice/ops-status", {
@@ -645,6 +649,24 @@
     }
   };
 
+  const refreshRealCallWorkerHealth = async () => {
+    try {
+      realCallWorkerHTML = renderVoiceRealCallEvidenceWorkerHealthHTML(
+        await fetchVoiceRealCallEvidenceWorkerHealth(),
+        {
+          description:
+            "Svelte renders whether rolling real-call evidence is automatic or manual, backed by the same worker health route used by readiness.",
+        },
+      );
+    } catch (error) {
+      realCallWorkerHTML = renderVoiceRealCallEvidenceWorkerHealthHTML(null, {
+        description:
+          "Svelte renders whether rolling real-call evidence is automatic or manual, backed by the same worker health route used by readiness.",
+        error: formatErrorMessage(error),
+      });
+    }
+  };
+
   onMount(() => {
     connectVoices();
     const demoWindow = window as VoiceDemoWindow;
@@ -746,6 +768,10 @@
         title: "Vapi Replacement Coverage",
       },
     );
+    realCallWorkerHTML = renderVoiceRealCallEvidenceWorkerHealthHTML(null, {
+      description:
+        "Svelte renders whether rolling real-call evidence is automatic or manual, backed by the same worker health route used by readiness.",
+    });
     proofTrendsHTML = renderVoiceProofTrendsHTML(proofTrends.getSnapshot(), {
       description:
         "Svelte renders sustained proof freshness, provider p95, turn p95, and live p95 from the package proof-trends widget.",
@@ -780,6 +806,7 @@
     void opsStatus.refresh().catch(() => {});
     void deliveryRuntime.refresh().catch(() => {});
     void platformCoverage.refresh().catch(() => {});
+    void refreshRealCallWorkerHealth();
     void proofTrends.refresh().catch(() => {});
     void reconnectEvidence.refresh().catch(() => {});
     void profileSwitchRecommendation.refresh().catch(() => {});
@@ -848,6 +875,9 @@
       void refreshIntakes();
       void refreshAgentSquadStatus();
     }, 4000);
+    realCallWorkerTimer = setInterval(() => {
+      void refreshRealCallWorkerHealth();
+    }, 10_000);
   });
 
   onDestroy(() => {
@@ -865,6 +895,9 @@
     }
     if (refreshTimer) {
       clearInterval(refreshTimer);
+    }
+    if (realCallWorkerTimer) {
+      clearInterval(realCallWorkerTimer);
     }
     stopMic();
     unsubscribeGuided();
@@ -1064,6 +1097,10 @@
           {/each}
         </div>
       </article>
+
+      <div class="voice-card voice-provider-health-card">
+        {@html realCallWorkerHTML}
+      </div>
 
       <div class="voice-card voice-provider-health-card">
         {@html platformCoverageHTML}

@@ -14,6 +14,7 @@ import type {
   VoiceBargeInMonitor,
   VoiceBargeInReport,
   VoiceOpsStatusReport,
+  VoiceRealCallEvidenceRuntimeWorkerHealthReport,
   VoiceReconnectClientState,
   VoiceRoutingDecisionSummary,
   VoiceStreamState,
@@ -121,6 +122,130 @@ export const fetchBargeInReport = async () => {
   }
 
   return (await response.json()) as VoiceBargeInReport;
+};
+
+export const fetchVoiceRealCallEvidenceWorkerHealth = async (
+  path = "/api/voice/real-call-evidence-runtime/worker",
+) => {
+  const response = await fetch(path);
+
+  if (!response.ok) {
+    throw new Error(`Worker health request failed with ${response.status}`);
+  }
+
+  return (await response.json()) as VoiceRealCallEvidenceRuntimeWorkerHealthReport;
+};
+
+export const renderVoiceRealCallEvidenceWorkerHealthHTML = (
+  health: VoiceRealCallEvidenceRuntimeWorkerHealthReport | null,
+  options: {
+    description?: string;
+    error?: string | null;
+    title?: string;
+  } = {},
+) => {
+  const title = options.title ?? "Real-Call Evidence Collector";
+  const description =
+    options.description ??
+    "Shows whether rolling real-call evidence is being collected automatically or only when manually triggered.";
+
+  if (options.error) {
+    return `<span class="voice-framework-pill">${escapeHtml(title)}</span>
+<h2>Collector status unavailable</h2>
+<p class="voice-footnote">${escapeHtml(options.error)}</p>
+<p class="voice-footnote"><a href="/api/voice/real-call-evidence-runtime/worker">Open worker JSON</a></p>`;
+  }
+
+  if (!health) {
+    return `<span class="voice-framework-pill">${escapeHtml(title)}</span>
+<h2>Checking collector</h2>
+<p class="voice-footnote">${escapeHtml(description)}</p>`;
+  }
+
+  const mode = health.isRunning ? "Automatic" : "Manual";
+  const headline = health.isRunning
+    ? "Auto-collector running"
+    : "Manual evidence collection";
+  const lastCollected = health.lastCollectedAt
+    ? new Date(health.lastCollectedAt).toLocaleString("en-US", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })
+    : "Not collected yet";
+  const lastTick = health.lastTickAt
+    ? new Date(health.lastTickAt).toLocaleTimeString("en-US", {
+        timeStyle: "short",
+      })
+    : "No tick yet";
+
+  return `<span class="voice-framework-pill">${escapeHtml(title)}</span>
+<h2>${headline}</h2>
+<p class="voice-footnote">${escapeHtml(description)}</p>
+<div class="voice-provider-health-list">
+  <div class="voice-provider-health-item">
+    <strong>Mode</strong>
+    <span>${escapeHtml(mode)}</span>
+    <small>${health.isRunning ? "Continuous runtime evidence is enabled." : "Set VOICE_REAL_CALL_EVIDENCE_AUTOCOLLECT=1 to run continuously."}</small>
+  </div>
+  <div class="voice-provider-health-item">
+    <strong>Collections</strong>
+    <span>${String(health.collectCount)}</span>
+    <small>Last collected: ${escapeHtml(lastCollected)}</small>
+  </div>
+  <div class="voice-provider-health-item">
+    <strong>State</strong>
+    <span>${escapeHtml(health.status)}</span>
+    <small>Last tick: ${escapeHtml(lastTick)}</small>
+  </div>
+</div>
+${health.error ? `<p class="voice-footnote">${escapeHtml(health.error)}</p>` : ""}
+<p class="voice-footnote"><a href="/voice/real-call-evidence-runtime">Open evidence runtime</a> · <a href="/api/voice/real-call-evidence-runtime/worker">Worker JSON</a></p>`;
+};
+
+export const mountVoiceRealCallEvidenceWorkerHealth = (
+  element: Element | null,
+  path = "/api/voice/real-call-evidence-runtime/worker",
+  options: {
+    description?: string;
+    intervalMs?: number;
+    title?: string;
+  } = {},
+) => {
+  let closed = false;
+  let timer: number | undefined;
+
+  const render = async () => {
+    if (!(element instanceof HTMLElement) || closed) {
+      return;
+    }
+
+    try {
+      const health = await fetchVoiceRealCallEvidenceWorkerHealth(path);
+      element.innerHTML = renderVoiceRealCallEvidenceWorkerHealthHTML(health, {
+        description: options.description,
+        title: options.title,
+      });
+    } catch (error) {
+      element.innerHTML = renderVoiceRealCallEvidenceWorkerHealthHTML(null, {
+        description: options.description,
+        error: formatErrorMessage(error),
+        title: options.title,
+      });
+    }
+  };
+
+  void render();
+  timer = window.setInterval(render, options.intervalMs ?? 10_000);
+
+  return {
+    close: () => {
+      closed = true;
+      if (timer !== undefined) {
+        window.clearInterval(timer);
+      }
+    },
+    refresh: render,
+  };
 };
 
 export const getOpsStatusLabel = (report?: VoiceOpsStatusReport | null) => {

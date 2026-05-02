@@ -84,6 +84,7 @@ import {
   createDemoMicrophone,
   fetchAgentSquadDemoStatus,
   fetchBargeInReport,
+  fetchVoiceRealCallEvidenceWorkerHealth,
   fetchSavedIntakes,
   getOpsStatusLabel,
   formatErrorMessage,
@@ -92,6 +93,7 @@ import {
   postVoiceLiveOpsAction,
   renderDemoBargeInProofHTML,
   renderDemoLiveTurnLatencyHTML,
+  renderVoiceRealCallEvidenceWorkerHealthHTML,
   renderVoiceLiveOpsResultHTML,
   pushVoiceWaveLevel,
   VOICE_LIVE_OPS_ACTIONS,
@@ -297,6 +299,11 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
               }
             </div>
           </article>
+
+          <article
+            class="voice-card voice-provider-health-card"
+            [innerHTML]="realCallWorkerHtml()"
+          ></article>
 
           <article class="voice-card voice-provider-health-card">
             <span class="voice-framework-pill">Vapi Replacement Coverage</span>
@@ -1510,6 +1517,12 @@ export class AngularVoiceDemoComponent {
   liveOpsResult = signal<VoiceLiveOpsActionResult | null>(null);
   liveOpsRunning = signal(false);
   liveOpsTag = signal("needs-review");
+  realCallWorkerHtml = signal(
+    renderVoiceRealCallEvidenceWorkerHealthHTML(null, {
+      description:
+        "Angular renders whether rolling real-call evidence is automatic or manual, backed by the same worker health route used by readiness.",
+    }),
+  );
   savedIntakes = signal<SavedIntake[]>([]);
   generalLabel = VOICE_DEMO_GENERAL_LABEL;
   guidedLabel = VOICE_DEMO_GUIDED_LABEL;
@@ -1781,6 +1794,7 @@ export class AngularVoiceDemoComponent {
   private microphone: ReturnType<typeof createDemoMicrophone> | null = null;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
   private bargeInProofTimer: ReturnType<typeof setInterval> | null = null;
+  private realCallWorkerTimer: ReturnType<typeof setInterval> | null = null;
   private simulateDisconnect = () => {
     this.currentVoice().simulateDisconnect();
   };
@@ -1808,6 +1822,10 @@ export class AngularVoiceDemoComponent {
       this.bargeInProofTimer = setInterval(() => {
         void this.refreshBargeInProof();
       }, 3_000);
+      void this.refreshRealCallWorkerHealth();
+      this.realCallWorkerTimer = setInterval(() => {
+        void this.refreshRealCallWorkerHealth();
+      }, 10_000);
       void this.refreshIntakes();
       this.refreshTimer = setInterval(() => {
         void this.refreshIntakes();
@@ -1831,6 +1849,28 @@ export class AngularVoiceDemoComponent {
         this.currentVoice().sessionId() || undefined,
       ),
     );
+  }
+
+  async refreshRealCallWorkerHealth() {
+    try {
+      this.realCallWorkerHtml.set(
+        renderVoiceRealCallEvidenceWorkerHealthHTML(
+          await fetchVoiceRealCallEvidenceWorkerHealth(),
+          {
+            description:
+              "Angular renders whether rolling real-call evidence is automatic or manual, backed by the same worker health route used by readiness.",
+          },
+        ),
+      );
+    } catch (error) {
+      this.realCallWorkerHtml.set(
+        renderVoiceRealCallEvidenceWorkerHealthHTML(null, {
+          description:
+            "Angular renders whether rolling real-call evidence is automatic or manual, backed by the same worker health route used by readiness.",
+          error: formatErrorMessage(error),
+        }),
+      );
+    }
   }
 
   downloadSessionSnapshot() {
@@ -2057,6 +2097,9 @@ export class AngularVoiceDemoComponent {
     }
     if (this.bargeInProofTimer) {
       clearInterval(this.bargeInProofTimer);
+    }
+    if (this.realCallWorkerTimer) {
+      clearInterval(this.realCallWorkerTimer);
     }
     this.stopMic();
     this.guidedVoice.close();

@@ -35,6 +35,7 @@ import {
   createDemoLiveTurnLatencyEvidence,
   createDemoMicrophone,
   fetchAgentSquadDemoStatus,
+  fetchVoiceRealCallEvidenceWorkerHealth,
   fetchSavedIntakes,
   formatErrorMessage,
   formatDateTime,
@@ -43,6 +44,7 @@ import {
   mountVoiceLiveOpsPanel,
   pushVoiceWaveLevel,
   renderDemoLiveTurnLatencyHTML,
+  renderVoiceRealCallEvidenceWorkerHealthHTML,
 } from "../../shared/browser";
 import {
   FRAMEWORKS,
@@ -195,6 +197,12 @@ export const ReactVoiceDemo = ({
   const [savedIntakes, setSavedIntakes] = useState<SavedIntake[]>([]);
   const [agentSquadStatus, setAgentSquadStatus] =
     useState<VoiceAgentSquadDemoStatus | null>(null);
+  const [realCallWorkerHTML, setRealCallWorkerHTML] = useState(() =>
+    renderVoiceRealCallEvidenceWorkerHealthHTML(null, {
+      description:
+        "React renders whether rolling real-call evidence is automatic or manual, backed by the same worker health route used by readiness.",
+    }),
+  );
   const [waveLevels, setWaveLevels] = useState(createInitialVoiceWaveLevels);
   const [liveLatencyHTML, setLiveLatencyHTML] = useState(() =>
     renderDemoLiveTurnLatencyHTML(
@@ -245,6 +253,37 @@ export const ReactVoiceDemo = ({
 
     refresh();
     const intervalId = window.setInterval(refresh, 4_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  useEffect(() => {
+    const refresh = async () => {
+      try {
+        setRealCallWorkerHTML(
+          renderVoiceRealCallEvidenceWorkerHealthHTML(
+            await fetchVoiceRealCallEvidenceWorkerHealth(),
+            {
+              description:
+                "React renders whether rolling real-call evidence is automatic or manual, backed by the same worker health route used by readiness.",
+            },
+          ),
+        );
+      } catch (error) {
+        setRealCallWorkerHTML(
+          renderVoiceRealCallEvidenceWorkerHealthHTML(null, {
+            description:
+              "React renders whether rolling real-call evidence is automatic or manual, backed by the same worker health route used by readiness.",
+            error: formatErrorMessage(error),
+          }),
+        );
+      }
+    };
+
+    void refresh();
+    const intervalId = window.setInterval(refresh, 10_000);
 
     return () => {
       window.clearInterval(intervalId);
@@ -658,6 +697,11 @@ export const ReactVoiceDemo = ({
                 ))}
               </div>
             </article>
+
+            <article
+              className="voice-card voice-provider-health-card"
+              dangerouslySetInnerHTML={{ __html: realCallWorkerHTML }}
+            />
 
             <VoicePlatformCoverage
               className="voice-card voice-provider-health-card"
