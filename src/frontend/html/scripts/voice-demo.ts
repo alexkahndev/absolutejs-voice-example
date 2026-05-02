@@ -4,6 +4,7 @@ import {
   createVoicePlatformCoverageStore,
   mountVoiceProfileComparison,
   mountVoiceProfileSwitchRecommendation,
+  mountVoiceReconnectProfileEvidence,
   mountVoiceOpsStatus,
   mountVoiceProofTrends,
   mountVoiceProviderCapabilities,
@@ -30,7 +31,6 @@ import {
   formatDateTime,
   formatReconnectState,
   mountDemoBargeInProof,
-  mountDemoReconnectProfileEvidence,
   mountVoiceLiveOpsPanel,
   pushVoiceWaveLevel,
   renderDemoLiveTurnLatencyHTML,
@@ -260,7 +260,7 @@ const profileComparison = mountVoiceProfileComparison(
     title: "Profile + Reconnect Evidence",
   },
 );
-const reconnectEvidence = mountDemoReconnectProfileEvidence(
+const reconnectEvidence = mountVoiceReconnectProfileEvidence(
   reconnectEvidenceHost,
 );
 const profileSwitchRecommendation = mountVoiceProfileSwitchRecommendation(

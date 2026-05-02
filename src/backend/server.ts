@@ -73,6 +73,7 @@ import {
   buildVoiceRealCallProfileHistoryReport,
   buildVoiceRealCallProfileReadinessCheck,
   buildVoiceRealCallProfileRecoveryJobHistoryCheck,
+  buildVoiceReconnectProfileEvidenceSummary,
   createVoiceFileObservabilityExportDeliveryReceiptStore,
   buildVoiceCompetitiveCoverageReport,
   buildVoiceFailureReplay,
@@ -267,7 +268,6 @@ import {
   type VoiceProofTrendReport,
   type VoiceSloCalibrationSample,
   type VoiceProofTrendSummary,
-  type VoiceRealCallProfileEvidenceRecord,
   type VoiceBrowserCallProfileReport,
   type VoiceProductionReadinessCheck,
   type VoiceProductionReadinessTiming,
@@ -276,6 +276,7 @@ import {
   voiceGuardrailPolicyPresets,
   voiceTelephonyOutcomeToRouteResult,
 } from "@absolutejs/voice";
+import { renderVoiceReconnectProfileEvidenceHTML } from "@absolutejs/voice/client";
 import {
   buildMediaWebRTCStatsReport,
   createMediaFrame,
@@ -348,37 +349,6 @@ const escapeHtml = (value: string) =>
     .replaceAll("'", "&#39;");
 const stringifyForHtml = (value: unknown) =>
   escapeHtml(JSON.stringify(value, null, 2) ?? "");
-const formatDemoLatency = (value?: number) =>
-  typeof value === "number" && Number.isFinite(value)
-    ? `${Math.round(value)}ms`
-    : "n/a";
-const formatDemoCount = (value: number) =>
-  new Intl.NumberFormat("en-US").format(value);
-const formatDemoAge = (value?: string) => {
-  if (!value) {
-    return "No evidence";
-  }
-
-  const elapsedMs = Date.now() - Date.parse(value);
-  if (!Number.isFinite(elapsedMs) || elapsedMs < 0) {
-    return "Just now";
-  }
-
-  const minutes = Math.floor(elapsedMs / 60_000);
-  if (minutes < 1) {
-    return "Just now";
-  }
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) {
-    return `${hours}h ago`;
-  }
-
-  return `${Math.floor(hours / 24)}d ago`;
-};
 
 const createJsonHandoffDeliveryStore = <
   TDelivery extends StoredVoiceHandoffDelivery,
@@ -4312,110 +4282,37 @@ const readRealCallProfileHistory = async () => {
   };
 };
 
-type ReconnectProfileEvidenceSummary = {
-  evidence: VoiceRealCallProfileEvidenceRecord[];
-  generatedAt: string;
-  latest?: VoiceRealCallProfileEvidenceRecord;
-  ok: boolean;
-  profileId: string;
-  resumeLatencyP95Ms?: number;
-  sampleCount: number;
-  snapshotCount: number;
-  sourceHref: string;
-  status: "empty" | "fail" | "pass" | "warn";
-};
-
-const readReconnectProfileEvidenceSummary =
-  async (): Promise<ReconnectProfileEvidenceSummary> => {
-    const evidence = await realCallProfileEvidenceStore.list({
+const readReconnectProfileEvidenceSummary = async () =>
+  buildVoiceReconnectProfileEvidenceSummary(
+    await realCallProfileEvidenceStore.list({
       limit: 100,
       profileId: "reconnect-resume",
-    });
-    const latest = evidence[0];
-    const sampleCount = evidence.reduce(
-      (total, record) => total + (record.reconnect?.samples ?? 1),
-      0,
-    );
-    const snapshotCount = evidence.reduce(
-      (total, record) => total + (record.reconnect?.snapshotCount ?? 0),
-      0,
-    );
-    const resumeLatencyP95Ms =
-      evidence
-        .map((record) => record.reconnect?.resumeLatencyP95Ms)
-        .filter(
-          (value): value is number =>
-            typeof value === "number" && Number.isFinite(value),
-        )
-        .sort((a, b) => b - a)[0] ?? latest?.reconnect?.resumeLatencyP95Ms;
-    const failed = evidence.some(
-      (record) => record.ok === false || record.reconnect?.status === "fail",
-    );
-    const passed = evidence.some(
-      (record) =>
-        record.ok === true &&
-        record.reconnect?.resumed === true &&
-        record.reconnect?.reconnected === true,
-    );
-
-    return {
-      evidence,
-      generatedAt: new Date().toISOString(),
-      latest,
-      ok: passed && !failed,
-      profileId: "reconnect-resume",
-      resumeLatencyP95Ms,
-      sampleCount,
-      snapshotCount,
+    }),
+    {
       sourceHref: "/api/voice/real-call-profile-history",
-      status:
-        evidence.length === 0
-          ? "empty"
-          : failed
-            ? "fail"
-            : passed
-              ? "pass"
-              : "warn",
-    };
-  };
+    },
+  );
 
-const renderReconnectProfileEvidenceCardHTML = (
-  summary: ReconnectProfileEvidenceSummary,
-) => {
-  const latest = summary.latest;
-  const reconnect = latest?.reconnect;
-  const label =
-    summary.status === "pass"
-      ? "Reconnect evidence passing"
-      : summary.status === "warn"
-        ? "Reconnect evidence incomplete"
-        : summary.status === "fail"
-          ? "Reconnect evidence failing"
-          : "Waiting for reconnect evidence";
-  const detail =
-    latest?.profileDescription ??
-    "Run a reconnect smoke or use the demo disconnect hook to persist real browser reconnect evidence.";
-
-  return `<article class="voice-card voice-provider-health-card voice-reconnect-evidence-card voice-reconnect-evidence-card--${escapeHtml(summary.status)}" hx-get="/voice/reconnect-profile-evidence-card" hx-trigger="every 10s" hx-swap="outerHTML">
-  <header class="voice-barge-in-proof__header">
-    <span class="voice-framework-pill">Persisted Reconnect Evidence</span>
-    <strong>${escapeHtml(label)}</strong>
-  </header>
-  <p class="voice-footnote">${escapeHtml(detail)}</p>
-  <div class="voice-barge-in-proof__grid">
-    <div><span>Samples</span><strong>${escapeHtml(formatDemoCount(summary.sampleCount))}</strong></div>
-    <div><span>Snapshots</span><strong>${escapeHtml(formatDemoCount(summary.snapshotCount || reconnect?.snapshotCount || 0))}</strong></div>
-    <div><span>Resume p95</span><strong>${escapeHtml(formatDemoLatency(summary.resumeLatencyP95Ms ?? reconnect?.resumeLatencyP95Ms))}</strong></div>
-    <div><span>Last proof</span><strong>${escapeHtml(formatDemoAge(latest?.generatedAt ?? latest?.createdAt))}</strong></div>
-  </div>
-  ${
-    latest
-      ? `<p class="voice-footnote">Latest ${escapeHtml(latest.profileLabel ?? latest.profileId)} · ${escapeHtml(latest.sessionId)} · ${escapeHtml((latest.surfaces ?? []).join(", ") || "browser")}</p>`
-      : `<p class="voice-footnote">No persisted reconnect profile evidence yet.</p>`
-  }
-  <a href="/voice/reconnect-contract">Open reconnect contract</a> · <a href="/api/voice/real-call-profile-history">Open profile history JSON</a>
-</article>`;
-};
+const renderReconnectProfileEvidenceCardHTML = async () =>
+  renderVoiceReconnectProfileEvidenceHTML(
+    {
+      error: null,
+      isLoading: false,
+      report: await readReconnectProfileEvidenceSummary(),
+    },
+    {
+      description:
+        "Real browser reconnect/resume traces captured by the demo UI.",
+    },
+  )
+    .replace(
+      "<section ",
+      '<section hx-get="/voice/reconnect-profile-evidence-card" hx-trigger="every 10s" hx-swap="outerHTML" ',
+    )
+    .replace(
+      'class="absolute-voice-reconnect-evidence',
+      'class="voice-card voice-provider-health-card absolute-voice-reconnect-evidence',
+    );
 
 const seedDemoRealCallProfileHistory = async () => {
   const now = Date.now();
@@ -12269,16 +12166,11 @@ const server = new Elysia()
   .get(
     "/voice/reconnect-profile-evidence-card",
     async () =>
-      new Response(
-        renderReconnectProfileEvidenceCardHTML(
-          await readReconnectProfileEvidenceSummary(),
-        ),
-        {
-          headers: {
-            "content-type": "text/html; charset=utf-8",
-          },
+      new Response(await renderReconnectProfileEvidenceCardHTML(), {
+        headers: {
+          "content-type": "text/html; charset=utf-8",
         },
-      ),
+      }),
   )
   .get(
     "/voice/reconnect-contract",

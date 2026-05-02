@@ -10,6 +10,7 @@ import {
   VoiceOpsStatus,
   VoicePlatformCoverage,
   VoiceProfileComparison,
+  VoiceReconnectProfileEvidence,
   VoiceProfileSwitchRecommendation,
   VoiceProofTrends,
   VoiceProviderCapabilities,
@@ -39,7 +40,6 @@ import {
   formatDateTime,
   formatReconnectState,
   mountDemoBargeInProof,
-  mountDemoReconnectProfileEvidence,
   mountVoiceLiveOpsPanel,
   pushVoiceWaveLevel,
   renderDemoLiveTurnLatencyHTML,
@@ -145,7 +145,6 @@ export const ReactVoiceDemo = ({
   const opsActionHistoryRef = useRef<HTMLDivElement | null>(null);
   const liveOpsPanelRef = useRef<HTMLDivElement | null>(null);
   const bargeInProofRef = useRef<HTMLDivElement | null>(null);
-  const reconnectEvidenceRef = useRef<HTMLDivElement | null>(null);
   const bargeInRef = useRef<ReturnType<
     typeof createDemoBargeInEvidence
   > | null>(null);
@@ -280,16 +279,6 @@ export const ReactVoiceDemo = ({
 
     const proof = mountDemoBargeInProof(bargeInProofRef.current);
     return () => proof.close();
-  }, []);
-  useEffect(() => {
-    if (!reconnectEvidenceRef.current) {
-      return;
-    }
-
-    const evidence = mountDemoReconnectProfileEvidence(
-      reconnectEvidenceRef.current,
-    );
-    return () => evidence.close();
   }, []);
   useEffect(() => {
     if (!opsActionHistoryRef.current) {
@@ -695,7 +684,13 @@ export const ReactVoiceDemo = ({
               title="Profile + Reconnect Evidence"
             />
 
-            <div ref={reconnectEvidenceRef} />
+            <VoiceReconnectProfileEvidence
+              className="voice-card voice-provider-health-card"
+              description="React renders persisted real browser reconnect/resume traces from the package reconnect evidence primitive."
+              intervalMs={10_000}
+              path="/api/voice/reconnect-profile-evidence"
+              title="Persisted Reconnect Evidence"
+            />
 
             <VoiceProfileSwitchRecommendation
               className="voice-card voice-provider-health-card"

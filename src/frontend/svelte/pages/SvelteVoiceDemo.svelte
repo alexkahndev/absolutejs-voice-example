@@ -9,6 +9,7 @@
     createVoicePlatformCoverage,
     createVoiceProfileComparison,
     createVoiceProofTrends,
+    createVoiceReconnectProfileEvidence,
     createVoiceProviderCapabilities,
     createVoiceProviderContracts,
     createVoiceProviderSimulationControls,
@@ -27,6 +28,7 @@
     renderVoiceProfileComparisonHTML,
     renderVoiceProfileSwitchRecommendationHTML,
     renderVoiceProofTrendsHTML,
+    renderVoiceReconnectProfileEvidenceHTML,
     renderVoiceReadinessFailuresHTML,
     createVoiceOpsActionCenterActions,
     mountVoiceOpsActionHistory,
@@ -84,7 +86,6 @@
     formatDateTime,
     formatReconnectState,
     mountDemoBargeInProof,
-    mountDemoReconnectProfileEvidence,
     mountVoiceLiveOpsPanel,
     pushVoiceWaveLevel,
     renderDemoLiveTurnLatencyHTML,
@@ -145,6 +146,7 @@
   let opsStatusHTML = $state("");
   let platformCoverageHTML = $state("");
   let profileComparisonHTML = $state("");
+  let reconnectEvidenceHTML = $state("");
   let profileSwitchHTML = $state("");
   let proofTrendsHTML = $state("");
   let readinessFailuresHTML = $state("");
@@ -176,13 +178,9 @@
   let waveLevels = $state(createInitialVoiceWaveLevels());
   let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
   let bargeInProofElement: HTMLElement | null = null;
-  let reconnectEvidenceElement: HTMLElement | null = null;
   let opsActionHistoryElement: HTMLElement | null = null;
   let liveOpsPanelElement: HTMLElement | null = null;
   let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
-  let reconnectEvidence: ReturnType<
-    typeof mountDemoReconnectProfileEvidence
-  > | null = null;
   let opsActionHistory: ReturnType<typeof mountVoiceOpsActionHistory> | null =
     null;
   let liveOpsPanel: ReturnType<typeof mountVoiceLiveOpsPanel> | null = null;
@@ -227,6 +225,21 @@
   profileComparisonHTML = renderVoiceProfileComparisonHTML(
     profileComparison.getSnapshot(),
     profileComparisonWidgetOptions,
+  );
+  const reconnectEvidence = createVoiceReconnectProfileEvidence(
+    "/api/voice/reconnect-profile-evidence",
+    {
+      intervalMs: 10_000,
+    },
+  );
+  const reconnectEvidenceWidgetOptions = {
+    description:
+      "Svelte renders persisted real browser reconnect/resume traces from the package reconnect evidence primitive.",
+    title: "Persisted Reconnect Evidence",
+  };
+  reconnectEvidenceHTML = renderVoiceReconnectProfileEvidenceHTML(
+    reconnectEvidence.getSnapshot(),
+    reconnectEvidenceWidgetOptions,
   );
   const profileSwitchRecommendation =
     createVoiceProfileSwitchRecommendationStore(
@@ -328,6 +341,7 @@
   let unsubscribeOpsStatus = () => {};
   let unsubscribePlatformCoverage = () => {};
   let unsubscribeProfileComparison = () => {};
+  let unsubscribeReconnectEvidence = () => {};
   let unsubscribeProfileSwitch = () => {};
   let unsubscribeProofTrends = () => {};
   let unsubscribeReadinessFailures = () => {};
@@ -666,6 +680,12 @@
         profileComparisonWidgetOptions,
       );
     });
+    unsubscribeReconnectEvidence = reconnectEvidence.subscribe(() => {
+      reconnectEvidenceHTML = renderVoiceReconnectProfileEvidenceHTML(
+        reconnectEvidence.getSnapshot(),
+        reconnectEvidenceWidgetOptions,
+      );
+    });
     unsubscribeProfileSwitch = profileSwitchRecommendation.subscribe(() => {
       profileSwitchHTML = renderVoiceProfileSwitchRecommendationHTML(
         profileSwitchRecommendation.getSnapshot(),
@@ -735,6 +755,10 @@
       profileComparison.getSnapshot(),
       profileComparisonWidgetOptions,
     );
+    reconnectEvidenceHTML = renderVoiceReconnectProfileEvidenceHTML(
+      reconnectEvidence.getSnapshot(),
+      reconnectEvidenceWidgetOptions,
+    );
     profileSwitchHTML = renderVoiceProfileSwitchRecommendationHTML(
       profileSwitchRecommendation.getSnapshot(),
       profileSwitchWidgetOptions,
@@ -757,6 +781,7 @@
     void deliveryRuntime.refresh().catch(() => {});
     void platformCoverage.refresh().catch(() => {});
     void proofTrends.refresh().catch(() => {});
+    void reconnectEvidence.refresh().catch(() => {});
     void profileSwitchRecommendation.refresh().catch(() => {});
     void readinessFailures.refresh().catch(() => {});
     void sessionSnapshot.refresh().catch(() => {});
@@ -776,11 +801,6 @@
     }
     if (bargeInProofElement) {
       bargeInProof = mountDemoBargeInProof(bargeInProofElement);
-    }
-    if (reconnectEvidenceElement) {
-      reconnectEvidence = mountDemoReconnectProfileEvidence(
-        reconnectEvidenceElement,
-      );
     }
     if (opsActionHistoryElement) {
       opsActionHistory = mountVoiceOpsActionHistory(
@@ -872,7 +892,7 @@
     unsubscribeTurnQuality();
     unsubscribeTurnLatency();
     bargeInProof?.close();
-    reconnectEvidence?.close();
+    unsubscribeReconnectEvidence();
     opsActionHistory?.close();
     liveOpsPanel?.close();
     guidedVoice?.close();
@@ -880,6 +900,7 @@
     opsStatus.close();
     platformCoverage.close();
     profileComparison.close();
+    reconnectEvidence.close();
     profileSwitchRecommendation.close();
     proofTrends.close();
     deliveryRuntime.close();
@@ -1056,7 +1077,9 @@
         {@html profileComparisonHTML}
       </div>
 
-      <div bind:this={reconnectEvidenceElement}></div>
+      <div class="voice-card voice-provider-health-card">
+        {@html reconnectEvidenceHTML}
+      </div>
 
       <div class="voice-card voice-provider-health-card">
         {@html profileSwitchHTML}

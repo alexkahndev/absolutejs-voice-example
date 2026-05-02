@@ -8,6 +8,7 @@ import {
   VoiceOpsStatus,
   VoicePlatformCoverage,
   VoiceProofTrends,
+  VoiceReconnectProfileEvidence,
   useVoiceProfileComparison,
   VoiceProviderCapabilities,
   VoiceProviderContracts,
@@ -80,7 +81,6 @@ import {
   formatDateTime,
   formatReconnectState,
   mountDemoBargeInProof,
-  mountDemoReconnectProfileEvidence,
   mountVoiceLiveOpsPanel,
   pushVoiceWaveLevel,
   renderDemoLiveTurnLatencyHTML,
@@ -240,16 +240,12 @@ const savedIntakes = ref<SavedIntake[]>([]);
 const agentSquadStatus = ref<VoiceAgentSquadDemoStatus | null>(null);
 const waveLevels = ref(createInitialVoiceWaveLevels());
 const bargeInProofEl = ref<HTMLElement | null>(null);
-const reconnectEvidenceEl = ref<HTMLElement | null>(null);
 const opsActionHistoryEl = ref<HTMLElement | null>(null);
 const liveOpsPanelEl = ref<HTMLElement | null>(null);
 const liveLatencyHTML = ref("");
 let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
-let reconnectEvidence: ReturnType<
-  typeof mountDemoReconnectProfileEvidence
-> | null = null;
 let opsActionHistory: ReturnType<typeof mountVoiceOpsActionHistory> | null =
   null;
 let liveOpsPanel: ReturnType<typeof mountVoiceLiveOpsPanel> | null = null;
@@ -476,11 +472,6 @@ onMounted(() => {
   if (bargeInProofEl.value) {
     bargeInProof = mountDemoBargeInProof(bargeInProofEl.value);
   }
-  if (reconnectEvidenceEl.value) {
-    reconnectEvidence = mountDemoReconnectProfileEvidence(
-      reconnectEvidenceEl.value,
-    );
-  }
   if (opsActionHistoryEl.value) {
     opsActionHistory = mountVoiceOpsActionHistory(
       opsActionHistoryEl.value,
@@ -543,7 +534,6 @@ onUnmounted(() => {
     clearInterval(refreshTimer);
   }
   bargeInProof?.close();
-  reconnectEvidence?.close();
   opsActionHistory?.close();
   liveOpsPanel?.close();
   unsubscribeProfileSwitch();
@@ -800,7 +790,13 @@ onUnmounted(() => {
           </p>
         </section>
 
-        <div ref="reconnectEvidenceEl" />
+        <VoiceReconnectProfileEvidence
+          class="voice-card voice-provider-health-card"
+          description="Vue renders persisted real browser reconnect/resume traces from the package reconnect evidence primitive."
+          :interval-ms="10000"
+          path="/api/voice/reconnect-profile-evidence"
+          title="Persisted Reconnect Evidence"
+        />
 
         <div
           class="voice-card voice-provider-health-card"

@@ -13,6 +13,7 @@ import {
   defineVoiceProfileComparisonElement,
   defineVoiceProfileSwitchRecommendationElement,
   defineVoiceProviderSimulationControlsElement,
+  renderVoiceReconnectProfileEvidenceHTML,
   createVoiceSessionSnapshotViewModel,
 } from "@absolutejs/voice/client";
 import { createVoiceOpsActionCenterActions } from "@absolutejs/voice/client";
@@ -28,6 +29,7 @@ import {
   VoicePlatformCoverageService,
   VoiceProofTrendsService,
   VoiceReadinessFailuresService,
+  VoiceReconnectProfileEvidenceService,
   VoiceRoutingStatusService,
   VoiceSessionSnapshotService,
   VoiceStreamService,
@@ -82,7 +84,6 @@ import {
   createDemoMicrophone,
   fetchAgentSquadDemoStatus,
   fetchBargeInReport,
-  fetchReconnectProfileEvidence,
   fetchSavedIntakes,
   getOpsStatusLabel,
   formatErrorMessage,
@@ -91,7 +92,6 @@ import {
   postVoiceLiveOpsAction,
   renderDemoBargeInProofHTML,
   renderDemoLiveTurnLatencyHTML,
-  renderDemoReconnectProfileEvidenceHTML,
   renderVoiceLiveOpsResultHTML,
   pushVoiceWaveLevel,
   VOICE_LIVE_OPS_ACTIONS,
@@ -351,7 +351,10 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             title="Profile + Reconnect Evidence"
           ></absolute-voice-profile-comparison>
 
-          <div [innerHTML]="reconnectEvidenceHtml()"></div>
+          <div
+            class="voice-card voice-provider-health-card"
+            [innerHTML]="reconnectEvidenceHtml()"
+          ></div>
 
           <absolute-voice-profile-switch
             class="voice-card voice-provider-health-card"
@@ -1500,7 +1503,6 @@ export class AngularVoiceDemoComponent {
   liveMicCopy = VOICE_DEMO_MIC_LIVE;
   micError = signal<string | null>(null);
   bargeInProofHtml = signal(renderDemoBargeInProofHTML(null));
-  reconnectEvidenceHtml = signal(renderDemoReconnectProfileEvidenceHTML(null));
   liveLatencyHtml = signal("");
   liveOpsAssignee = signal("demo-operator");
   liveOpsDetail = signal("Operator marked this live session.");
@@ -1558,6 +1560,27 @@ export class AngularVoiceDemoComponent {
     {
       intervalMs: 10_000,
     },
+  );
+  reconnectEvidence = inject(VoiceReconnectProfileEvidenceService).connect(
+    "/api/voice/reconnect-profile-evidence",
+    {
+      intervalMs: 10_000,
+    },
+  );
+  reconnectEvidenceHtml = computed(() =>
+    renderVoiceReconnectProfileEvidenceHTML(
+      {
+        error: this.reconnectEvidence.error(),
+        isLoading: this.reconnectEvidence.isLoading(),
+        report: this.reconnectEvidence.report(),
+        updatedAt: this.reconnectEvidence.updatedAt(),
+      },
+      {
+        description:
+          "Angular renders persisted real browser reconnect/resume traces from the package reconnect evidence primitive.",
+        title: "Persisted Reconnect Evidence",
+      },
+    ),
   );
   readinessFailures = inject(VoiceReadinessFailuresService).connect(
     "/api/production-readiness",
@@ -1782,10 +1805,8 @@ export class AngularVoiceDemoComponent {
         this.simulateDisconnect,
       );
       void this.refreshBargeInProof();
-      void this.refreshReconnectEvidence();
       this.bargeInProofTimer = setInterval(() => {
         void this.refreshBargeInProof();
-        void this.refreshReconnectEvidence();
       }, 3_000);
       void this.refreshIntakes();
       this.refreshTimer = setInterval(() => {
@@ -1834,20 +1855,6 @@ export class AngularVoiceDemoComponent {
     } catch (error) {
       this.bargeInProofHtml.set(
         renderDemoBargeInProofHTML(null, formatErrorMessage(error)),
-      );
-    }
-  }
-
-  async refreshReconnectEvidence() {
-    try {
-      this.reconnectEvidenceHtml.set(
-        renderDemoReconnectProfileEvidenceHTML(
-          await fetchReconnectProfileEvidence(),
-        ),
-      );
-    } catch (error) {
-      this.reconnectEvidenceHtml.set(
-        renderDemoReconnectProfileEvidenceHTML(null, formatErrorMessage(error)),
       );
     }
   }
@@ -2059,6 +2066,7 @@ export class AngularVoiceDemoComponent {
     this.opsActionCenter.close();
     this.platformCoverage.close();
     this.proofTrends.close();
+    this.reconnectEvidence.close();
     this.sessionSnapshot.close();
     this.callDebugger.close();
     this.providerCapabilities.close();
