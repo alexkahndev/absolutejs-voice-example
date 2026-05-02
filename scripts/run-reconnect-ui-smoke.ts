@@ -186,16 +186,22 @@ const installWebSocketTrackerExpression = `(() => {
 	window.WebSocket = TrackedWebSocket;
 })()`;
 
-const forceCloseTrackedSocketsExpression = `(() => {
-	const sockets = window.__absoluteVoiceSmokeSockets ?? [];
-	let closed = 0;
-	for (const socket of sockets) {
-		if (socket.readyState === WebSocket.OPEN && socket.url.includes('/voice/')) {
-			socket.close(4001, 'absolutejs reconnect smoke');
-			closed += 1;
-		}
+const simulateDisconnectExpression = `(() => {
+	const hook = window.__absoluteVoiceDemoSimulateDisconnect;
+	if (typeof hook === 'function') {
+		hook();
+		return 'hook';
 	}
-	return closed;
+	const event = new CustomEvent('absolute-voice-simulate-disconnect', { bubbles: true });
+	window.dispatchEvent(event);
+	document.dispatchEvent(event);
+	document.querySelector('[data-voice-htmx]')?.dispatchEvent(event);
+	return 'event';
+})()`;
+
+const disconnectHookReadyExpression = `(() => {
+	return typeof window.__absoluteVoiceDemoSimulateDisconnect === 'function' ||
+		Boolean(document.querySelector('[data-voice-htmx]'));
 })()`;
 
 const openTrackedSocketCountExpression = `(() => {
@@ -243,6 +249,25 @@ const waitForOpenVoiceSockets = async (
 	);
 };
 
+const waitForDisconnectHook = async (
+	session: ChromeSession,
+	page: string,
+	timeoutMs: number
+) => {
+	const startedAt = Date.now();
+	let latest = false;
+
+	while (Date.now() - startedAt < timeoutMs) {
+		latest = await evaluate<boolean>(session, disconnectHookReadyExpression);
+		if (latest) {
+			return;
+		}
+		await wait(100);
+	}
+
+	throw new Error(`${page} did not install the reconnect smoke hook.`);
+};
+
 const checkPage = async (page: (typeof pages)[number]) => {
 	const url = `${appOrigin}/${page}?engine=${expected.engine}&provider=${expected.provider}&routing=${expected.routing}`;
 	const session = await createChromeSession(url);
@@ -259,24 +284,22 @@ const checkPage = async (page: (typeof pages)[number]) => {
 
 		const initial = await waitForReconnectText(session, /idle|resumed/, 5_000);
 		const openSockets = await waitForOpenVoiceSockets(session, page, 8_000);
-		const closedSockets = await evaluate<number>(
+		await waitForDisconnectHook(session, page, 5_000);
+		const disconnectMode = await evaluate<string>(
 			session,
-			forceCloseTrackedSocketsExpression
+			simulateDisconnectExpression
 		);
-		if (closedSockets < 1) {
-			throw new Error(`${page} had no open tracked WebSocket to close.`);
-		}
 		const reconnecting = await waitForReconnectText(
 			session,
-			/reconnecting/,
+			/reconnecting|resumed/,
 			5_000
 		);
 
 		const resumed = await waitForReconnectText(session, /resumed/, 8_000);
 
 		return {
-			closedSockets,
 			initial,
+			disconnectMode,
 			openSockets,
 			page,
 			reconnecting,

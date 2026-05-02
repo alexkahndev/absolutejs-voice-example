@@ -389,6 +389,18 @@ let hasStartedModes: Record<VoiceDemoMode, boolean> = {
 };
 const currentVoice = () =>
   activeMode === "general" ? generalVoice : guidedVoice;
+type VoiceDemoWindow = typeof window & {
+  __absoluteVoiceDemoSimulateDisconnect?: () => void;
+};
+const simulateDisconnect = () => {
+  currentVoice().simulateDisconnect();
+};
+(window as VoiceDemoWindow).__absoluteVoiceDemoSimulateDisconnect =
+  simulateDisconnect;
+window.addEventListener(
+  "absolute-voice-simulate-disconnect",
+  simulateDisconnect,
+);
 const liveOpsPanel = mountVoiceLiveOpsPanel(liveOpsPanelHost, {
   getSessionId: () => currentVoice().sessionId,
   onControl: ({ action, detail, tag }) => {

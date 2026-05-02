@@ -115,6 +115,9 @@
     initialRoutingMode?: VoiceRoutingMode;
     initialSpeechEngine?: VoiceSpeechEngine;
   };
+  type VoiceDemoWindow = typeof window & {
+    __absoluteVoiceDemoSimulateDisconnect?: () => void;
+  };
 
   let {
     cssPath,
@@ -393,6 +396,8 @@
   let currentVoice = $derived(
     activeMode === "general" ? generalState : guidedState,
   );
+  const simulateDisconnect = () =>
+    (activeMode === "general" ? generalVoice : guidedVoice)?.simulateDisconnect();
   let campaignDialerProofReadyProviders = $derived(
     (
       campaignDialerProofSnapshot?.status?.providers ?? [
@@ -620,6 +625,12 @@
 
   onMount(() => {
     connectVoices();
+    const demoWindow = window as VoiceDemoWindow;
+    demoWindow.__absoluteVoiceDemoSimulateDisconnect = simulateDisconnect;
+    window.addEventListener(
+      "absolute-voice-simulate-disconnect",
+      simulateDisconnect,
+    );
     unsubscribeOpsStatus = opsStatus.subscribe(() => {
       opsStatusHTML = opsStatus.getHTML();
     });
@@ -807,6 +818,18 @@
   });
 
   onDestroy(() => {
+    if (typeof window !== "undefined") {
+      const demoWindow = window as VoiceDemoWindow;
+      window.removeEventListener(
+        "absolute-voice-simulate-disconnect",
+        simulateDisconnect,
+      );
+      if (
+        demoWindow.__absoluteVoiceDemoSimulateDisconnect === simulateDisconnect
+      ) {
+        delete demoWindow.__absoluteVoiceDemoSimulateDisconnect;
+      }
+    }
     if (refreshTimer) {
       clearInterval(refreshTimer);
     }

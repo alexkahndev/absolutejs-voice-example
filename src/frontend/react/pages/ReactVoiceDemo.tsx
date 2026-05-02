@@ -93,6 +93,9 @@ type ReactVoiceDemoProps = {
 };
 
 type ReactVoiceDemoStream = ReturnType<typeof useVoiceStream<SavedIntake>>;
+type VoiceDemoWindow = typeof window & {
+  __absoluteVoiceDemoSimulateDisconnect?: () => void;
+};
 
 const EMPTY_VOICE: ReactVoiceDemoStream = {
   assistantTexts: [] as string[],
@@ -198,6 +201,24 @@ export const ReactVoiceDemo = ({
     ),
   );
   const currentVoice = activeMode === "general" ? generalVoice : guidedVoice;
+  useEffect(() => {
+    const demoWindow = window as VoiceDemoWindow;
+    const simulateDisconnect = () => currentVoice.simulateDisconnect();
+    demoWindow.__absoluteVoiceDemoSimulateDisconnect = simulateDisconnect;
+    window.addEventListener(
+      "absolute-voice-simulate-disconnect",
+      simulateDisconnect,
+    );
+    return () => {
+      window.removeEventListener(
+        "absolute-voice-simulate-disconnect",
+        simulateDisconnect,
+      );
+      if (demoWindow.__absoluteVoiceDemoSimulateDisconnect === simulateDisconnect) {
+        delete demoWindow.__absoluteVoiceDemoSimulateDisconnect;
+      }
+    };
+  }, [currentVoice]);
   const profileSwitchGuardDecision = getVoiceProfileSwitchGuardDecision(
     currentVoice.sessionMetadata,
   );

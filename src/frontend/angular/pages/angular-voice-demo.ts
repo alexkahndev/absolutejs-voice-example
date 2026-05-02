@@ -103,6 +103,9 @@ type AngularVoiceDemoProps = {
   initialRoutingMode: VoiceRoutingMode;
   initialSpeechEngine: VoiceSpeechEngine;
 };
+type VoiceDemoWindow = typeof window & {
+  __absoluteVoiceDemoSimulateDisconnect?: () => void;
+};
 
 export const INITIAL_MODEL_PROVIDER = new InjectionToken<VoiceModelProvider>(
   "INITIAL_MODEL_PROVIDER",
@@ -1749,6 +1752,9 @@ export class AngularVoiceDemoComponent {
   private microphone: ReturnType<typeof createDemoMicrophone> | null = null;
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
   private bargeInProofTimer: ReturnType<typeof setInterval> | null = null;
+  private simulateDisconnect = () => {
+    this.currentVoice().simulateDisconnect();
+  };
 
   constructor() {
     defineVoiceProfileComparisonElement();
@@ -1762,6 +1768,13 @@ export class AngularVoiceDemoComponent {
       queueMicrotask(() => this.syncLiveLatencyProof());
     });
     if (typeof window !== "undefined") {
+      const demoWindow = window as VoiceDemoWindow;
+      demoWindow.__absoluteVoiceDemoSimulateDisconnect =
+        this.simulateDisconnect;
+      window.addEventListener(
+        "absolute-voice-simulate-disconnect",
+        this.simulateDisconnect,
+      );
       void this.refreshBargeInProof();
       this.bargeInProofTimer = setInterval(() => {
         void this.refreshBargeInProof();
@@ -1997,6 +2010,19 @@ export class AngularVoiceDemoComponent {
   }
 
   ngOnDestroy() {
+    if (typeof window !== "undefined") {
+      const demoWindow = window as VoiceDemoWindow;
+      window.removeEventListener(
+        "absolute-voice-simulate-disconnect",
+        this.simulateDisconnect,
+      );
+      if (
+        demoWindow.__absoluteVoiceDemoSimulateDisconnect ===
+        this.simulateDisconnect
+      ) {
+        delete demoWindow.__absoluteVoiceDemoSimulateDisconnect;
+      }
+    }
     if (this.refreshTimer) {
       clearInterval(this.refreshTimer);
     }

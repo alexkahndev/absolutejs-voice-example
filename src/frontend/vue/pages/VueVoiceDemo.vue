@@ -91,6 +91,9 @@ type VueVoiceDemoProps = {
   initialRoutingMode?: VoiceRoutingMode;
   initialSpeechEngine?: VoiceSpeechEngine;
 };
+type VoiceDemoWindow = typeof window & {
+  __absoluteVoiceDemoSimulateDisconnect?: () => void;
+};
 
 const props = withDefaults(defineProps<VueVoiceDemoProps>(), {
   initialModelProvider: "deterministic",
@@ -451,8 +454,15 @@ const runCallControl = (
   currentVoice.value.callControl(action);
   stopMic();
 };
+const simulateDisconnect = () => currentVoice.value.simulateDisconnect();
 
 onMounted(() => {
+  const demoWindow = window as VoiceDemoWindow;
+  demoWindow.__absoluteVoiceDemoSimulateDisconnect = simulateDisconnect;
+  window.addEventListener(
+    "absolute-voice-simulate-disconnect",
+    simulateDisconnect,
+  );
   unsubscribeProfileSwitch = profileSwitchRecommendation.subscribe(() => {
     profileSwitchHTML.value = renderVoiceProfileSwitchRecommendationHTML(
       profileSwitchRecommendation.getSnapshot(),
@@ -513,6 +523,14 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  const demoWindow = window as VoiceDemoWindow;
+  window.removeEventListener(
+    "absolute-voice-simulate-disconnect",
+    simulateDisconnect,
+  );
+  if (demoWindow.__absoluteVoiceDemoSimulateDisconnect === simulateDisconnect) {
+    delete demoWindow.__absoluteVoiceDemoSimulateDisconnect;
+  }
   if (refreshTimer) {
     clearInterval(refreshTimer);
   }
