@@ -11,6 +11,7 @@ import {
   defineVoiceProviderSimulationControlsElement,
   defineVoiceProviderStatusElement,
   defineVoiceRoutingStatusElement,
+  defineVoiceSessionObservabilityElement,
   defineVoiceSessionSnapshotElement,
   defineVoiceTraceTimelineElement,
   defineVoiceTurnLatencyElement,
@@ -34,6 +35,7 @@ defineVoiceProviderContractsElement();
 defineVoiceProviderSimulationControlsElement();
 defineVoiceProviderStatusElement();
 defineVoiceRoutingStatusElement();
+defineVoiceSessionObservabilityElement();
 defineVoiceSessionSnapshotElement();
 defineVoiceTraceTimelineElement();
 defineVoiceTurnLatencyElement();
@@ -77,7 +79,9 @@ if (proofTrendsHost instanceof HTMLElement) {
   });
 }
 
-const readinessFailuresHost = document.querySelector("#readiness-failures-card");
+const readinessFailuresHost = document.querySelector(
+  "#readiness-failures-card",
+);
 if (readinessFailuresHost instanceof HTMLElement) {
   mountVoiceReadinessFailures(
     readinessFailuresHost,
@@ -106,9 +110,13 @@ for (const actionHistory of document.querySelectorAll(
   "[data-voice-ops-action-history]",
 )) {
   if (actionHistory instanceof HTMLElement) {
-    mountVoiceOpsActionHistory(actionHistory, "/api/voice/ops-actions/history", {
-      intervalMs: 5_000,
-    });
+    mountVoiceOpsActionHistory(
+      actionHistory,
+      "/api/voice/ops-actions/history",
+      {
+        intervalMs: 5_000,
+      },
+    );
   }
 }
 

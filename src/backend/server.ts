@@ -145,6 +145,7 @@ import {
   summarizeVoiceTurnQuality,
   createVoiceSTTProviderRouter,
   createVoiceSessionListRoutes,
+  createVoiceSessionObservabilityRoutes,
   buildVoiceSessionSnapshot,
   createVoiceSessionSnapshotRoutes,
   createVoiceSessionReplayRoutes,
@@ -192,6 +193,7 @@ import {
   renderVoiceFailureReplayMarkdown,
   renderVoiceOperationsRecordIncidentMarkdown,
   renderVoiceOperationsRecordHTML,
+  renderVoiceSessionObservabilityHTML,
   resolveVoiceTelephonyOutcome,
   signVoiceTwilioWebhook,
   signVoicePlivoWebhook,
@@ -12156,6 +12158,23 @@ const server = new Elysia()
   )
   .use(createVoiceCallDebuggerRoutes(demoVoiceCallDebuggerOptions()))
   .use(failureReplayRoutes)
+  .use(
+    createVoiceSessionObservabilityRoutes({
+      audit: runtimeStorage.audit,
+      callDebuggerHref: "/voice-call-debugger/:sessionId",
+      htmlPath: "/voice-observability/:sessionId",
+      incidentPath: "/voice-observability/:sessionId/incident.md",
+      operationsRecordHref: "/voice-operations/:sessionId",
+      path: "/api/voice/session-observability/:sessionId",
+      redact: voiceSupportArtifactRedaction,
+      render: (report) =>
+        renderVoiceSessionObservabilityHTML(report, {
+          title: "AbsoluteJS Voice Session Observability",
+        }),
+      store: deliveryTraceStore,
+      traceTimelineHref: "/traces/:sessionId",
+    }) as unknown as Elysia,
+  )
   .use(
     createVoiceOperationsRecordRoutes({
       audit: runtimeStorage.audit,

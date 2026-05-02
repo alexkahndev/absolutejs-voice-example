@@ -16,6 +16,7 @@ import {
   VoiceProviderStatus,
   VoiceReadinessFailures,
   VoiceRoutingStatus,
+  VoiceSessionObservability,
   VoiceSessionSnapshot,
   useVoiceTraceTimeline,
   VoiceTurnLatency,
@@ -855,6 +856,14 @@ onUnmounted(() => {
           :interval-ms="5000"
           path="/api/voice/session-snapshot/latest"
           title="Session Debug Snapshot"
+        />
+
+        <VoiceSessionObservability
+          class="voice-card voice-provider-health-card"
+          description="Vue renders one per-call support report with turn waterfalls, provider recovery, tools, handoffs, guardrails, and incident handoff links."
+          :interval-ms="5000"
+          path="/api/voice/session-observability/demo-incident-bundle"
+          title="Session Observability"
         />
 
         <VoiceCallDebuggerLaunch

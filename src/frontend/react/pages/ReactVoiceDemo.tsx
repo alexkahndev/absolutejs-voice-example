@@ -19,6 +19,7 @@ import {
   VoiceProviderStatus,
   VoiceReadinessFailures,
   VoiceRoutingStatus,
+  VoiceSessionObservability,
   VoiceSessionSnapshot,
   VoiceTraceTimeline,
   VoiceTurnLatency,
@@ -758,6 +759,14 @@ export const ReactVoiceDemo = ({
               intervalMs={5_000}
               path="/api/voice/session-snapshot/latest"
               title="Session Debug Snapshot"
+            />
+
+            <VoiceSessionObservability
+              className="voice-card voice-provider-health-card"
+              description="React renders one per-call support report with turn waterfalls, provider recovery, tools, handoffs, guardrails, and incident handoff links."
+              intervalMs={5_000}
+              path="/api/voice/session-observability/demo-incident-bundle"
+              title="Session Observability"
             />
 
             <VoiceCallDebuggerLaunch

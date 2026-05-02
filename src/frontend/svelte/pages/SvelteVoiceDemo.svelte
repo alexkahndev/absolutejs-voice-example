@@ -16,6 +16,7 @@
     createVoiceProviderStatus,
     createVoiceReadinessFailures,
     createVoiceRoutingStatus,
+    createVoiceSessionObservability,
     createVoiceSessionSnapshot,
     createVoiceStream,
     createVoiceTraceTimeline,
@@ -154,6 +155,7 @@
   let proofTrendsHTML = $state("");
   let readinessFailuresHTML = $state("");
   let sessionSnapshotHTML = $state("");
+  let sessionObservabilityHTML = $state("");
   let callDebuggerHTML = $state("");
   let providerCapabilitiesHTML = $state("");
   let providerContractsHTML = $state("");
@@ -286,6 +288,16 @@
     },
   );
   sessionSnapshotHTML = sessionSnapshot.getHTML();
+  const sessionObservability = createVoiceSessionObservability(
+    "/api/voice/session-observability/demo-incident-bundle",
+    {
+      description:
+        "Svelte renders one per-call support report with turn waterfalls, provider recovery, tools, handoffs, guardrails, and incident handoff links.",
+      intervalMs: 5_000,
+      title: "Session Observability",
+    },
+  );
+  sessionObservabilityHTML = sessionObservability.getHTML();
   const callDebugger = createVoiceCallDebugger(
     "/api/voice-call-debugger/latest",
     {
@@ -350,6 +362,7 @@
   let unsubscribeProofTrends = () => {};
   let unsubscribeReadinessFailures = () => {};
   let unsubscribeSessionSnapshot = () => {};
+  let unsubscribeSessionObservability = () => {};
   let unsubscribeCallDebugger = () => {};
   let unsubscribeProviderSimulation = () => {};
   let unbindProviderSimulation = () => {};
@@ -723,6 +736,9 @@
     unsubscribeSessionSnapshot = sessionSnapshot.subscribe(() => {
       sessionSnapshotHTML = sessionSnapshot.getHTML();
     });
+    unsubscribeSessionObservability = sessionObservability.subscribe(() => {
+      sessionObservabilityHTML = sessionObservability.getHTML();
+    });
     unsubscribeCallDebugger = callDebugger.subscribe(() => {
       callDebuggerHTML = callDebugger.getHTML();
     });
@@ -794,6 +810,7 @@
       readinessFailuresWidgetOptions,
     );
     sessionSnapshotHTML = sessionSnapshot.getHTML();
+    sessionObservabilityHTML = sessionObservability.getHTML();
     callDebuggerHTML = callDebugger.getHTML();
     providerCapabilitiesHTML = providerCapabilities.getHTML();
     providerContractsHTML = providerContracts.getHTML();
@@ -911,10 +928,12 @@
     unsubscribeProofTrends();
     unsubscribeReadinessFailures();
     unsubscribeSessionSnapshot();
+    unsubscribeSessionObservability();
     unsubscribeCallDebugger();
     unsubscribeProviderSimulation();
     readinessFailures.close();
     sessionSnapshot.close();
+    sessionObservability.close();
     callDebugger.close();
     unbindProviderSimulation();
     unsubscribeProviderCapabilities();
@@ -1128,6 +1147,10 @@
 
       <div class="voice-card voice-provider-health-card">
         {@html sessionSnapshotHTML}
+      </div>
+
+      <div class="voice-card voice-provider-health-card">
+        {@html sessionObservabilityHTML}
       </div>
 
       <div class="voice-card voice-provider-health-card">

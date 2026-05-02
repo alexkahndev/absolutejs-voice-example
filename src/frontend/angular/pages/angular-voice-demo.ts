@@ -14,6 +14,7 @@ import {
   defineVoiceProfileSwitchRecommendationElement,
   defineVoiceProviderSimulationControlsElement,
   renderVoiceReconnectProfileEvidenceHTML,
+  createVoiceSessionObservabilityViewModel,
   createVoiceSessionSnapshotViewModel,
 } from "@absolutejs/voice/client";
 import { createVoiceOpsActionCenterActions } from "@absolutejs/voice/client";
@@ -31,6 +32,7 @@ import {
   VoiceReadinessFailuresService,
   VoiceReconnectProfileEvidenceService,
   VoiceRoutingStatusService,
+  VoiceSessionObservabilityService,
   VoiceSessionSnapshotService,
   VoiceStreamService,
   VoiceTraceTimelineService,
@@ -521,6 +523,63 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
             @if (sessionSnapshotModel().error) {
               <p class="absolute-voice-session-snapshot__error">
                 {{ sessionSnapshotModel().error }}
+              </p>
+            }
+          </article>
+
+          <article
+            class="voice-card voice-provider-health-card absolute-voice-session-observability"
+            [class.absolute-voice-session-observability--ready]="
+              sessionObservabilityModel().status === 'ready'
+            "
+            [class.absolute-voice-session-observability--warning]="
+              sessionObservabilityModel().status === 'warning'
+            "
+          >
+            <header class="absolute-voice-session-observability__header">
+              <span class="absolute-voice-session-observability__eyebrow">
+                {{ sessionObservabilityModel().title }}
+              </span>
+              <strong class="absolute-voice-session-observability__label">
+                {{ sessionObservabilityModel().label }}
+              </strong>
+            </header>
+            <p class="absolute-voice-session-observability__description">
+              {{ sessionObservabilityModel().description }}
+            </p>
+            @if (sessionObservabilityModel().links.length > 0) {
+              <p class="absolute-voice-session-observability__actions">
+                @for (
+                  link of sessionObservabilityModel().links;
+                  track link.href
+                ) {
+                  <a [href]="link.href">{{ link.label }}</a>
+                }
+              </p>
+            }
+            @if (sessionObservabilityModel().turns.length > 0) {
+              <div class="absolute-voice-session-observability__turns">
+                @for (
+                  turn of sessionObservabilityModel().turns;
+                  track turn.turnId
+                ) {
+                  <article class="absolute-voice-session-observability__turn">
+                    <header>
+                      <strong>{{ turn.turnId }}</strong>
+                      <span>{{ turn.durationLabel }}</span>
+                    </header>
+                    <p>{{ turn.label }}</p>
+                  </article>
+                }
+              </div>
+            } @else {
+              <p class="absolute-voice-session-observability__empty">
+                Open a voice session to see turn waterfalls.
+              </p>
+            }
+            @if (sessionObservabilityModel().error) {
+              <p class="absolute-voice-session-observability__error">
+                {{ sessionObservabilityModel().error }}
               </p>
             }
           </article>
@@ -1619,6 +1678,27 @@ export class AngularVoiceDemoComponent {
         description:
           "Angular renders a downloadable support bundle with session media graph, provider routing, and turn-quality evidence.",
         title: "Session Debug Snapshot",
+      },
+    ),
+  );
+  sessionObservability = inject(VoiceSessionObservabilityService).connect(
+    "/api/voice/session-observability/demo-incident-bundle",
+    {
+      intervalMs: 5_000,
+    },
+  );
+  sessionObservabilityModel = computed(() =>
+    createVoiceSessionObservabilityViewModel(
+      {
+        error: this.sessionObservability.error(),
+        isLoading: this.sessionObservability.isLoading(),
+        report: this.sessionObservability.report(),
+        updatedAt: this.sessionObservability.updatedAt(),
+      },
+      {
+        description:
+          "Angular renders one per-call support report with turn waterfalls, provider recovery, tools, handoffs, guardrails, and incident handoff links.",
+        title: "Session Observability",
       },
     ),
   );
