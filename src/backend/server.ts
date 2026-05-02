@@ -12420,6 +12420,7 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
           };
         },
       },
+      audit: runtimeStorage.audit,
       failureReplays: async () => [await buildDemoIncidentTimelineFailureReplay()],
       links: {
         callDebugger: (sessionId) =>
@@ -12458,6 +12459,7 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
       ],
       opsRecovery: buildDemoOpsRecoveryReport,
       title: "AbsoluteJS Voice Demo Incident Timeline",
+      trace: deliveryTraceStore,
     }),
   )
   .use(
