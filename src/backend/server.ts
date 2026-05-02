@@ -64,6 +64,7 @@ import {
   createVoicePostCallAnalysisRoutes,
   createVoiceProofTrendRecommendationRoutes,
   createVoiceProofTrendRoutes,
+  createVoiceRealCallEvidenceRuntime,
   createVoiceRealCallEvidenceRuntimeRoutes,
   createVoiceRealCallProfileHistoryRoutes,
   createVoiceRealCallProfileRecoveryActionRoutes,
@@ -71,6 +72,7 @@ import {
   createVoiceSQLiteRealCallProfileEvidenceStore,
   createVoiceSQLiteRealCallProfileRecoveryJobStore,
   buildVoiceRealCallProfileEvidenceFromReconnectProofReports,
+  buildVoiceRealCallEvidenceRuntimeReadinessCheck,
   buildVoiceRealCallProfileHistoryReport,
   buildVoiceRealCallProfileReadinessCheck,
   buildVoiceRealCallProfileRecoveryJobHistoryCheck,
@@ -3991,17 +3993,34 @@ const proofTrendsMaxAgeMs =
   configuredProofTrendsMaxAgeMs > 0
     ? configuredProofTrendsMaxAgeMs
     : 24 * 60 * 60 * 1000;
-const realCallEvidenceRuntimeRoutes = createVoiceRealCallEvidenceRuntimeRoutes({
+const realCallEvidenceRuntime = createVoiceRealCallEvidenceRuntime({
   evidenceStore: realCallProfileEvidenceStore,
   existingEvidenceLimit: 5000,
   history: {
     maxAgeMs: proofTrendsMaxAgeMs,
     source: ".voice-runtime/real-call-evidence-runtime",
   },
-  name: "absolutejs-voice-example-real-call-evidence-runtime",
-  title: "AbsoluteJS Voice Real-Call Evidence Runtime",
   traceStore: deliveryTraceStore,
 });
+const realCallEvidenceRuntimeRoutes = createVoiceRealCallEvidenceRuntimeRoutes({
+  evidenceStore: realCallProfileEvidenceStore,
+  name: "absolutejs-voice-example-real-call-evidence-runtime",
+  runtime: realCallEvidenceRuntime,
+  title: "AbsoluteJS Voice Real-Call Evidence Runtime",
+});
+const buildRealCallEvidenceRuntimeReadinessCheck =
+  async (): Promise<VoiceProductionReadinessCheck> =>
+    buildVoiceRealCallEvidenceRuntimeReadinessCheck(
+      await realCallEvidenceRuntime.buildReport(),
+      {
+        collectHref: "/api/voice/real-call-evidence-runtime/collect",
+        href: "/voice/real-call-evidence-runtime",
+        minProfiles: 2,
+        minSessions: 2,
+        minStoredEvidence: 2,
+        sourceHref: "/api/voice/real-call-evidence-runtime",
+      },
+    );
 const configuredSloCalibrationMinRuns = Number(
   process.env.VOICE_SLO_CALIBRATION_MIN_RUNS ?? 1,
 );
@@ -9806,6 +9825,14 @@ const buildDemoVoiceProofPack = async (input: {
         buildRealCallProfileReadinessCheck,
       ),
   );
+  const realCallEvidenceRuntimeReadiness = context.cache(
+    "realCallEvidenceRuntimeReadiness",
+    () =>
+      context.time(
+        "additionalChecks:realCallEvidenceRuntime",
+        buildRealCallEvidenceRuntimeReadinessCheck,
+      ),
+  );
   const realCallProfileRecoveryReadiness = context.cache(
     "realCallProfileRecoveryReadiness",
     () =>
@@ -9886,6 +9913,7 @@ const buildDemoVoiceProofPack = async (input: {
           bargeInReport,
           browserCallProfileReadiness,
           deliveryRuntimeSummary,
+          realCallEvidenceRuntimeReadiness,
           realCallProfileReadiness,
           realCallProfileRecoveryReadiness,
           proofPackContext: context,
@@ -10226,6 +10254,7 @@ const productionReadinessOptions = (
     >;
     includeObservabilityExport?: boolean;
     onTiming?: (timing: VoiceProductionReadinessTiming) => void;
+    realCallEvidenceRuntimeReadiness?: Promise<VoiceProductionReadinessCheck>;
     realCallProfileReadiness?: Promise<VoiceProductionReadinessCheck>;
     realCallProfileRecoveryReadiness?: Promise<VoiceProductionReadinessCheck>;
     proofPackContext?: ReturnType<typeof createVoiceProofPackBuildContext>;
@@ -10271,6 +10300,8 @@ const productionReadinessOptions = (
         buildBrowserCallProfileReadinessCheck()),
       await (input.realCallProfileReadiness ??
         buildRealCallProfileReadinessCheck()),
+      await (input.realCallEvidenceRuntimeReadiness ??
+        buildRealCallEvidenceRuntimeReadinessCheck()),
       await (input.realCallProfileRecoveryReadiness ??
         buildVoiceRealCallProfileRecoveryJobHistoryCheck(
           realCallProfileRecoveryJobStore,
