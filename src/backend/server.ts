@@ -12370,6 +12370,56 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
   )
   .use(
     createVoiceIncidentTimelineRoutes({
+      actionHandlers: {
+        "delivery.retry": async ({ actionId }) => {
+          const result = await deliveryRuntimeControl.tick();
+
+          return {
+            actionId,
+            detail: JSON.stringify(result),
+            ok: true,
+            status: "completed",
+          };
+        },
+        "proof.rerun": async ({ actionId }) => {
+          await refreshProductionReadinessProof();
+
+          return {
+            actionId,
+            href: "/voice/proof-pack",
+            ok: true,
+            status: "refreshed",
+          };
+        },
+        "readiness.refresh": async ({ actionId }) => {
+          await buildVoiceProductionReadinessReport(
+            productionReadinessOptions({
+              fast: true,
+              includeObservabilityExport: false,
+              refresh: true,
+            }),
+          );
+
+          return {
+            actionId,
+            href: "/production-readiness",
+            ok: true,
+            status: "refreshed",
+          };
+        },
+        "support.bundle": async ({ action, actionId }) => {
+          await buildDemoVoiceSessionSnapshot({
+            sessionId: action.sessionId ?? demoIncidentSessionId,
+          });
+
+          return {
+            actionId,
+            href: action.href,
+            ok: true,
+            status: "generated",
+          };
+        },
+      },
       failureReplays: async () => [await buildDemoIncidentTimelineFailureReplay()],
       links: {
         callDebugger: (sessionId) =>
