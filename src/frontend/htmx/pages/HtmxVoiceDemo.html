@@ -230,10 +230,19 @@
 
         <absolute-voice-profile-comparison
           class="voice-card voice-provider-health-card"
-          description="HTMX renders measured profile defaults behind each selected stack."
+          description="HTMX renders measured profile defaults and persisted reconnect resume evidence behind each selected stack."
           interval-ms="10000"
-          title="Profile Stack Comparison"
+          title="Profile + Reconnect Evidence"
         ></absolute-voice-profile-comparison>
+
+        <article
+          class="voice-card voice-provider-health-card"
+          hx-get="/voice/reconnect-profile-evidence-card"
+          hx-trigger="load, every 10s"
+          hx-swap="outerHTML"
+        >
+          <p class="empty-copy">Checking persisted reconnect evidence.</p>
+        </article>
 
         <absolute-voice-profile-switch
           class="voice-card voice-provider-health-card"

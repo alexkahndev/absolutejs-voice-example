@@ -267,6 +267,7 @@ import {
   type VoiceProofTrendReport,
   type VoiceSloCalibrationSample,
   type VoiceProofTrendSummary,
+  type VoiceRealCallProfileEvidenceRecord,
   type VoiceBrowserCallProfileReport,
   type VoiceProductionReadinessCheck,
   type VoiceProductionReadinessTiming,
@@ -347,6 +348,37 @@ const escapeHtml = (value: string) =>
     .replaceAll("'", "&#39;");
 const stringifyForHtml = (value: unknown) =>
   escapeHtml(JSON.stringify(value, null, 2) ?? "");
+const formatDemoLatency = (value?: number) =>
+  typeof value === "number" && Number.isFinite(value)
+    ? `${Math.round(value)}ms`
+    : "n/a";
+const formatDemoCount = (value: number) =>
+  new Intl.NumberFormat("en-US").format(value);
+const formatDemoAge = (value?: string) => {
+  if (!value) {
+    return "No evidence";
+  }
+
+  const elapsedMs = Date.now() - Date.parse(value);
+  if (!Number.isFinite(elapsedMs) || elapsedMs < 0) {
+    return "Just now";
+  }
+
+  const minutes = Math.floor(elapsedMs / 60_000);
+  if (minutes < 1) {
+    return "Just now";
+  }
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
+
+  return `${Math.floor(hours / 24)}d ago`;
+};
 
 const createJsonHandoffDeliveryStore = <
   TDelivery extends StoredVoiceHandoffDelivery,
@@ -4278,6 +4310,111 @@ const readRealCallProfileHistory = async () => {
     ),
     source: realCallProfilesRoot,
   };
+};
+
+type ReconnectProfileEvidenceSummary = {
+  evidence: VoiceRealCallProfileEvidenceRecord[];
+  generatedAt: string;
+  latest?: VoiceRealCallProfileEvidenceRecord;
+  ok: boolean;
+  profileId: string;
+  resumeLatencyP95Ms?: number;
+  sampleCount: number;
+  snapshotCount: number;
+  sourceHref: string;
+  status: "empty" | "fail" | "pass" | "warn";
+};
+
+const readReconnectProfileEvidenceSummary =
+  async (): Promise<ReconnectProfileEvidenceSummary> => {
+    const evidence = await realCallProfileEvidenceStore.list({
+      limit: 100,
+      profileId: "reconnect-resume",
+    });
+    const latest = evidence[0];
+    const sampleCount = evidence.reduce(
+      (total, record) => total + (record.reconnect?.samples ?? 1),
+      0,
+    );
+    const snapshotCount = evidence.reduce(
+      (total, record) => total + (record.reconnect?.snapshotCount ?? 0),
+      0,
+    );
+    const resumeLatencyP95Ms =
+      evidence
+        .map((record) => record.reconnect?.resumeLatencyP95Ms)
+        .filter(
+          (value): value is number =>
+            typeof value === "number" && Number.isFinite(value),
+        )
+        .sort((a, b) => b - a)[0] ?? latest?.reconnect?.resumeLatencyP95Ms;
+    const failed = evidence.some(
+      (record) => record.ok === false || record.reconnect?.status === "fail",
+    );
+    const passed = evidence.some(
+      (record) =>
+        record.ok === true &&
+        record.reconnect?.resumed === true &&
+        record.reconnect?.reconnected === true,
+    );
+
+    return {
+      evidence,
+      generatedAt: new Date().toISOString(),
+      latest,
+      ok: passed && !failed,
+      profileId: "reconnect-resume",
+      resumeLatencyP95Ms,
+      sampleCount,
+      snapshotCount,
+      sourceHref: "/api/voice/real-call-profile-history",
+      status:
+        evidence.length === 0
+          ? "empty"
+          : failed
+            ? "fail"
+            : passed
+              ? "pass"
+              : "warn",
+    };
+  };
+
+const renderReconnectProfileEvidenceCardHTML = (
+  summary: ReconnectProfileEvidenceSummary,
+) => {
+  const latest = summary.latest;
+  const reconnect = latest?.reconnect;
+  const label =
+    summary.status === "pass"
+      ? "Reconnect evidence passing"
+      : summary.status === "warn"
+        ? "Reconnect evidence incomplete"
+        : summary.status === "fail"
+          ? "Reconnect evidence failing"
+          : "Waiting for reconnect evidence";
+  const detail =
+    latest?.profileDescription ??
+    "Run a reconnect smoke or use the demo disconnect hook to persist real browser reconnect evidence.";
+
+  return `<article class="voice-card voice-provider-health-card voice-reconnect-evidence-card voice-reconnect-evidence-card--${escapeHtml(summary.status)}" hx-get="/voice/reconnect-profile-evidence-card" hx-trigger="every 10s" hx-swap="outerHTML">
+  <header class="voice-barge-in-proof__header">
+    <span class="voice-framework-pill">Persisted Reconnect Evidence</span>
+    <strong>${escapeHtml(label)}</strong>
+  </header>
+  <p class="voice-footnote">${escapeHtml(detail)}</p>
+  <div class="voice-barge-in-proof__grid">
+    <div><span>Samples</span><strong>${escapeHtml(formatDemoCount(summary.sampleCount))}</strong></div>
+    <div><span>Snapshots</span><strong>${escapeHtml(formatDemoCount(summary.snapshotCount || reconnect?.snapshotCount || 0))}</strong></div>
+    <div><span>Resume p95</span><strong>${escapeHtml(formatDemoLatency(summary.resumeLatencyP95Ms ?? reconnect?.resumeLatencyP95Ms))}</strong></div>
+    <div><span>Last proof</span><strong>${escapeHtml(formatDemoAge(latest?.generatedAt ?? latest?.createdAt))}</strong></div>
+  </div>
+  ${
+    latest
+      ? `<p class="voice-footnote">Latest ${escapeHtml(latest.profileLabel ?? latest.profileId)} · ${escapeHtml(latest.sessionId)} · ${escapeHtml((latest.surfaces ?? []).join(", ") || "browser")}</p>`
+      : `<p class="voice-footnote">No persisted reconnect profile evidence yet.</p>`
+  }
+  <a href="/voice/reconnect-contract">Open reconnect contract</a> · <a href="/api/voice/real-call-profile-history">Open profile history JSON</a>
+</article>`;
 };
 
 const seedDemoRealCallProfileHistory = async () => {
@@ -8880,36 +9017,41 @@ const storeReconnectTrace = async (body: unknown) => {
   return { ok: true, sessionId };
 };
 
-const getLiveReconnectContractSnapshots = async (input: {
-  events?: readonly StoredVoiceTraceEvent[];
-} = {}) =>
+const getLiveReconnectContractSnapshots = async (
+  input: {
+    events?: readonly StoredVoiceTraceEvent[];
+  } = {},
+) =>
   summarizeVoiceReconnectContractSnapshots(
     input.events ? [...input.events] : await runtimeStorage.traces.list(),
   );
 
-const getReconnectContractSnapshotSource = async (input: {
-  events?: readonly StoredVoiceTraceEvent[];
-} = {}) =>
-  (await getLiveReconnectContractSnapshots(input)).length > 0
-    ? "live"
-    : "demo";
+const getReconnectContractSnapshotSource = async (
+  input: {
+    events?: readonly StoredVoiceTraceEvent[];
+  } = {},
+) =>
+  (await getLiveReconnectContractSnapshots(input)).length > 0 ? "live" : "demo";
 
-const getReconnectContractSnapshots = async (input: {
-  events?: readonly StoredVoiceTraceEvent[];
-} = {}) => {
+const getReconnectContractSnapshots = async (
+  input: {
+    events?: readonly StoredVoiceTraceEvent[];
+  } = {},
+) => {
   const snapshots = await getLiveReconnectContractSnapshots(input);
 
   return snapshots.length > 0 ? snapshots : getDemoReconnectContractSnapshots();
 };
 
-const buildDemoReconnectContractReport = async (input: {
-  events?: readonly StoredVoiceTraceEvent[];
-} = {}) => {
+const buildDemoReconnectContractReport = async (
+  input: {
+    events?: readonly StoredVoiceTraceEvent[];
+  } = {},
+) => {
   const snapshots = await getReconnectContractSnapshots(input);
   const source = snapshots.some((snapshot) =>
     input.events?.some(
-      (event) =>
-        event.type === "client.reconnect" && event.at === snapshot.at,
+      (event) => event.type === "client.reconnect" && event.at === snapshot.at,
     ),
   )
     ? "live"
@@ -9641,20 +9783,20 @@ const buildProductionReadinessObservabilityExport = async (
         }),
       )
     : buildVoiceObservabilityExport({
-    ...proofPackObservabilityExportOptions(),
-    audit: input.snapshot?.auditStore ?? productionReadinessAuditStore,
-    auditDeliveries: undefined,
-    callDebuggerReports: input.callDebuggerReports,
-    events:
-      input.snapshot?.traceEvents ??
-      (await productionReadinessTraceStore.list()),
-    includeOperationsRecords: false,
-    onTiming: input.onTiming,
-    operationsRecords: input.operationsRecords,
-    sessionSnapshots: input.sessionSnapshots,
-    store: input.snapshot?.traceStore ?? productionReadinessTraceStore,
-    traceDeliveries: undefined,
-  });
+        ...proofPackObservabilityExportOptions(),
+        audit: input.snapshot?.auditStore ?? productionReadinessAuditStore,
+        auditDeliveries: undefined,
+        callDebuggerReports: input.callDebuggerReports,
+        events:
+          input.snapshot?.traceEvents ??
+          (await productionReadinessTraceStore.list()),
+        includeOperationsRecords: false,
+        onTiming: input.onTiming,
+        operationsRecords: input.operationsRecords,
+        sessionSnapshots: input.sessionSnapshots,
+        store: input.snapshot?.traceStore ?? productionReadinessTraceStore,
+        traceDeliveries: undefined,
+      });
 
 const buildProofPackProviderSloReport = async (
   input: {
@@ -9747,11 +9889,13 @@ const buildDemoVoiceProofPack = async (input: {
         buildBrowserCallProfileReadinessCheck,
       ),
   );
-  const realCallProfileReadiness = context.cache("realCallProfileReadiness", () =>
-    context.time(
-      "additionalChecks:realCallProfile",
-      buildRealCallProfileReadinessCheck,
-    ),
+  const realCallProfileReadiness = context.cache(
+    "realCallProfileReadiness",
+    () =>
+      context.time(
+        "additionalChecks:realCallProfile",
+        buildRealCallProfileReadinessCheck,
+      ),
   );
   const realCallProfileRecoveryReadiness = context.cache(
     "realCallProfileRecoveryReadiness",
@@ -10168,7 +10312,9 @@ const productionReadinessOptions = (
     fast?: boolean;
     bargeInReport?: Promise<Awaited<ReturnType<typeof buildDemoBargeInReport>>>;
     browserCallProfileReadiness?: Promise<VoiceProductionReadinessCheck>;
-    deliveryRuntimeSummary?: ReturnType<typeof deliveryRuntimeControl.summarize>;
+    deliveryRuntimeSummary?: ReturnType<
+      typeof deliveryRuntimeControl.summarize
+    >;
     includeObservabilityExport?: boolean;
     onTiming?: (timing: VoiceProductionReadinessTiming) => void;
     realCallProfileReadiness?: Promise<VoiceProductionReadinessCheck>;
@@ -12117,6 +12263,23 @@ const server = new Elysia()
   .get("/api/voice/reconnect-contract", async () =>
     Response.json(await buildDemoReconnectContractReport()),
   )
+  .get("/api/voice/reconnect-profile-evidence", async () =>
+    Response.json(await readReconnectProfileEvidenceSummary()),
+  )
+  .get(
+    "/voice/reconnect-profile-evidence-card",
+    async () =>
+      new Response(
+        renderReconnectProfileEvidenceCardHTML(
+          await readReconnectProfileEvidenceSummary(),
+        ),
+        {
+          headers: {
+            "content-type": "text/html; charset=utf-8",
+          },
+        },
+      ),
+  )
   .get(
     "/voice/reconnect-contract",
     async () =>
@@ -12472,7 +12635,9 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
         },
       },
       audit: runtimeStorage.audit,
-      failureReplays: async () => [await buildDemoIncidentTimelineFailureReplay()],
+      failureReplays: async () => [
+        await buildDemoIncidentTimelineFailureReplay(),
+      ],
       links: {
         callDebugger: (sessionId) =>
           `/voice-call-debugger/${encodeURIComponent(sessionId)}`,

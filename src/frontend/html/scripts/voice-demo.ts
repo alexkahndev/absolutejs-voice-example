@@ -30,6 +30,7 @@ import {
   formatDateTime,
   formatReconnectState,
   mountDemoBargeInProof,
+  mountDemoReconnectProfileEvidence,
   mountVoiceLiveOpsPanel,
   pushVoiceWaveLevel,
   renderDemoLiveTurnLatencyHTML,
@@ -121,7 +122,12 @@ const voiceWavePath = document.querySelector("#voice-wave-path");
 const workflowStatusHost = document.querySelector("#workflow-status-card");
 const platformCoverageHost = document.querySelector("#platform-coverage-card");
 const proofTrendsHost = document.querySelector("#proof-trends-card");
-const profileComparisonHost = document.querySelector("#profile-comparison-card");
+const profileComparisonHost = document.querySelector(
+  "#profile-comparison-card",
+);
+const reconnectEvidenceHost = document.querySelector(
+  "#reconnect-evidence-card",
+);
 const profileSwitchHost = document.querySelector("#profile-switch-card");
 const readinessFailuresHost = document.querySelector(
   "#readiness-failures-card",
@@ -177,6 +183,7 @@ if (
   !(platformCoverageHost instanceof HTMLElement) ||
   !(proofTrendsHost instanceof HTMLElement) ||
   !(profileComparisonHost instanceof HTMLElement) ||
+  !(reconnectEvidenceHost instanceof HTMLElement) ||
   !(profileSwitchHost instanceof HTMLElement) ||
   !(readinessFailuresHost instanceof HTMLElement) ||
   !(providerCapabilitiesHost instanceof HTMLElement) ||
@@ -248,10 +255,13 @@ const profileComparison = mountVoiceProfileComparison(
   profileComparisonHost,
   "/api/voice/real-call-profile-history",
   {
-    description: `${framework.toUpperCase()} renders measured profile defaults behind each selected stack.`,
+    description: `${framework.toUpperCase()} renders measured profile defaults and persisted reconnect resume evidence behind each selected stack.`,
     intervalMs: 10_000,
-    title: "Profile Stack Comparison",
+    title: "Profile + Reconnect Evidence",
   },
+);
+const reconnectEvidence = mountDemoReconnectProfileEvidence(
+  reconnectEvidenceHost,
 );
 const profileSwitchRecommendation = mountVoiceProfileSwitchRecommendation(
   profileSwitchHost,
@@ -606,8 +616,9 @@ const render = () => {
   profileSwitchGuardMetric.textContent = formatVoiceProfileSwitchGuardLabel(
     profileSwitchGuardDecision,
   );
-  profileSwitchGuardSummary.textContent =
-    formatVoiceProfileSwitchGuardSummary(profileSwitchGuardDecision);
+  profileSwitchGuardSummary.textContent = formatVoiceProfileSwitchGuardSummary(
+    profileSwitchGuardDecision,
+  );
   routingModeCopy.textContent = `${getVoiceProfileLabel(profileId)} uses ${
     VOICE_PROFILES.find((item) => item.id === profileId)?.description ??
     "the selected real-call defaults."
@@ -744,6 +755,7 @@ window.addEventListener("beforeunload", () => {
   guidedVoice.close();
   generalVoice.close();
   profileComparison.close();
+  reconnectEvidence.close();
   profileSwitchRecommendation.close();
 });
 

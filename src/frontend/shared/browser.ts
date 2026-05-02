@@ -14,14 +14,12 @@ import type {
   VoiceBargeInMonitor,
   VoiceBargeInReport,
   VoiceOpsStatusReport,
+  VoiceRealCallProfileEvidenceRecord,
   VoiceReconnectClientState,
   VoiceRoutingDecisionSummary,
   VoiceStreamState,
 } from "@absolutejs/voice";
-import type {
-  SavedIntake,
-  VoiceAgentSquadDemoStatus,
-} from "../../shared/demo";
+import type { SavedIntake, VoiceAgentSquadDemoStatus } from "../../shared/demo";
 
 export type { VoiceLiveOpsAction };
 
@@ -126,9 +124,7 @@ export const fetchBargeInReport = async () => {
   return (await response.json()) as VoiceBargeInReport;
 };
 
-export const getOpsStatusLabel = (
-  report?: VoiceOpsStatusReport | null,
-) => {
+export const getOpsStatusLabel = (report?: VoiceOpsStatusReport | null) => {
   if (!report) {
     return "Checking";
   }
@@ -142,9 +138,7 @@ export const formatDateTime = (value: number) =>
     timeStyle: "short",
   });
 
-export const formatReconnectState = (
-  reconnect: VoiceReconnectClientState,
-) => {
+export const formatReconnectState = (reconnect: VoiceReconnectClientState) => {
   const pieces: string[] = [reconnect.status];
 
   if (reconnect.attempts > 0 || reconnect.maxAttempts > 0) {
@@ -157,6 +151,156 @@ export const formatReconnectState = (
   }
 
   return pieces.join(" · ");
+};
+
+export type VoiceReconnectProfileEvidenceSummary = {
+  evidence: VoiceRealCallProfileEvidenceRecord[];
+  generatedAt: string;
+  latest?: VoiceRealCallProfileEvidenceRecord;
+  ok: boolean;
+  profileId: string;
+  resumeLatencyP95Ms?: number;
+  sampleCount: number;
+  snapshotCount: number;
+  sourceHref: string;
+  status: "empty" | "fail" | "pass" | "warn";
+};
+
+export const fetchReconnectProfileEvidence = async () => {
+  const response = await fetch("/api/voice/reconnect-profile-evidence");
+
+  if (!response.ok) {
+    throw new Error(`Reconnect profile evidence failed: ${response.status}`);
+  }
+
+  return (await response.json()) as VoiceReconnectProfileEvidenceSummary;
+};
+
+const formatCount = (value: number) =>
+  new Intl.NumberFormat("en-US").format(value);
+
+const formatEvidenceAge = (value?: string) => {
+  if (!value) {
+    return "No evidence";
+  }
+
+  const elapsedMs = Date.now() - Date.parse(value);
+
+  if (!Number.isFinite(elapsedMs) || elapsedMs < 0) {
+    return "Just now";
+  }
+
+  const minutes = Math.floor(elapsedMs / 60_000);
+  if (minutes < 1) {
+    return "Just now";
+  }
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) {
+    return `${hours}h ago`;
+  }
+
+  return `${Math.floor(hours / 24)}d ago`;
+};
+
+export const renderDemoReconnectProfileEvidenceHTML = (
+  summary: VoiceReconnectProfileEvidenceSummary | null,
+  error?: string | null,
+) => {
+  const status = error ? "fail" : (summary?.status ?? "empty");
+  const latest = summary?.latest;
+  const reconnect = latest?.reconnect;
+  const statusLabel =
+    status === "pass"
+      ? "Reconnect evidence passing"
+      : status === "warn"
+        ? "Reconnect evidence incomplete"
+        : status === "fail"
+          ? "Reconnect evidence failing"
+          : "Waiting for reconnect evidence";
+  const detail =
+    error ??
+    latest?.profileDescription ??
+    "Run a reconnect smoke or use the demo disconnect hook to persist real browser reconnect evidence.";
+
+  return `<article class="voice-card voice-provider-health-card voice-reconnect-evidence-card voice-reconnect-evidence-card--${escapeHtml(status)}">
+  <header class="voice-barge-in-proof__header">
+    <span class="voice-framework-pill">Persisted Reconnect Evidence</span>
+    <strong>${escapeHtml(statusLabel)}</strong>
+  </header>
+  <p class="voice-footnote">${escapeHtml(detail)}</p>
+  <div class="voice-barge-in-proof__grid">
+    <div>
+      <span>Samples</span>
+      <strong>${escapeHtml(formatCount(summary?.sampleCount ?? 0))}</strong>
+    </div>
+    <div>
+      <span>Snapshots</span>
+      <strong>${escapeHtml(formatCount(summary?.snapshotCount ?? reconnect?.snapshotCount ?? 0))}</strong>
+    </div>
+    <div>
+      <span>Resume p95</span>
+      <strong>${escapeHtml(formatLatency(summary?.resumeLatencyP95Ms ?? reconnect?.resumeLatencyP95Ms))}</strong>
+    </div>
+    <div>
+      <span>Last proof</span>
+      <strong>${escapeHtml(formatEvidenceAge(latest?.generatedAt ?? latest?.createdAt))}</strong>
+    </div>
+  </div>
+  ${
+    latest
+      ? `<p class="voice-footnote">Latest ${escapeHtml(latest.profileLabel ?? latest.profileId)} · ${escapeHtml(latest.sessionId)} · ${escapeHtml((latest.surfaces ?? []).join(", ") || "browser")}</p>`
+      : `<p class="voice-footnote">No persisted reconnect profile evidence yet.</p>`
+  }
+  <a href="/voice/reconnect-contract">Open reconnect contract</a> · <a href="/api/voice/real-call-profile-history">Open profile history JSON</a>
+</article>`;
+};
+
+export const mountDemoReconnectProfileEvidence = (
+  element: HTMLElement,
+  options: { intervalMs?: number } = {},
+) => {
+  let isClosed = false;
+  let timer: ReturnType<typeof setInterval> | null = null;
+  let summary: VoiceReconnectProfileEvidenceSummary | null = null;
+  let errorMessage: string | null = null;
+
+  const render = () => {
+    element.innerHTML = renderDemoReconnectProfileEvidenceHTML(
+      summary,
+      errorMessage,
+    );
+  };
+
+  const refresh = async () => {
+    try {
+      summary = await fetchReconnectProfileEvidence();
+      errorMessage = null;
+    } catch (error) {
+      errorMessage = formatErrorMessage(error);
+    }
+
+    if (!isClosed) {
+      render();
+    }
+  };
+
+  render();
+  void refresh();
+  timer = setInterval(refresh, options.intervalMs ?? 10_000);
+
+  return {
+    close: () => {
+      isClosed = true;
+      if (timer) {
+        clearInterval(timer);
+      }
+    },
+    refresh,
+  };
 };
 
 export const formatErrorMessage = (error: unknown): string => {
@@ -322,7 +466,10 @@ const createBargeInTestChunk = () => {
     const pulse = 0.55 + 0.25 * Math.sin(2 * Math.PI * 2.2 * seconds);
     const fadeIn = Math.min(1, seconds / 0.08);
     const fadeOut = Math.min(1, (durationSeconds - seconds) / 0.18);
-    const sample = Math.max(-1, Math.min(1, carrier * pulse * fadeIn * fadeOut));
+    const sample = Math.max(
+      -1,
+      Math.min(1, carrier * pulse * fadeIn * fadeOut),
+    );
     view.setInt16(index * 2, Math.round(sample * 0x7fff), true);
   }
 
@@ -551,7 +698,10 @@ export const mountDemoBargeInProof = (
 
   const onClick = (event: Event) => {
     const target = event.target;
-    if (target instanceof HTMLElement && target.closest("[data-barge-in-test]")) {
+    if (
+      target instanceof HTMLElement &&
+      target.closest("[data-barge-in-test]")
+    ) {
       void runTest();
     }
   };
@@ -643,7 +793,9 @@ export const createDemoBargeInEvidence = <TResult = unknown>(
 
     if (audioCount > 0) {
       notifyAssistantOutput();
-      void getPlayer().start().catch(() => {});
+      void getPlayer()
+        .start()
+        .catch(() => {});
     }
   };
 
@@ -654,7 +806,8 @@ export const createDemoBargeInEvidence = <TResult = unknown>(
     const isRecentAssistantOutput =
       Date.now() - lastAssistantAt <=
       (options.recentAssistantWindowMs ?? 4_000);
-    const isSpeechLike = getPcmLevel(audio) >= (options.speechThreshold ?? 0.04);
+    const isSpeechLike =
+      getPcmLevel(audio) >= (options.speechThreshold ?? 0.04);
 
     if (isSpeechLike && player?.isPlaying) {
       monitor.recordRequested({
@@ -796,7 +949,8 @@ export const VOICE_LIVE_OPS_ACTIONS: Array<{
   },
   {
     action: "pause-assistant",
-    description: "Stop assistant-side automation while the operator intervenes.",
+    description:
+      "Stop assistant-side automation while the operator intervenes.",
     label: "Pause assistant",
   },
   {
@@ -828,13 +982,13 @@ export const postVoiceLiveOpsAction = async (input: {
   sessionId: string | null | undefined;
   tag?: string;
 }) => {
-  return await postCoreVoiceLiveOpsAction(
+  return (await postCoreVoiceLiveOpsAction(
     {
       ...input,
       sessionId: input.sessionId ?? "",
     },
     { actionPath: "/api/voice/live-ops/action" },
-  ) as VoiceLiveOpsActionResult;
+  )) as VoiceLiveOpsActionResult;
 };
 
 export const renderVoiceLiveOpsResultHTML = (
@@ -933,13 +1087,16 @@ export const mountVoiceLiveOpsPanel = (
   };
 
   const onClick = async (event: Event) => {
-    const button = event.target instanceof Element
-      ? event.target.closest("[data-live-ops-action]")
-      : null;
+    const button =
+      event.target instanceof Element
+        ? event.target.closest("[data-live-ops-action]")
+        : null;
     if (!(button instanceof HTMLButtonElement)) {
       return;
     }
-    const action = button.dataset.liveOpsAction as VoiceLiveOpsAction | undefined;
+    const action = button.dataset.liveOpsAction as
+      | VoiceLiveOpsAction
+      | undefined;
     if (!action) {
       return;
     }

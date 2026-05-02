@@ -80,6 +80,7 @@ import {
   formatDateTime,
   formatReconnectState,
   mountDemoBargeInProof,
+  mountDemoReconnectProfileEvidence,
   mountVoiceLiveOpsPanel,
   pushVoiceWaveLevel,
   renderDemoLiveTurnLatencyHTML,
@@ -145,8 +146,8 @@ const profileComparisonModel = computed(() =>
     },
     {
       description:
-        "Vue renders measured profile defaults behind each selected stack.",
-      title: "Profile Stack Comparison",
+        "Vue renders measured profile defaults and persisted reconnect resume evidence behind each selected stack.",
+      title: "Profile + Reconnect Evidence",
     },
   ),
 );
@@ -239,12 +240,16 @@ const savedIntakes = ref<SavedIntake[]>([]);
 const agentSquadStatus = ref<VoiceAgentSquadDemoStatus | null>(null);
 const waveLevels = ref(createInitialVoiceWaveLevels());
 const bargeInProofEl = ref<HTMLElement | null>(null);
+const reconnectEvidenceEl = ref<HTMLElement | null>(null);
 const opsActionHistoryEl = ref<HTMLElement | null>(null);
 const liveOpsPanelEl = ref<HTMLElement | null>(null);
 const liveLatencyHTML = ref("");
 let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
+let reconnectEvidence: ReturnType<
+  typeof mountDemoReconnectProfileEvidence
+> | null = null;
 let opsActionHistory: ReturnType<typeof mountVoiceOpsActionHistory> | null =
   null;
 let liveOpsPanel: ReturnType<typeof mountVoiceLiveOpsPanel> | null = null;
@@ -277,9 +282,7 @@ const errorMessage = computed(
   () => micError.value || currentVoice.value.error.value || "None",
 );
 const profileSwitchGuardDecision = computed(() =>
-  getVoiceProfileSwitchGuardDecision(
-    currentVoice.value.sessionMetadata.value,
-  ),
+  getVoiceProfileSwitchGuardDecision(currentVoice.value.sessionMetadata.value),
 );
 const currentPrompt = computed(() =>
   getVoiceModePrompt({
@@ -473,6 +476,11 @@ onMounted(() => {
   if (bargeInProofEl.value) {
     bargeInProof = mountDemoBargeInProof(bargeInProofEl.value);
   }
+  if (reconnectEvidenceEl.value) {
+    reconnectEvidence = mountDemoReconnectProfileEvidence(
+      reconnectEvidenceEl.value,
+    );
+  }
   if (opsActionHistoryEl.value) {
     opsActionHistory = mountVoiceOpsActionHistory(
       opsActionHistoryEl.value,
@@ -535,6 +543,7 @@ onUnmounted(() => {
     clearInterval(refreshTimer);
   }
   bargeInProof?.close();
+  reconnectEvidence?.close();
   opsActionHistory?.close();
   liveOpsPanel?.close();
   unsubscribeProfileSwitch();
@@ -790,6 +799,8 @@ onUnmounted(() => {
             }}
           </p>
         </section>
+
+        <div ref="reconnectEvidenceEl" />
 
         <div
           class="voice-card voice-provider-health-card"

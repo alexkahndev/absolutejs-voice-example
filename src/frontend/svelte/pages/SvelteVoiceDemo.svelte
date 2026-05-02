@@ -84,6 +84,7 @@
     formatDateTime,
     formatReconnectState,
     mountDemoBargeInProof,
+    mountDemoReconnectProfileEvidence,
     mountVoiceLiveOpsPanel,
     pushVoiceWaveLevel,
     renderDemoLiveTurnLatencyHTML,
@@ -175,9 +176,13 @@
   let waveLevels = $state(createInitialVoiceWaveLevels());
   let microphone: ReturnType<typeof createDemoMicrophone> | null = null;
   let bargeInProofElement: HTMLElement | null = null;
+  let reconnectEvidenceElement: HTMLElement | null = null;
   let opsActionHistoryElement: HTMLElement | null = null;
   let liveOpsPanelElement: HTMLElement | null = null;
   let bargeInProof: ReturnType<typeof mountDemoBargeInProof> | null = null;
+  let reconnectEvidence: ReturnType<
+    typeof mountDemoReconnectProfileEvidence
+  > | null = null;
   let opsActionHistory: ReturnType<typeof mountVoiceOpsActionHistory> | null =
     null;
   let liveOpsPanel: ReturnType<typeof mountVoiceLiveOpsPanel> | null = null;
@@ -216,8 +221,8 @@
   );
   const profileComparisonWidgetOptions = {
     description:
-      "Svelte renders measured profile defaults behind each selected stack.",
-    title: "Profile Stack Comparison",
+      "Svelte renders measured profile defaults and persisted reconnect resume evidence behind each selected stack.",
+    title: "Profile + Reconnect Evidence",
   };
   profileComparisonHTML = renderVoiceProfileComparisonHTML(
     profileComparison.getSnapshot(),
@@ -397,7 +402,10 @@
     activeMode === "general" ? generalState : guidedState,
   );
   const simulateDisconnect = () =>
-    (activeMode === "general" ? generalVoice : guidedVoice)?.simulateDisconnect();
+    (activeMode === "general"
+      ? generalVoice
+      : guidedVoice
+    )?.simulateDisconnect();
   let campaignDialerProofReadyProviders = $derived(
     (
       campaignDialerProofSnapshot?.status?.providers ?? [
@@ -769,6 +777,11 @@
     if (bargeInProofElement) {
       bargeInProof = mountDemoBargeInProof(bargeInProofElement);
     }
+    if (reconnectEvidenceElement) {
+      reconnectEvidence = mountDemoReconnectProfileEvidence(
+        reconnectEvidenceElement,
+      );
+    }
     if (opsActionHistoryElement) {
       opsActionHistory = mountVoiceOpsActionHistory(
         opsActionHistoryElement,
@@ -859,6 +872,7 @@
     unsubscribeTurnQuality();
     unsubscribeTurnLatency();
     bargeInProof?.close();
+    reconnectEvidence?.close();
     opsActionHistory?.close();
     liveOpsPanel?.close();
     guidedVoice?.close();
@@ -951,9 +965,7 @@
             <div class="voice-metric">
               <span class="voice-metric-label">Guarded profile</span>
               <span class="voice-metric-value">
-                {formatVoiceProfileSwitchGuardLabel(
-                  profileSwitchGuardDecision,
-                )}
+                {formatVoiceProfileSwitchGuardLabel(profileSwitchGuardDecision)}
               </span>
               <span class="voice-metric-label">
                 {formatVoiceProfileSwitchGuardSummary(
@@ -1043,6 +1055,8 @@
       <div class="voice-card voice-provider-health-card">
         {@html profileComparisonHTML}
       </div>
+
+      <div bind:this={reconnectEvidenceElement}></div>
 
       <div class="voice-card voice-provider-health-card">
         {@html profileSwitchHTML}

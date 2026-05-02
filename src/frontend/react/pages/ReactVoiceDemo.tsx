@@ -39,6 +39,7 @@ import {
   formatDateTime,
   formatReconnectState,
   mountDemoBargeInProof,
+  mountDemoReconnectProfileEvidence,
   mountVoiceLiveOpsPanel,
   pushVoiceWaveLevel,
   renderDemoLiveTurnLatencyHTML,
@@ -144,6 +145,7 @@ export const ReactVoiceDemo = ({
   const opsActionHistoryRef = useRef<HTMLDivElement | null>(null);
   const liveOpsPanelRef = useRef<HTMLDivElement | null>(null);
   const bargeInProofRef = useRef<HTMLDivElement | null>(null);
+  const reconnectEvidenceRef = useRef<HTMLDivElement | null>(null);
   const bargeInRef = useRef<ReturnType<
     typeof createDemoBargeInEvidence
   > | null>(null);
@@ -214,7 +216,9 @@ export const ReactVoiceDemo = ({
         "absolute-voice-simulate-disconnect",
         simulateDisconnect,
       );
-      if (demoWindow.__absoluteVoiceDemoSimulateDisconnect === simulateDisconnect) {
+      if (
+        demoWindow.__absoluteVoiceDemoSimulateDisconnect === simulateDisconnect
+      ) {
         delete demoWindow.__absoluteVoiceDemoSimulateDisconnect;
       }
     };
@@ -276,6 +280,16 @@ export const ReactVoiceDemo = ({
 
     const proof = mountDemoBargeInProof(bargeInProofRef.current);
     return () => proof.close();
+  }, []);
+  useEffect(() => {
+    if (!reconnectEvidenceRef.current) {
+      return;
+    }
+
+    const evidence = mountDemoReconnectProfileEvidence(
+      reconnectEvidenceRef.current,
+    );
+    return () => evidence.close();
   }, []);
   useEffect(() => {
     if (!opsActionHistoryRef.current) {
@@ -675,11 +689,13 @@ export const ReactVoiceDemo = ({
 
             <VoiceProfileComparison
               className="voice-card voice-provider-health-card"
-              description="React renders measured profile defaults so users can see why each voice stack was selected."
+              description="React renders measured profile defaults and persisted reconnect resume evidence so users can see why each voice stack was selected."
               intervalMs={10_000}
               path="/api/voice/real-call-profile-history"
-              title="Profile Stack Comparison"
+              title="Profile + Reconnect Evidence"
             />
+
+            <div ref={reconnectEvidenceRef} />
 
             <VoiceProfileSwitchRecommendation
               className="voice-card voice-provider-health-card"

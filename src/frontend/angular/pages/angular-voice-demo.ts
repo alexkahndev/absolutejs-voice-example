@@ -82,6 +82,7 @@ import {
   createDemoMicrophone,
   fetchAgentSquadDemoStatus,
   fetchBargeInReport,
+  fetchReconnectProfileEvidence,
   fetchSavedIntakes,
   getOpsStatusLabel,
   formatErrorMessage,
@@ -90,6 +91,7 @@ import {
   postVoiceLiveOpsAction,
   renderDemoBargeInProofHTML,
   renderDemoLiveTurnLatencyHTML,
+  renderDemoReconnectProfileEvidenceHTML,
   renderVoiceLiveOpsResultHTML,
   pushVoiceWaveLevel,
   VOICE_LIVE_OPS_ACTIONS,
@@ -344,10 +346,12 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
 
           <absolute-voice-profile-comparison
             class="voice-card voice-provider-health-card"
-            description="Angular renders measured profile defaults behind each selected stack."
+            description="Angular renders measured profile defaults and persisted reconnect resume evidence behind each selected stack."
             interval-ms="10000"
-            title="Profile Stack Comparison"
+            title="Profile + Reconnect Evidence"
           ></absolute-voice-profile-comparison>
+
+          <div [innerHTML]="reconnectEvidenceHtml()"></div>
 
           <absolute-voice-profile-switch
             class="voice-card voice-provider-health-card"
@@ -574,15 +578,21 @@ export const INITIAL_SPEECH_ENGINE = new InjectionToken<VoiceSpeechEngine>(
                 </div>
                 <div>
                   <span>LLM</span>
-                  <strong>{{ formatProviderRoute(decision.providerRoutes, "llm") }}</strong>
+                  <strong>{{
+                    formatProviderRoute(decision.providerRoutes, "llm")
+                  }}</strong>
                 </div>
                 <div>
                   <span>STT</span>
-                  <strong>{{ formatProviderRoute(decision.providerRoutes, "stt") }}</strong>
+                  <strong>{{
+                    formatProviderRoute(decision.providerRoutes, "stt")
+                  }}</strong>
                 </div>
                 <div>
                   <span>TTS</span>
-                  <strong>{{ formatProviderRoute(decision.providerRoutes, "tts") }}</strong>
+                  <strong>{{
+                    formatProviderRoute(decision.providerRoutes, "tts")
+                  }}</strong>
                 </div>
                 <div>
                   <span>Fallback path</span>
@@ -1478,8 +1488,7 @@ export class AngularVoiceDemoComponent {
   getVoiceProfileLabel = getVoiceProfileLabel;
   getVoiceRoutingLabel = getVoiceRoutingLabel;
   formatVoiceProfileSwitchGuardLabel = formatVoiceProfileSwitchGuardLabel;
-  formatVoiceProfileSwitchGuardSummary =
-    formatVoiceProfileSwitchGuardSummary;
+  formatVoiceProfileSwitchGuardSummary = formatVoiceProfileSwitchGuardSummary;
   getOpsStatusLabel = getOpsStatusLabel;
   hasStartedModes = signal<Record<VoiceDemoMode, boolean>>({
     general: false,
@@ -1491,6 +1500,7 @@ export class AngularVoiceDemoComponent {
   liveMicCopy = VOICE_DEMO_MIC_LIVE;
   micError = signal<string | null>(null);
   bargeInProofHtml = signal(renderDemoBargeInProofHTML(null));
+  reconnectEvidenceHtml = signal(renderDemoReconnectProfileEvidenceHTML(null));
   liveLatencyHtml = signal("");
   liveOpsAssignee = signal("demo-operator");
   liveOpsDetail = signal("Operator marked this live session.");
@@ -1666,9 +1676,7 @@ export class AngularVoiceDemoComponent {
     }
 
     const value = (routes as Record<string, unknown>)[role];
-    return typeof value === "string" && value.trim()
-      ? value
-      : "Not configured";
+    return typeof value === "string" && value.trim() ? value : "Not configured";
   }
   formatFallbackPath(decision: VoiceRoutingDecisionSummary) {
     const provider = decision.provider || "Unknown";
@@ -1688,9 +1696,7 @@ export class AngularVoiceDemoComponent {
     this.activeMode() === "general" ? this.generalVoice : this.guidedVoice,
   );
   profileSwitchGuardDecision = computed(() =>
-    getVoiceProfileSwitchGuardDecision(
-      this.currentVoice().sessionMetadata(),
-    ),
+    getVoiceProfileSwitchGuardDecision(this.currentVoice().sessionMetadata()),
   );
   waveLevels = signal(createInitialVoiceWaveLevels());
   currentPrompt = computed(() =>
@@ -1776,8 +1782,10 @@ export class AngularVoiceDemoComponent {
         this.simulateDisconnect,
       );
       void this.refreshBargeInProof();
+      void this.refreshReconnectEvidence();
       this.bargeInProofTimer = setInterval(() => {
         void this.refreshBargeInProof();
+        void this.refreshReconnectEvidence();
       }, 3_000);
       void this.refreshIntakes();
       this.refreshTimer = setInterval(() => {
@@ -1826,6 +1834,20 @@ export class AngularVoiceDemoComponent {
     } catch (error) {
       this.bargeInProofHtml.set(
         renderDemoBargeInProofHTML(null, formatErrorMessage(error)),
+      );
+    }
+  }
+
+  async refreshReconnectEvidence() {
+    try {
+      this.reconnectEvidenceHtml.set(
+        renderDemoReconnectProfileEvidenceHTML(
+          await fetchReconnectProfileEvidence(),
+        ),
+      );
+    } catch (error) {
+      this.reconnectEvidenceHtml.set(
+        renderDemoReconnectProfileEvidenceHTML(null, formatErrorMessage(error)),
       );
     }
   }
