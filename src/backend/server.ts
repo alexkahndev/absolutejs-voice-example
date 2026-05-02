@@ -64,6 +64,7 @@ import {
   createVoicePostCallAnalysisRoutes,
   createVoiceProofTrendRecommendationRoutes,
   createVoiceProofTrendRoutes,
+  createVoiceRealCallEvidenceRuntimeRoutes,
   createVoiceRealCallProfileHistoryRoutes,
   createVoiceRealCallProfileRecoveryActionRoutes,
   createVoiceRealCallProfileTraceCollector,
@@ -3990,6 +3991,17 @@ const proofTrendsMaxAgeMs =
   configuredProofTrendsMaxAgeMs > 0
     ? configuredProofTrendsMaxAgeMs
     : 24 * 60 * 60 * 1000;
+const realCallEvidenceRuntimeRoutes = createVoiceRealCallEvidenceRuntimeRoutes({
+  evidenceStore: realCallProfileEvidenceStore,
+  existingEvidenceLimit: 5000,
+  history: {
+    maxAgeMs: proofTrendsMaxAgeMs,
+    source: ".voice-runtime/real-call-evidence-runtime",
+  },
+  name: "absolutejs-voice-example-real-call-evidence-runtime",
+  title: "AbsoluteJS Voice Real-Call Evidence Runtime",
+  traceStore: deliveryTraceStore,
+});
 const configuredSloCalibrationMinRuns = Number(
   process.env.VOICE_SLO_CALIBRATION_MIN_RUNS ?? 1,
 );
@@ -13067,6 +13079,7 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
       title: "AbsoluteJS Voice Real-Call Profile History",
     }),
   )
+  .use(realCallEvidenceRuntimeRoutes)
   .use(
     createVoiceRealCallProfileRecoveryActionRoutes({
       asyncActionIds: ["collect-browser-proof", "collect-phone-proof"],
