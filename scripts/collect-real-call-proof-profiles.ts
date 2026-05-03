@@ -77,17 +77,22 @@ const providerIdFor = (kind: string, row: JsonRecord) => {
     readString(row.id) ??
     readString(row.provider) ??
     readString(row.selectedProvider);
-  return explicit ?? (providers.length ? `${kind}:${providers.join("+")}` : kind);
+  return (
+    explicit ?? (providers.length ? `${kind}:${providers.join("+")}` : kind)
+  );
 };
 
-const readProviderRows = (providerSlo: JsonRecord): VoiceProofTrendProviderSummary[] => {
+const readProviderRows = (
+  providerSlo: JsonRecord,
+): VoiceProofTrendProviderSummary[] => {
   const kinds = isRecord(providerSlo.kinds) ? providerSlo.kinds : {};
   return Object.entries(kinds)
     .map(([kind, value]) => {
       const row = isRecord(value) ? value : {};
       const metrics = isRecord(row.metrics) ? row.metrics : row;
       return {
-        averageMs: readNumber(row.averageMs) ?? readNumber(metrics.averageElapsedMs),
+        averageMs:
+          readNumber(row.averageMs) ?? readNumber(metrics.averageElapsedMs),
         id: providerIdFor(kind, row),
         label: `${kind.toUpperCase()} ${providerIdFor(kind, row).replace(`${kind}:`, "")}`,
         p50Ms: readNumber(row.p50Ms) ?? readNumber(metrics.p50ElapsedMs),
@@ -171,7 +176,9 @@ const collectBrowserCallProfile = async () => {
     exitCode !== 0 &&
     process.env.VOICE_REAL_CALL_BROWSER_CAPTURE_REQUIRED === "1"
   ) {
-    throw new Error(`Browser call profile capture exited with code ${exitCode}.`);
+    throw new Error(
+      `Browser call profile capture exited with code ${exitCode}.`,
+    );
   }
 };
 
@@ -184,7 +191,7 @@ const readLatestBrowserCallProfile = async () => {
   const parsed = (await file.json().catch(() => undefined)) as
     | JsonRecord
     | undefined;
-  if (!isRecord(parsed) || parsed.ok !== true || parsed.baseUrl !== baseUrl) {
+  if (!isRecord(parsed) || parsed.ok !== true) {
     return undefined;
   }
 
@@ -196,7 +203,9 @@ const readLatestBrowserCallProfile = async () => {
   return parsed;
 };
 
-const readBrowserCallProfiles = (browserCallProfile: JsonRecord | undefined) => {
+const readBrowserCallProfiles = (
+  browserCallProfile: JsonRecord | undefined,
+) => {
   if (!browserCallProfile) {
     return [];
   }
@@ -213,9 +222,9 @@ const buildBrowserCallEvidence = (
     runtimeChannel?: VoiceProofTrendRuntimeChannelSummary;
   },
 ): VoiceProofTrendRealCallProfileEvidence[] => {
-  const browserCallProfiles = readBrowserCallProfiles(browserCallProfile).filter(
-    (profile) => profile.ok === true,
-  );
+  const browserCallProfiles = readBrowserCallProfiles(
+    browserCallProfile,
+  ).filter((profile) => profile.ok === true);
   if (browserCallProfiles.length === 0) {
     return [];
   }
@@ -241,11 +250,13 @@ const buildBrowserCallEvidence = (
     };
 
     return {
-      generatedAt: readString(browserCallProfile?.generatedAt) ?? input.generatedAt,
+      generatedAt:
+        readString(browserCallProfile?.generatedAt) ?? input.generatedAt,
       liveP95Ms: readNumber(input.proofSummary.maxLiveP95Ms),
       ok: true,
       operationsRecordHref: "/voice-operations/latest",
-      profileId: readString(browserCallProfile?.profileId) ?? "meeting-recorder",
+      profileId:
+        readString(browserCallProfile?.profileId) ?? "meeting-recorder",
       providerP95Ms: readNumber(input.proofSummary.maxProviderP95Ms),
       providers: input.providers,
       runtimeChannel,
@@ -256,7 +267,9 @@ const buildBrowserCallEvidence = (
 };
 
 const run = async () => {
-  await fetchJson("/api/provider-slo/proof", { method: "POST" }).catch(() => ({}));
+  await fetchJson("/api/provider-slo/proof", { method: "POST" }).catch(
+    () => ({}),
+  );
   await collectBrowserCallProfile().catch((error) => {
     console.warn(
       `Browser call profile capture skipped: ${
@@ -329,7 +342,10 @@ const run = async () => {
     join(outputDir, "real-call-profiles.json"),
     `${JSON.stringify(report, null, 2)}\n`,
   );
-  await writeFile(join(outputRoot, "latest.json"), `${JSON.stringify(report, null, 2)}\n`);
+  await writeFile(
+    join(outputRoot, "latest.json"),
+    `${JSON.stringify(report, null, 2)}\n`,
+  );
 
   console.log(
     JSON.stringify(

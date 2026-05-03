@@ -737,6 +737,15 @@ const productionReadinessProofRuntime =
     cacheMs: 10_000,
     traceMaxAgeMs: 30 * 60 * 1000,
   });
+const configuredProductionReadinessCacheMs = Number(
+  process.env.VOICE_PRODUCTION_READINESS_CACHE_MS ??
+    productionReadinessProofRuntime.options.cacheMs,
+);
+const productionReadinessCacheMs =
+  Number.isFinite(configuredProductionReadinessCacheMs) &&
+  configuredProductionReadinessCacheMs >= 0
+    ? configuredProductionReadinessCacheMs
+    : productionReadinessProofRuntime.options.cacheMs;
 const productionReadinessTraceStore = productionReadinessProofRuntime.store;
 const hiddenTraceTimelineSessionPattern =
   /^(latency-proof-|phone-|provider-sim-|quality-routing-proof$|stt-contract-|stt-sim-|tts-contract-|tts-sim-)/;
@@ -2159,30 +2168,10 @@ const resolveVoiceProfileIdFromContext = (context: unknown) => {
   const scenarioId = readQueryString(query, ["scenarioId"]);
   return scenarioId === "guided" ? "support-agent" : "meeting-recorder";
 };
-let realCallProfileDefaultsCache:
-  | {
-      expiresAt: number;
-      report: ReturnType<typeof buildVoiceRealCallProfileHistoryReport>;
-    }
-  | undefined;
-const realCallProfileDefaultsCacheMs = 60_000;
 const readRealCallProfileDefaultsReport = async () => {
-  const now = Date.now();
-  if (
-    realCallProfileDefaultsCache &&
-    realCallProfileDefaultsCache.expiresAt > now
-  ) {
-    return realCallProfileDefaultsCache.report;
-  }
-
-  const report = buildVoiceRealCallProfileHistoryReport(
+  return buildVoiceRealCallProfileHistoryReport(
     await readRealCallProfileHistory(),
   );
-  realCallProfileDefaultsCache = {
-    expiresAt: now + realCallProfileDefaultsCacheMs,
-    report,
-  };
-  return report;
 };
 const resolveProfileProviderRoute = async <TProvider extends string>(input: {
   availableProviders: readonly TProvider[];
@@ -3965,18 +3954,30 @@ type VapiCoverageSummary = VoicePlatformCoverageSummary & {
   vapiCoverage: VoicePlatformCoverageSurface[];
 };
 
-const latestProofPackJsonPath = ".voice-runtime/proof-pack/latest.json";
-const latestProofPackMarkdownPath = ".voice-runtime/proof-pack/latest.md";
-const longProofWindowRoot = ".voice-runtime/long-proof-window";
-const latestBrowserCallProfilesJsonPath =
-  ".voice-runtime/browser-call-profiles/latest.json";
+const latestProofPackJsonPath = resolve(
+  runtimeDirectory,
+  "proof-pack/latest.json",
+);
+const latestProofPackMarkdownPath = resolve(
+  runtimeDirectory,
+  "proof-pack/latest.md",
+);
+const longProofWindowRoot = resolve(runtimeDirectory, "long-proof-window");
+const latestBrowserCallProfilesJsonPath = resolve(
+  runtimeDirectory,
+  "browser-call-profiles/latest.json",
+);
 const realCallProfilesRoot =
   process.env.VOICE_REAL_CALL_PROFILES_ROOT ??
-  ".voice-runtime/real-call-profiles";
-const realCallProfileRecoveryJobsPath =
-  ".voice-runtime/real-call-recovery/jobs.sqlite";
-const realCallProfileEvidencePath =
-  ".voice-runtime/real-call-profile-evidence.sqlite";
+  resolve(runtimeDirectory, "real-call-profiles");
+const realCallProfileRecoveryJobsPath = resolve(
+  runtimeDirectory,
+  "real-call-recovery/jobs.sqlite",
+);
+const realCallProfileEvidencePath = resolve(
+  runtimeDirectory,
+  "real-call-profile-evidence.sqlite",
+);
 mkdirSync(dirname(realCallProfileRecoveryJobsPath), { recursive: true });
 mkdirSync(dirname(realCallProfileEvidencePath), { recursive: true });
 const realCallProfileRecoveryJobStore =
@@ -3989,8 +3990,14 @@ const realCallProfileEvidenceStore =
     idPrefix: "voice-profile-evidence",
     path: realCallProfileEvidencePath,
   });
-const latestProofTrendsJsonPath = ".voice-runtime/proof-trends/latest.json";
-const latestProofTrendsMarkdownPath = ".voice-runtime/proof-trends/latest.md";
+const latestProofTrendsJsonPath = resolve(
+  runtimeDirectory,
+  "proof-trends/latest.json",
+);
+const latestProofTrendsMarkdownPath = resolve(
+  runtimeDirectory,
+  "proof-trends/latest.md",
+);
 const configuredProofTrendsMaxAgeMs = Number(
   process.env.VOICE_PROOF_TRENDS_MAX_AGE_MS ?? 24 * 60 * 60 * 1000,
 );
@@ -4014,8 +4021,25 @@ const readRealCallEvidenceRuntimeBrowserEvidence = async () => {
     surfaces: ["framework"],
   };
 };
+const isMissingFileError = (error: unknown) =>
+  error &&
+  typeof error === "object" &&
+  "code" in error &&
+  error.code === "ENOENT";
+
+const listDeliveryTraceEvidenceSafely = async () => {
+  try {
+    return await deliveryTraceStore.listEvidence({ limit: 5000 });
+  } catch (error) {
+    if (isMissingFileError(error)) {
+      return [];
+    }
+    throw error;
+  }
+};
+
 const readRealCallEvidenceRuntimePhoneEvidence = async () => {
-  const evidence = await deliveryTraceStore.listEvidence({ limit: 5000 });
+  const evidence = await listDeliveryTraceEvidenceSafely();
 
   return evidence.filter((item) =>
     (item.surfaces ?? []).some(
@@ -4191,7 +4215,6 @@ const runRecoveryProofScript = async (
 };
 
 const refreshRealCallEvidenceRuntimeAfterRecovery = async () => {
-  realCallProfileDefaultsCache = undefined;
   return await realCallEvidenceRuntime.collect();
 };
 
@@ -4410,7 +4433,7 @@ const readRealCallProfileHistory = async () => {
   return {
     evidence: [
       ...(await realCallProfileEvidenceStore.list({ limit: 5000 })),
-      ...(await deliveryTraceStore.listEvidence({ limit: 5000 })),
+      ...(await listDeliveryTraceEvidenceSafely()),
     ],
     generatedAt: new Date().toISOString(),
     maxAgeMs: proofTrendsMaxAgeMs,
@@ -4571,17 +4594,6 @@ const seedDemoRealCallProfileHistory = async () => {
     status: "pass",
     updatedAt: new Date(now + profiles.length * 10).toISOString(),
   });
-  realCallProfileDefaultsCache = {
-    expiresAt: Date.now() + realCallProfileDefaultsCacheMs,
-    report: buildVoiceRealCallProfileHistoryReport({
-      evidence,
-      generatedAt: new Date(now).toISOString(),
-      maxAgeMs: proofTrendsMaxAgeMs,
-      reports: [report],
-      source: realCallProfilesRoot,
-    }),
-  };
-
   return report;
 };
 
@@ -9552,7 +9564,7 @@ const seedDemoProviderDecisionProof = async () => {
 
 const observabilityExportDeliveryDestinations = () => [
   {
-    directory: ".voice-runtime/observability-exports",
+    directory: resolve(runtimeDirectory, "observability-exports"),
     kind: "file" as const,
     label: "Local customer-owned observability archive",
   },
@@ -9597,7 +9609,7 @@ const observabilityExportDeliveryDestinations = () => [
 ];
 const observabilityExportDeliveryReceipts =
   createVoiceFileObservabilityExportDeliveryReceiptStore({
-    directory: ".voice-runtime/observability-export-receipts",
+    directory: resolve(runtimeDirectory, "observability-export-receipts"),
   });
 
 const proofArtifact = (input: {
@@ -10194,7 +10206,7 @@ const buildDemoVoiceProofPack = async (input: {
       {
         jsonFileName: "latest.json",
         markdownFileName: "latest.md",
-        outputDir: ".voice-runtime/proof-pack",
+        outputDir: resolve(runtimeDirectory, "proof-pack"),
       },
     ),
   );
@@ -10401,9 +10413,12 @@ const buildDemoObservabilityExportReplay = async () => {
   }
 
   return {
-    directory: ".voice-runtime/observability-exports",
+    directory: resolve(runtimeDirectory, "observability-exports"),
     kind: "file" as const,
-    receiptDirectory: ".voice-runtime/observability-export-receipts",
+    receiptDirectory: resolve(
+      runtimeDirectory,
+      "observability-export-receipts",
+    ),
     runId: latestReceipt.runId,
   };
 };
@@ -10493,7 +10508,7 @@ const productionReadinessOptions = (
             context: input.proofPackContext,
           }),
     ]),
-  cacheMs: productionReadinessProofRuntime.options.cacheMs,
+  cacheMs: productionReadinessCacheMs,
   htmlPath: "/production-readiness",
   opsActionHistory:
     input.fast === true ? (false as const) : runtimeStorage.audit,
@@ -10782,6 +10797,26 @@ const getDemoProofStatus = (surfaces: DemoProofSurface[]) =>
       ? "warn"
       : "pass";
 
+const listDemoProofTracesSafely = async () => {
+  try {
+    return await runtimeStorage.traces.list({ limit: 50 });
+  } catch (error) {
+    if (!isMissingFileError(error)) {
+      throw error;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    try {
+      return await runtimeStorage.traces.list({ limit: 50 });
+    } catch (retryError) {
+      if (isMissingFileError(retryError)) {
+        return [];
+      }
+      throw retryError;
+    }
+  }
+};
+
 const runDemoProofSuite = async (request: Request) => {
   await ensureDemoIncidentBundleEvidence();
 
@@ -10831,7 +10866,7 @@ const runDemoProofSuite = async (request: Request) => {
     ),
     buildDemoProviderContractMatrix(),
     deliveryRuntimeControl.summarize(),
-    runtimeStorage.traces.list({ limit: 50 }),
+    listDemoProofTracesSafely(),
   ]);
   const readinessPassed = readiness.checks.filter(
     (check) => check.status === "pass",
@@ -11800,14 +11835,24 @@ const createDemoAssistant = (
     }),
     guardrails: {
       beforeTurn: async (input) => {
+        const turn = input.turn ?? {
+          id: `guardrail-turn-${Date.now()}`,
+          text: "",
+        };
+        const guardrailInput = {
+          ...input,
+          turn,
+        };
         const guardrailResult =
-          await demoLiveGuardrails.assistantGuardrails.beforeTurn?.(input);
+          await demoLiveGuardrails.assistantGuardrails.beforeTurn?.(
+            guardrailInput,
+          );
         if (guardrailResult) {
           return guardrailResult;
         }
 
-        return /\b(human|agent|supervisor|manager)\b/i.test(input.turn.text) &&
-          /\b(please|need|want|get|talk|speak)\b/i.test(input.turn.text)
+        return /\b(human|agent|supervisor|manager)\b/i.test(turn.text) &&
+          /\b(please|need|want|get|talk|speak)\b/i.test(turn.text)
           ? {
               assistantText: "Escalating this call for human follow-up.",
               escalate: {
@@ -13321,7 +13366,6 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
           };
         },
         refresh: async () => {
-          realCallProfileDefaultsCache = undefined;
           await readRealCallProfileDefaultsReport();
           await refreshProductionReadinessProof();
 

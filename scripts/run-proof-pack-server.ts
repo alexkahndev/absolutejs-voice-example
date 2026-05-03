@@ -10,8 +10,7 @@ const pollMs = Number(process.env.VOICE_PROOF_PACK_SERVER_POLL_MS ?? 500);
 const serverOutputLineLimit = Number(
   process.env.VOICE_PROOF_PACK_SERVER_OUTPUT_LINES ?? 80,
 );
-const refreshTrends =
-  process.env.VOICE_PROOF_PACK_REFRESH_TRENDS !== "false";
+const refreshTrends = process.env.VOICE_PROOF_PACK_REFRESH_TRENDS !== "false";
 const refreshObservabilityExport =
   process.env.VOICE_PROOF_PACK_REFRESH_OBSERVABILITY_EXPORT !== "false";
 const refreshBrowserCalls =
@@ -29,6 +28,10 @@ const proofRuntimeDir =
   `.voice-runtime/proof-pack/runtime/${new Date()
     .toISOString()
     .replaceAll(":", "-")}`;
+const proofBrowserCallProfilesRoot = `${proofRuntimeDir}/browser-call-profiles`;
+const proofOutputRoot = `${proofRuntimeDir}/proof-pack`;
+const proofRealCallProfilesRoot = `${proofRuntimeDir}/real-call-profiles`;
+const proofTrendOutputRoot = `${proofRuntimeDir}/proof-trends`;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const textDecoder = new TextDecoder();
@@ -145,7 +148,22 @@ const runScript = async (script: string, env: Record<string, string> = {}) => {
     env: {
       ...process.env,
       PORT: env.PORT ?? process.env.PORT ?? "3004",
+      VOICE_DEMO_RUNTIME_DIR:
+        env.VOICE_DEMO_RUNTIME_DIR ??
+        process.env.VOICE_DEMO_RUNTIME_DIR ??
+        proofRuntimeDir,
       VOICE_DEMO_URL: env.VOICE_DEMO_URL ?? baseUrl,
+      VOICE_BROWSER_CALL_PROFILE_OUTPUT_DIR:
+        env.VOICE_BROWSER_CALL_PROFILE_OUTPUT_DIR ??
+        proofBrowserCallProfilesRoot,
+      VOICE_PROOF_PACK_OUTPUT_DIR:
+        env.VOICE_PROOF_PACK_OUTPUT_DIR ?? proofOutputRoot,
+      VOICE_TREND_OUTPUT_DIR:
+        env.VOICE_TREND_OUTPUT_DIR ?? proofTrendOutputRoot,
+      VOICE_REAL_CALL_PROFILE_OUTPUT_DIR:
+        env.VOICE_REAL_CALL_PROFILE_OUTPUT_DIR ?? proofRealCallProfilesRoot,
+      VOICE_REAL_CALL_PROFILES_ROOT:
+        env.VOICE_REAL_CALL_PROFILES_ROOT ?? proofRealCallProfilesRoot,
       ...env,
     },
     stderr: "inherit",
@@ -164,6 +182,16 @@ const startServer = (
       ...process.env,
       PORT: port,
       VOICE_DEMO_RUNTIME_DIR: runtimeDir,
+      VOICE_BROWSER_CALL_PROFILE_OUTPUT_DIR: proofBrowserCallProfilesRoot,
+      VOICE_REAL_CALL_EVIDENCE_AUTOCOLLECT:
+        process.env.VOICE_REAL_CALL_EVIDENCE_AUTOCOLLECT ?? "1",
+      VOICE_REAL_CALL_EVIDENCE_AUTOCOLLECT_INTERVAL_MS:
+        process.env.VOICE_REAL_CALL_EVIDENCE_AUTOCOLLECT_INTERVAL_MS ?? "1000",
+      VOICE_REAL_CALL_PROFILE_OUTPUT_DIR: proofRealCallProfilesRoot,
+      VOICE_REAL_CALL_PROFILES_ROOT: proofRealCallProfilesRoot,
+      VOICE_PRODUCTION_READINESS_CACHE_MS: "0",
+      VOICE_PROOF_PACK_OUTPUT_DIR: proofOutputRoot,
+      VOICE_TREND_OUTPUT_DIR: proofTrendOutputRoot,
     },
     stderr: "pipe",
     stdout: "pipe",
@@ -220,9 +248,12 @@ const refreshBrowserCallProfiles = async () => {
 };
 
 const refreshObservabilityEvidence = async () => {
-  const exportResponse = await fetch(`${baseUrl}/api/voice/observability-export`, {
-    headers: { accept: "application/json" },
-  });
+  const exportResponse = await fetch(
+    `${baseUrl}/api/voice/observability-export`,
+    {
+      headers: { accept: "application/json" },
+    },
+  );
 
   if (!exportResponse.ok) {
     throw new Error(
@@ -245,12 +276,149 @@ const refreshObservabilityEvidence = async () => {
   }
 };
 
+const refreshRealCallProfileEvidence = async () => {
+  const profileRefreshPasses = Math.max(
+    1,
+    Number(process.env.VOICE_PROOF_PACK_REAL_CALL_PROFILE_REFRESH_PASSES ?? 6),
+  );
+  for (let pass = 1; pass <= profileRefreshPasses; pass += 1) {
+    const realCallProfileExitCode = await runScript(
+      "proof:profiles:real-calls",
+      {
+        VOICE_REAL_CALL_BROWSER_CAPTURE: "0",
+      },
+    );
+    if (realCallProfileExitCode !== 0) {
+      return realCallProfileExitCode;
+    }
+  }
+
+  const runtimeCollectResponse = await fetch(
+    `${baseUrl}/api/voice/real-call-evidence-runtime/collect`,
+    {
+      headers: { accept: "application/json" },
+      method: "POST",
+    },
+  );
+  if (!runtimeCollectResponse.ok) {
+    throw new Error(
+      `Real-call evidence runtime collect returned HTTP ${runtimeCollectResponse.status}.`,
+    );
+  }
+
+  const refreshResponse = await fetch(
+    `${baseUrl}/api/voice/real-call-profile-history/refresh`,
+    {
+      headers: { accept: "application/json" },
+      method: "POST",
+    },
+  );
+  if (!refreshResponse.ok) {
+    throw new Error(
+      `Real-call profile refresh returned HTTP ${refreshResponse.status}.`,
+    );
+  }
+
+  return 0;
+};
+
+const refreshRealCallProfilePass = async () =>
+  await runScript("proof:profiles:real-calls", {
+    VOICE_REAL_CALL_BROWSER_CAPTURE: "0",
+  });
+
+const refreshRealCallRuntimeAndHistory = async () => {
+  const runtimeCollectResponse = await fetch(
+    `${baseUrl}/api/voice/real-call-evidence-runtime/collect`,
+    {
+      headers: { accept: "application/json" },
+      method: "POST",
+    },
+  );
+  if (!runtimeCollectResponse.ok) {
+    throw new Error(
+      `Real-call evidence runtime collect returned HTTP ${runtimeCollectResponse.status}.`,
+    );
+  }
+
+  const refreshResponse = await fetch(
+    `${baseUrl}/api/voice/real-call-profile-history/refresh`,
+    {
+      headers: { accept: "application/json" },
+      method: "POST",
+    },
+  );
+  if (!refreshResponse.ok) {
+    throw new Error(
+      `Real-call profile refresh returned HTTP ${refreshResponse.status}.`,
+    );
+  }
+};
+
+const waitForProductionReadinessPass = async () => {
+  const attempts = Math.max(
+    1,
+    Number(process.env.VOICE_PROOF_PACK_READINESS_WARMUP_ATTEMPTS ?? 6),
+  );
+  let lastStatus = "unknown";
+  let lastIssues: string[] = [];
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const response = await fetch(`${baseUrl}/api/production-readiness`, {
+      headers: { accept: "application/json" },
+    });
+    const body = (await response.json().catch(() => undefined)) as
+      | {
+          checks?: Array<{
+            detail?: string;
+            label?: string;
+            status?: string;
+            value?: string;
+          }>;
+          status?: string;
+        }
+      | undefined;
+    lastStatus = body?.status ?? `HTTP ${response.status}`;
+    lastIssues = (body?.checks ?? [])
+      .filter((check) => check.status && check.status !== "pass")
+      .map((check) => {
+        const label = check.label ?? "Readiness check";
+        const status = check.status ?? "unknown";
+        const detail = check.detail ? ` - ${check.detail}` : "";
+        const value = check.value ? ` (${check.value})` : "";
+        return `${label}: ${status}${value}${detail}`;
+      });
+
+    if (response.ok && body?.status === "pass") {
+      return;
+    }
+
+    if (attempt === attempts) {
+      throw new Error(
+        [
+          `Production readiness stayed ${lastStatus} after ${attempts} warmup attempt(s).`,
+          ...lastIssues,
+        ].join("\n"),
+      );
+    }
+
+    const exitCode = await refreshRealCallProfilePass();
+    if (exitCode !== 0) {
+      throw new Error(`Real-call profile warmup failed with ${exitCode}.`);
+    }
+    await refreshRealCallRuntimeAndHistory();
+    await sleep(500);
+  }
+};
+
 let exitCode = 0;
 let server: ReturnType<typeof Bun.spawn> | undefined;
 
 try {
   if (refreshBrowserCalls) {
-    console.log("Refreshing browser-call profile evidence in isolated runtime.");
+    console.log(
+      "Refreshing browser-call profile evidence in isolated runtime.",
+    );
     await refreshBrowserCallProfiles();
   }
 
@@ -273,6 +441,19 @@ try {
     await refreshObservabilityEvidence();
   }
 
+  if (refreshRealCallProfiles) {
+    console.log("Refreshing real-call profile history before proof trends.");
+    const realCallProfileExitCode = await refreshRealCallProfileEvidence();
+    if (realCallProfileExitCode !== 0) {
+      exitCode = realCallProfileExitCode;
+    }
+  }
+
+  if (exitCode === 0) {
+    console.log("Waiting for production readiness before proof trends.");
+    await waitForProductionReadinessPass();
+  }
+
   if (refreshTrends) {
     for (let pass = 1; pass <= trendRefreshPasses; pass += 1) {
       console.log(
@@ -285,16 +466,6 @@ try {
       if (pass === trendRefreshPasses) {
         exitCode = trendExitCode;
       }
-    }
-  }
-
-  if (refreshRealCallProfiles) {
-    console.log("Refreshing real-call profile history before proof pack.");
-    const realCallProfileExitCode = await runScript("proof:profiles:real-calls", {
-      VOICE_REAL_CALL_BROWSER_CAPTURE: "0",
-    });
-    if (realCallProfileExitCode !== 0) {
-      exitCode = realCallProfileExitCode;
     }
   }
 

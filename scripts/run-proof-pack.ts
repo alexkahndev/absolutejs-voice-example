@@ -66,6 +66,7 @@ import {
   type VoiceProductionReadinessReport,
   type VoiceProofTrendReport,
   type VoiceProofTrendRecommendationReport,
+  type VoiceRealCallEvidenceRuntimeReport,
   type VoiceProviderSloReport,
   type VoiceSimulationSuiteReport,
   type VoiceTelephonyWebhookNormalizationEvidenceDecision,
@@ -144,6 +145,12 @@ const seedTargets: ProofTarget[] = [
     method: "POST",
     name: "realtimeChannelProof",
     path: "/api/voice/realtime-channel/proof",
+  },
+  {
+    kind: "json",
+    method: "POST",
+    name: "realCallEvidenceRuntimeCollect",
+    path: "/api/voice/real-call-evidence-runtime/collect",
   },
   {
     body: {
@@ -767,6 +774,33 @@ const proofTargets: ProofTarget[] = [
     kind: "json",
     name: "realCallProfileHistory",
     path: "/api/voice/real-call-profile-history",
+  },
+  {
+    kind: "json",
+    name: "realCallEvidenceRuntime",
+    path: "/api/voice/real-call-evidence-runtime",
+  },
+  {
+    accept: "text/html,text/plain,*/*",
+    kind: "text",
+    name: "realCallEvidenceRuntimePage",
+    path: "/voice/real-call-evidence-runtime",
+    requiredText: [
+      "Real-call evidence runtime",
+      "Rolling Profile History",
+      "Stored",
+    ],
+  },
+  {
+    accept: "text/markdown,text/plain,*/*",
+    kind: "text",
+    name: "realCallEvidenceRuntimeMarkdown",
+    path: "/voice/real-call-evidence-runtime.md",
+    requiredText: [
+      "Voice Real-Call Evidence Runtime",
+      "Rolling Profile History",
+      "Stored evidence",
+    ],
   },
   {
     accept: "text/html,text/plain,*/*",
@@ -1432,6 +1466,7 @@ const renderMarkdown = (input: {
   browserCallProfileEvidenceAssertion: JsonAssertionResult;
   proofTrendEvidenceAssertion: JsonAssertionResult;
   proofTrendRecommendationAssertion: JsonAssertionResult;
+  realCallEvidenceRuntimeAssertion: JsonAssertionResult;
   providerContractMatrixEvidenceAssertion: JsonAssertionResult;
   providerDecisionEvidenceAssertion: JsonAssertionResult;
   failureReplayEvidenceAssertion: JsonAssertionResult;
@@ -1517,6 +1552,8 @@ Production readiness evidence assertion: **${input.productionReadinessEvidenceAs
 
 Browser call profile evidence assertion: **${input.browserCallProfileEvidenceAssertion.ok ? "pass" : "fail"}**.
 
+Real-call evidence runtime assertion: **${input.realCallEvidenceRuntimeAssertion.ok ? "pass" : "fail"}**.
+
 Production readiness gate explanations assertion: **${input.productionReadinessGateExplanationAssertion.ok ? "pass" : "fail"}**.
 
 Campaign readiness assertion: **${input.campaignReadinessEvidenceAssertion.ok ? "pass" : "fail"}**.
@@ -1595,6 +1632,33 @@ ${failures || "No failing proof artifacts."}
 await mkdir(outputDir, { recursive: true });
 
 const generatedAt = new Date().toISOString();
+await Bun.write(
+  join(outputRoot, "latest.json"),
+  `${JSON.stringify(
+    {
+      generatedAt,
+      ok: false,
+      outputDir,
+      runId,
+      status: "running",
+    },
+    null,
+    2,
+  )}\n`,
+);
+await Bun.write(
+  join(outputRoot, "latest.md"),
+  [
+    "# AbsoluteJS Voice Proof Pack",
+    "",
+    `Generated: ${generatedAt}`,
+    "",
+    "Overall: running",
+    "",
+    "This in-progress artifact is replaced by the completed proof-pack summary at the end of the run.",
+    "",
+  ].join("\n"),
+);
 const orderedSeedNames = new Set([
   "liveOpsOperatorTakeoverSeed",
   "liveOpsPauseAssistantSeed",
@@ -2535,6 +2599,45 @@ const proofTrendRecommendationAssertion: JsonAssertionResult = {
     summary: proofTrendRecommendationReport?.summary,
   },
 };
+const realCallEvidenceRuntimeReport = proofResults.find(
+  (result) => result.name === "realCallEvidenceRuntime",
+)?.body as VoiceRealCallEvidenceRuntimeReport | undefined;
+const realCallEvidenceRuntimeIssues = [
+  !realCallEvidenceRuntimeReport
+    ? "Missing real-call evidence runtime report."
+    : undefined,
+  realCallEvidenceRuntimeReport && realCallEvidenceRuntimeReport.ok !== true
+    ? `Expected real-call evidence runtime to pass, found ${realCallEvidenceRuntimeReport.status}.`
+    : undefined,
+  realCallEvidenceRuntimeReport &&
+  realCallEvidenceRuntimeReport.summary.storedEvidence < 2
+    ? `Expected at least two stored real-call evidence records, found ${realCallEvidenceRuntimeReport.summary.storedEvidence}.`
+    : undefined,
+  realCallEvidenceRuntimeReport &&
+  realCallEvidenceRuntimeReport.summary.sessions < 2
+    ? `Expected at least two real-call evidence sessions, found ${realCallEvidenceRuntimeReport.summary.sessions}.`
+    : undefined,
+  realCallEvidenceRuntimeReport &&
+  realCallEvidenceRuntimeReport.summary.profiles < 2
+    ? `Expected at least two real-call evidence profiles, found ${realCallEvidenceRuntimeReport.summary.profiles}.`
+    : undefined,
+].filter((issue): issue is string => typeof issue === "string");
+const realCallEvidenceRuntimeAssertion: JsonAssertionResult = {
+  kind: "json-assertion",
+  name: "realCallEvidenceRuntimeEvidence",
+  ok: realCallEvidenceRuntimeIssues.length === 0,
+  summary: {
+    issues: realCallEvidenceRuntimeIssues,
+    report: realCallEvidenceRuntimeReport
+      ? {
+          generatedAt: realCallEvidenceRuntimeReport.generatedAt,
+          source: realCallEvidenceRuntimeReport.source,
+          status: realCallEvidenceRuntimeReport.status,
+          summary: realCallEvidenceRuntimeReport.summary,
+        }
+      : undefined,
+  },
+};
 const providerContractMatrix = proofResults.find(
   (result) => result.name === "providerContracts",
 )?.body as VoiceProviderContractMatrixReport | undefined;
@@ -2907,6 +3010,7 @@ const ok =
   telephonyWebhookVerificationEvidenceAssertion.ok &&
   proofTrendEvidenceAssertion.ok &&
   proofTrendRecommendationAssertion.ok &&
+  realCallEvidenceRuntimeAssertion.ok &&
   providerContractMatrixEvidenceAssertion.ok &&
   providerRoutingContractEvidenceAssertion.ok &&
   realtimeChannelEvidenceAssertion.ok &&
@@ -2946,6 +3050,7 @@ const summary = {
   productionReadinessGateExplanationAssertion,
   proofTrendEvidenceAssertion,
   proofTrendRecommendationAssertion,
+  realCallEvidenceRuntimeAssertion,
   providerContractMatrixEvidenceAssertion,
   providerDecisionEvidenceAssertion,
   providerOrchestrationEvidenceAssertion,
@@ -2993,6 +3098,7 @@ const markdown = renderMarkdown({
   productionReadinessGateExplanationAssertion,
   proofTrendEvidenceAssertion,
   proofTrendRecommendationAssertion,
+  realCallEvidenceRuntimeAssertion,
   providerContractMatrixEvidenceAssertion,
   providerDecisionEvidenceAssertion,
   providerOrchestrationEvidenceAssertion,
