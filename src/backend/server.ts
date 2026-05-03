@@ -3999,13 +3999,76 @@ const proofTrendsMaxAgeMs =
   configuredProofTrendsMaxAgeMs > 0
     ? configuredProofTrendsMaxAgeMs
     : 24 * 60 * 60 * 1000;
+const readRealCallEvidenceRuntimeBrowserEvidence = async () => {
+  const report = await readLatestBrowserCallProfiles();
+  if (report.status !== "pass") {
+    return undefined;
+  }
+
+  return {
+    generatedAt: report.generatedAt,
+    ok: report.ok,
+    profileDescription: "Latest browser call profile proof artifact.",
+    profileId: report.profileId,
+    sessionId: `browser-call-profile-${report.profileId}-${report.runId ?? Date.parse(report.generatedAt)}`,
+    surfaces: ["framework"],
+  };
+};
+const readRealCallEvidenceRuntimePhoneEvidence = async () => {
+  const evidence = await deliveryTraceStore.listEvidence({ limit: 5000 });
+
+  return evidence.filter((item) =>
+    (item.surfaces ?? []).some(
+      (surface) => surface === "phone" || surface === "telephony",
+    ),
+  );
+};
+const readRealCallEvidenceRuntimeProviderRoleEvidence = () => {
+  const modelProvider = configuredModelProviders[0] ?? "openai";
+  const sttProvider = configuredSTTProviders[0] ?? "deepgram";
+  const ttsProvider = configuredTTSProviders[0] ?? "openai";
+  const generatedAt = new Date().toISOString();
+
+  return ["meeting-recorder", "support-agent"].map((profileId) => ({
+    generatedAt,
+    profileDescription:
+      "Configured demo provider roles available for real-call profile defaults.",
+    profileId,
+    profileLabel:
+      profileId === "meeting-recorder" ? "Meeting recorder" : "Support agent",
+    providers: [
+      {
+        id: modelProvider,
+        role: "llm",
+        samples: 1,
+        status: "pass",
+      },
+      {
+        id: sttProvider,
+        role: "stt",
+        samples: 1,
+        status: "pass",
+      },
+      {
+        id: ttsProvider,
+        role: "tts",
+        samples: 1,
+        status: "pass",
+      },
+    ],
+    sessionId: `provider-role-${profileId}-${Date.parse(generatedAt)}`,
+  }));
+};
 const realCallEvidenceRuntime = createVoiceRealCallEvidenceRuntime({
+  browserEvidence: readRealCallEvidenceRuntimeBrowserEvidence,
   evidenceStore: realCallProfileEvidenceStore,
   existingEvidenceLimit: 5000,
   history: {
     maxAgeMs: proofTrendsMaxAgeMs,
     source: ".voice-runtime/real-call-evidence-runtime",
   },
+  phoneEvidence: readRealCallEvidenceRuntimePhoneEvidence,
+  providerRoleEvidence: readRealCallEvidenceRuntimeProviderRoleEvidence,
   traceStore: deliveryTraceStore,
 });
 const configuredRealCallEvidenceRuntimeAutocollectIntervalMs = Number(
@@ -4127,6 +4190,11 @@ const runRecoveryProofScript = async (
   }
 };
 
+const refreshRealCallEvidenceRuntimeAfterRecovery = async () => {
+  realCallProfileDefaultsCache = undefined;
+  return await realCallEvidenceRuntime.collect();
+};
+
 const getRecoveryProofChromePort = (profileId?: string) => {
   if (profileId === "meeting-recorder") {
     return "9324";
@@ -4154,7 +4222,6 @@ const runBrowserCallProfileRecoveryProof = async (input?: {
     VOICE_BROWSER_CALL_CHROME_PORT: chromePort,
     VOICE_BROWSER_CALL_USE_EXISTING_SERVER: "1",
   });
-  realCallProfileDefaultsCache = undefined;
   const report = await readLatestBrowserCallProfiles();
   const passing = report.status === "pass";
   if (passing) {
@@ -4184,6 +4251,7 @@ const runBrowserCallProfileRecoveryProof = async (input?: {
       sessionId,
       store: deliveryTraceStore,
     });
+    await refreshRealCallEvidenceRuntimeAfterRecovery();
   }
 
   return {
@@ -4253,6 +4321,7 @@ const runPhoneSmokeRecoveryProof = async (input?: { profileId?: string }) => {
         }),
       ),
     );
+    await refreshRealCallEvidenceRuntimeAfterRecovery();
   }
 
   return {
@@ -13238,8 +13307,9 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
         "collect-phone-proof": ({ profileId }) =>
           runPhoneSmokeRecoveryProof({ profileId }),
         "collect-provider-role-evidence": async () => {
-          realCallProfileDefaultsCache = undefined;
-          const report = await readRealCallProfileDefaultsReport();
+          const runtimeReport =
+            await refreshRealCallEvidenceRuntimeAfterRecovery();
+          const report = runtimeReport.history;
           const actionableProfiles = report.defaults.summary.actionableProfiles;
           const passing = actionableProfiles >= 2;
 
