@@ -30,6 +30,8 @@ import {
   evaluateVoiceTelephonyWebhookNormalizationEvidence,
   evaluateVoiceToolContractEvidence,
   evaluateVoiceMediaPipelineEvidence,
+  summarizeVoiceMediaPipelineReport,
+  writeVoiceMediaPipelineArtifacts,
   evaluateVoiceLiveOpsControlEvidence,
   evaluateVoiceLiveOpsEvidence,
   createVoiceEvidenceAssertion,
@@ -2926,13 +2928,22 @@ const mediaPipelineCalibrationEvidence = mediaPipelineCalibration
       requireTransportConnected: true,
     })
   : undefined;
+const mediaPipelineArtifactWriteResult = mediaPipelineCalibration
+  ? await writeVoiceMediaPipelineArtifacts({
+      dir: outputDir,
+      hrefBase: "./",
+      report: mediaPipelineCalibration,
+    })
+  : undefined;
 const mediaPipelineCalibrationAssertion: JsonAssertionResult = {
   kind: "json-assertion",
   name: "mediaPipelineCalibration",
   ok: mediaPipelineCalibrationEvidence?.ok === true,
   summary: mediaPipelineCalibration
     ? {
-        ...mediaPipelineCalibration,
+        ...summarizeVoiceMediaPipelineReport(mediaPipelineCalibration, {
+          artifacts: mediaPipelineArtifactWriteResult?.hrefs,
+        }),
         proofIssues: mediaPipelineCalibrationEvidence?.issues ?? [],
       }
     : {
