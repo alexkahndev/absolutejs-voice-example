@@ -50,6 +50,7 @@ import {
   createVoiceCompetitiveCoverageRoutes,
   buildVoiceRealtimeChannelReport,
   buildVoiceRealtimeChannelRuntimeSamplesFromTrace,
+  buildVoiceMediaPipelineReadinessChecks,
   buildVoiceMediaPipelineReport,
   buildVoiceBrowserCallProfileReport,
   createVoiceBrowserCallProfileRoutes,
@@ -10446,7 +10447,25 @@ const productionReadinessOptions = (
     >;
     refresh?: boolean;
   } = {},
-) => ({
+) => {
+  let mediaPipelineReportPromise: ReturnType<
+    typeof buildVoiceMediaPipelineReport
+  > | Promise<ReturnType<typeof buildVoiceMediaPipelineReport>> | undefined;
+  const getMediaPipelineReport = () => {
+    if (!mediaPipelineReportPromise) {
+      mediaPipelineReportPromise = timeReadinessResolver(
+        "mediaPipeline",
+        async () =>
+          buildVoiceMediaPipelineReport(
+            await buildDemoMediaPipelineReportOptions({
+              preferTraceEvidence: input.fast !== true,
+            }),
+          ),
+      );
+    }
+    return mediaPipelineReportPromise;
+  };
+  return {
   ...createVoiceReadinessProfile("phone-agent", {
     auditDeliveries: runtimeStorage.auditDeliveries,
     campaignReadiness: () =>
@@ -10494,6 +10513,7 @@ const productionReadinessOptions = (
             sourceHref: "/api/voice/real-call-profile-history/actions/jobs",
           },
         )),
+      ...buildVoiceMediaPipelineReadinessChecks(await getMediaPipelineReport()),
     ]),
   agentSquadContracts: () =>
     timeReadinessResolver("agentSquadContracts", async () => [
@@ -10552,14 +10572,7 @@ const productionReadinessOptions = (
             store: runtimeStorage.traces,
           })) ?? buildDemoBrowserMediaReport()),
     ),
-  mediaPipeline: async () =>
-    timeReadinessResolver("mediaPipeline", async () =>
-      buildVoiceMediaPipelineReport(
-        await buildDemoMediaPipelineReportOptions({
-          preferTraceEvidence: input.fast !== true,
-        }),
-      ),
-    ),
+  mediaPipeline: () => getMediaPipelineReport(),
   telephonyMedia: async () =>
     timeReadinessResolver("telephonyMedia", async () =>
       input.fast === true
@@ -10779,7 +10792,8 @@ const productionReadinessOptions = (
   store: productionReadinessTraceStore,
   traceDeliveries: false as const,
   traceMaxAgeMs: productionReadinessProofRuntime.options.traceMaxAgeMs,
-});
+  };
+};
 
 type DemoProofSurface = {
   detail: string;
