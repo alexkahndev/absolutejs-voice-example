@@ -50,6 +50,7 @@ import {
   createVoiceCompetitiveCoverageRoutes,
   buildVoiceRealtimeChannelReport,
   buildVoiceRealtimeChannelRuntimeSamplesFromTrace,
+  buildVoiceMediaPipelineIncidentEvents,
   buildVoiceMediaPipelineReadinessChecks,
   buildVoiceMediaPipelineReport,
   buildVoiceBrowserCallProfileReport,
@@ -9309,10 +9310,16 @@ const opsRecoveryOptions = () => ({
 const buildDemoOpsRecoveryReport = () =>
   buildVoiceOpsRecoveryReport(opsRecoveryOptions());
 
-const buildDemoIncidentTimelineOperationsRecord = () =>
+const buildDemoIncidentTimelineMediaPipelineReport = async () =>
+  buildVoiceMediaPipelineReport(
+    await buildDemoMediaPipelineReportOptions({ preferTraceEvidence: false }),
+  );
+
+const buildDemoIncidentTimelineOperationsRecord = async () =>
   buildVoiceOperationsRecord({
     audit: runtimeStorage.audit,
     integrationEvents: runtimeStorage.events,
+    mediaPipeline: await buildDemoIncidentTimelineMediaPipelineReport(),
     redact: voiceSupportArtifactRedaction,
     reviews: runtimeStorage.reviews as unknown as VoiceCallReviewStore,
     sessionId: demoIncidentSessionId,
@@ -11715,7 +11722,7 @@ const liveOpsRuntime = {
   getControl: (sessionId: string) => liveOpsSessionControls.get(sessionId),
 };
 
-const buildDemoOperationsRecord = (
+const buildDemoOperationsRecord = async (
   sessionId: string,
   input: {
     audit?: VoiceAuditEventStore;
@@ -11724,6 +11731,7 @@ const buildDemoOperationsRecord = (
 ) =>
   buildVoiceOperationsRecord({
     audit: input.audit ?? runtimeStorage.audit,
+    mediaPipeline: await buildDemoIncidentTimelineMediaPipelineReport(),
     redact: voiceSupportArtifactRedaction,
     sessionId,
     store: input.store ?? deliveryTraceStore,
@@ -12356,6 +12364,7 @@ const server = new Elysia()
     createVoiceOperationsRecordRoutes({
       audit: runtimeStorage.audit,
       htmlPath: "/voice-operations/:sessionId",
+      mediaPipeline: () => buildDemoIncidentTimelineMediaPipelineReport(),
       path: "/api/voice-operations/:sessionId",
       redact: voiceSupportArtifactRedaction,
       render: (record) => {
@@ -12813,6 +12822,11 @@ ${rows || "| n/a | n/a | n/a | n/a |"}
         },
       },
       audit: runtimeStorage.audit,
+      extraEvents: async () =>
+        buildVoiceMediaPipelineIncidentEvents(
+          await buildDemoIncidentTimelineMediaPipelineReport(),
+          { source: "demo-media-pipeline" },
+        ),
       failureReplays: async () => [
         await buildDemoIncidentTimelineFailureReplay(),
       ],
